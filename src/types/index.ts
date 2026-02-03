@@ -51,8 +51,11 @@ export interface GitStatus {
 
 export type ThemeName = "midnight" | "ember" | "arctic" | "forest" | "crimson";
 
+export type LayoutMode = "grid" | "tabs";
+
 export interface Settings {
   theme: ThemeName;
+  layoutMode: LayoutMode;
   terminalFontSize: number;
   terminalFontFamily: string;
   terminalCursorStyle: "bar" | "block" | "underline";
@@ -61,6 +64,7 @@ export interface Settings {
 
 export const DEFAULT_SETTINGS: Settings = {
   theme: "midnight",
+  layoutMode: "grid",
   terminalFontSize: 15,
   terminalFontFamily: "'Cascadia Code', 'Consolas', 'Monaco', monospace",
   terminalCursorStyle: "bar",

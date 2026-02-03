@@ -7,6 +7,7 @@ interface SessionStore {
   activeProjectPath: string | null;
   thinkingSessions: Set<string>;
   needsAttentionSessions: Set<string>;
+  sessionTitles: Map<string, string>;
   addSession: (session: TerminalSession) => void;
   removeSession: (id: string) => void;
   removeProjectSessions: (projectPath: string) => void;
@@ -15,6 +16,7 @@ interface SessionStore {
   updateSessionPtyId: (id: string, sessionId: string) => void;
   setThinking: (tabId: string, isThinking: boolean) => void;
   setNeedsAttention: (tabId: string, needsAttention: boolean) => void;
+  setSessionTitle: (tabId: string, title: string) => void;
   restoreFromConfig: (config: SessionsConfig) => void;
   toSessionsConfig: () => SessionsConfig;
   clearRestoredFlag: (id: string) => void;
@@ -30,6 +32,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   activeProjectPath: null,
   thinkingSessions: new Set(),
   needsAttentionSessions: new Set(),
+  sessionTitles: new Map(),
 
   addSession: (session) =>
     set((state) => ({
@@ -103,6 +106,13 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         next.delete(tabId);
       }
       return { needsAttentionSessions: next };
+    }),
+
+  setSessionTitle: (tabId, title) =>
+    set((state) => {
+      const next = new Map(state.sessionTitles);
+      next.set(tabId, title);
+      return { sessionTitles: next };
     }),
 
   restoreFromConfig: (config) =>

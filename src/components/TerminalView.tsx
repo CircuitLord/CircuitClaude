@@ -42,10 +42,11 @@ interface TerminalViewProps {
   projectName: string;
   claudeSessionId?: string;
   isRestored?: boolean;
+  hideTitleBar?: boolean;
   onClose: () => void;
 }
 
-export function TerminalView({ tabId, projectPath, projectName, claudeSessionId, isRestored, onClose }: TerminalViewProps) {
+export function TerminalView({ tabId, projectPath, projectName, claudeSessionId, isRestored, hideTitleBar, onClose }: TerminalViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const [title, setTitle] = useState(projectName);
@@ -57,7 +58,9 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
   const clearRestoredFlag = useSessionStore((s) => s.clearRestoredFlag);
   const setThinking = useSessionStore((s) => s.setThinking);
   const setNeedsAttention = useSessionStore((s) => s.setNeedsAttention);
+  const setSessionTitle = useSessionStore((s) => s.setSessionTitle);
   const activeProjectPath = useSessionStore((s) => s.activeProjectPath);
+  const activeSessionId = useSessionStore((s) => s.activeSessionId);
   const settings = useSettingsStore((s) => s.settings);
   const thinkingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastInputTimeRef = useRef<number>(0);
@@ -187,7 +190,12 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
     });
 
     // Capture terminal title changes (OSC 2 sequences from Claude CLI)
-    const onTitleDisposable = terminal.onTitleChange(setTitle);
+    // Strip leading non-ASCII decorative characters (spinner/star icons) from the title
+    const onTitleDisposable = terminal.onTitleChange((t) => {
+      const clean = t.replace(/^[^\x20-\x7E]+\s*/, '').trim() || t;
+      setTitle(clean);
+      setSessionTitle(tabId, clean);
+    });
 
     // ResizeObserver for container size changes — skip fit when hidden (zero dimensions)
     const resizeObserver = new ResizeObserver((entries) => {
@@ -220,15 +228,17 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectPath, tabId, claudeSessionId]);
 
-  // Re-fit terminal when this project becomes the active one (switching from display:none to display:flex)
+  // Re-fit and focus terminal when this session becomes active (tab switch or new spawn)
   useEffect(() => {
     if (activeProjectPath !== projectPath) return;
+    if (activeSessionId !== tabId) return;
     // Small delay to let the browser paint the now-visible container
     const raf = requestAnimationFrame(() => {
       fitAddonRef.current?.fit();
+      terminalRef.current?.focus();
     });
     return () => cancelAnimationFrame(raf);
-  }, [activeProjectPath, projectPath]);
+  }, [activeProjectPath, projectPath, activeSessionId, tabId]);
 
   // Apply settings changes to live terminals
   useEffect(() => {
@@ -245,10 +255,12 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
 
   return (
     <div className="terminal-view">
-      <div className="terminal-title-bar">
-        <span className="terminal-title-text" title={title}>{title}</span>
-        <button className="terminal-title-close" onClick={onClose} title="Close session">x</button>
-      </div>
+      {!hideTitleBar && (
+        <div className="terminal-title-bar">
+          <span className="terminal-title-text" title={title}>{title}</span>
+          <button className="terminal-title-close" onClick={onClose} title="Close session">x</button>
+        </div>
+      )}
       <div className="terminal-container" ref={containerRef} />
     </div>
   );

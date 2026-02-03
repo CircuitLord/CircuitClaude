@@ -1,8 +1,13 @@
 import { useState, useRef, useEffect } from "react";
 import { useSettingsStore } from "../stores/settingsStore";
-import { DEFAULT_SETTINGS, ThemeName } from "../types";
+import { DEFAULT_SETTINGS, ThemeName, LayoutMode } from "../types";
 import { THEME_OPTIONS } from "../lib/themes";
 import { SegmentedControl } from "./SegmentedControl";
+
+const LAYOUT_OPTIONS: Array<{ label: string; value: LayoutMode }> = [
+  { label: "grid", value: "grid" },
+  { label: "tabs", value: "tabs" },
+];
 
 export function GearIcon() {
   return (
@@ -217,6 +222,20 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
 
         <div className="settings-dialog-body">
           <TerminalPreview />
+
+          <div className="settings-section">
+            <div className="settings-section-title">~layout</div>
+            <div className="settings-row">
+              <div className="settings-row-label">
+                <span className="settings-row-name">layout-mode</span>
+              </div>
+              <SegmentedControl
+                value={settings.layoutMode}
+                options={LAYOUT_OPTIONS}
+                onChange={(v) => update({ layoutMode: v })}
+              />
+            </div>
+          </div>
 
           <div className="settings-section">
             <div className="settings-section-title">~theme</div>

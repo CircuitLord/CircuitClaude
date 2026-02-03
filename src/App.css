@@ -1714,3 +1714,148 @@ body,
   color: var(--text-tertiary);
   font-style: italic;
 }
+
+/* ========================================================================
+   Terminal Tabs Layout
+   ======================================================================== */
+
+.terminal-tabs-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+}
+
+.terminal-tabs-bar {
+  display: flex;
+  align-items: stretch;
+  height: 36px;
+  min-height: 36px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+  overflow-x: auto;
+  overflow-y: hidden;
+  user-select: none;
+  font-family: var(--font-mono);
+}
+
+.terminal-tabs-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.terminal-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 270px;
+  min-width: 270px;
+  height: 100%;
+  padding: 0 12px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  white-space: nowrap;
+  position: relative;
+  transition: background 0.1s, color 0.1s;
+}
+
+.terminal-tab:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.terminal-tab--active {
+  background: var(--accent-muted);
+  color: var(--text-primary);
+}
+
+.terminal-tab--active::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 12px;
+  right: 12px;
+  height: 1px;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
+}
+
+.terminal-tab-prefix {
+  width: 0;
+  overflow: hidden;
+  flex-shrink: 0;
+  color: var(--accent-text);
+  font-size: 13px;
+}
+
+.terminal-tab-prefix--active {
+  width: 14px;
+}
+
+.terminal-tab-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: clip;
+  text-align: left;
+}
+
+/* Trailing slot: status indicator at rest, close button on hover */
+
+.terminal-tab-trailing {
+  flex-shrink: 0;
+  width: 1ch;
+  text-align: center;
+  position: relative;
+}
+
+.terminal-tab-status {
+  display: inline;
+}
+
+.terminal-tab-thinking {
+  color: var(--accent-text);
+  animation: tui-color-cycle 2.4s step-end infinite;
+}
+
+.terminal-tab-attention {
+  color: #e5c07b;
+  animation: tui-waiting-pulse 1.5s step-end infinite;
+}
+
+.terminal-tab-close {
+  display: none;
+  color: var(--text-tertiary);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.terminal-tab:hover .terminal-tab-status {
+  display: none;
+}
+
+.terminal-tab:hover .terminal-tab-close {
+  display: inline;
+}
+
+.terminal-tab-close:hover {
+  color: var(--accent-text);
+}
+
+.terminal-tabs-panels {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.terminal-tabs-panel {
+  width: 100%;
+  height: 100%;
+}
+
+.terminal-tabs-panel .terminal-view {
+  border: none;
+}

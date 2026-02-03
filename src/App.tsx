@@ -3,6 +3,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Sidebar } from "./components/Sidebar";
 import { ProjectHeader } from "./components/ProjectHeader";
 import { TerminalGrid } from "./components/TerminalGrid";
+import { TerminalTabs } from "./components/TerminalTabs";
 import { EmptyState } from "./components/EmptyState";
 import { WindowControls } from "./components/WindowControls";
 import { DiffViewer } from "./components/DiffViewer";
@@ -29,6 +30,7 @@ async function saveAllSessionData() {
 function App() {
   const { sessions, activeProjectPath, addSession } = useSessionStore();
   const { projects } = useProjectStore();
+  const layoutMode = useSettingsStore((s) => s.settings.layoutMode);
   const restoredRef = useRef(false);
 
   // Restore sessions on startup (once, after projects are loaded)
@@ -120,14 +122,18 @@ function App() {
               </div>
             </>
           )}
-          {/* Render all project grids simultaneously; only the active one is visible */}
+          {/* Render all project terminals simultaneously; only the active one is visible */}
           {projectsWithSessions.map((path) => (
             <div
               key={path}
               className="terminal-grid-wrapper"
               style={{ display: path === activeProjectPath ? "flex" : "none" }}
             >
-              <TerminalGrid projectPath={path} />
+              {layoutMode === "tabs" ? (
+                <TerminalTabs projectPath={path} />
+              ) : (
+                <TerminalGrid projectPath={path} />
+              )}
             </div>
           ))}
         </div>
