@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useSettingsStore } from "../stores/settingsStore";
 import { DEFAULT_SETTINGS, ThemeName } from "../types";
 import { THEME_OPTIONS } from "../lib/themes";
+import { SegmentedControl } from "./SegmentedControl";
 
 export function GearIcon() {
   return (
@@ -159,39 +160,6 @@ function CustomSelect<T extends string>({
           ))}
         </div>
       )}
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Segmented Control — bracket selection [bar] block underline       */
-/* ------------------------------------------------------------------ */
-function SegmentedControl<T extends string>({
-  value,
-  options,
-  onChange,
-}: {
-  value: T;
-  options: Array<{ label: string; value: T }>;
-  onChange: (v: T) => void;
-}) {
-  return (
-    <div className="settings-segmented">
-      {options.map((opt) => {
-        const isActive = opt.value === value;
-        return (
-          <button
-            key={opt.value}
-            className={[
-              "settings-segmented-btn",
-              isActive ? "settings-segmented-btn--active" : "",
-            ].filter(Boolean).join(" ")}
-            onClick={() => onChange(opt.value)}
-          >
-            {isActive ? `[${opt.label}]` : ` ${opt.label} `}
-          </button>
-        );
-      })}
     </div>
   );
 }

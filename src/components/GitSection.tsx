@@ -1,7 +1,8 @@
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useEffect, useRef, useCallback, useState, useMemo } from "react";
 import { useGitStore } from "../stores/gitStore";
 import { useSessionStore } from "../stores/sessionStore";
 import { GitFileEntry } from "../types";
+import { SegmentedControl } from "./SegmentedControl";
 
 const POLL_INTERVAL = 7000;
 const DEFAULT_HEIGHT = 190;
@@ -30,6 +31,148 @@ function splitPath(filePath: string): { dir: string; name: string } {
   if (sep === -1) return { dir: "", name: filePath };
   return { dir: filePath.slice(0, sep + 1), name: filePath.slice(sep + 1) };
 }
+
+/* ---- Tree view types & utilities ---- */
+
+interface TreeNode {
+  name: string;
+  fullPath: string;
+  type: "dir" | "file";
+  children: TreeNode[];
+  file?: GitFileEntry;
+}
+
+function buildFileTree(files: GitFileEntry[]): TreeNode[] {
+  const root: TreeNode[] = [];
+
+  for (const f of files) {
+    const parts = f.path.split("/");
+    let current = root;
+
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      const isFile = i === parts.length - 1;
+      const fullPath = parts.slice(0, i + 1).join("/");
+
+      let existing = current.find((n) => n.name === part && n.type === (isFile ? "file" : "dir"));
+      if (!existing) {
+        existing = {
+          name: part,
+          fullPath,
+          type: isFile ? "file" : "dir",
+          children: [],
+          file: isFile ? f : undefined,
+        };
+        current.push(existing);
+      }
+      current = existing.children;
+    }
+  }
+
+  function sortNodes(nodes: TreeNode[]): TreeNode[] {
+    const dirs = nodes.filter((n) => n.type === "dir").sort((a, b) => a.name.localeCompare(b.name));
+    const files = nodes.filter((n) => n.type === "file").sort((a, b) => a.name.localeCompare(b.name));
+    for (const d of dirs) {
+      d.children = sortNodes(d.children);
+    }
+    return [...dirs, ...files];
+  }
+
+  return sortNodes(root);
+}
+
+function countFiles(node: TreeNode): number {
+  if (node.type === "file") return 1;
+  return node.children.reduce((sum, c) => sum + countFiles(c), 0);
+}
+
+/* ---- Tree view components ---- */
+
+function TreeFileItem({
+  node,
+  depth,
+  onFileClick,
+}: {
+  node: TreeNode;
+  depth: number;
+  onFileClick: (file: GitFileEntry) => void;
+}) {
+  const f = node.file!;
+  return (
+    <div
+      className="git-file-item git-tree-file-item"
+      style={{ paddingLeft: 12 + depth * 12 }}
+      title={f.path}
+      onClick={() => onFileClick(f)}
+    >
+      <span className="git-file-status" style={{ color: statusColor(f.status) }}>
+        {f.status}
+      </span>
+      <span className="git-file-name">{node.name}</span>
+      {f.staged && <span className="git-tree-staged">S</span>}
+    </div>
+  );
+}
+
+function TreeDirNode({
+  node,
+  depth,
+  onFileClick,
+}: {
+  node: TreeNode;
+  depth: number;
+  onFileClick: (file: GitFileEntry) => void;
+}) {
+  const { collapsedGroups, toggleGroup } = useGitStore();
+  const key = `tree:${node.fullPath}`;
+  const collapsed = collapsedGroups[key] ?? false;
+  const count = countFiles(node);
+
+  return (
+    <div>
+      <div
+        className="git-tree-dir-header"
+        style={{ paddingLeft: 12 + depth * 12 }}
+        onClick={() => toggleGroup(key)}
+      >
+        <span className="git-group-chevron">{collapsed ? ">" : "v"}</span>
+        <span className="git-tree-dir-name">{node.name}/</span>
+        <span className="git-group-count">[{count}]</span>
+      </div>
+      {!collapsed &&
+        node.children.map((child) => (
+          <TreeNodeRenderer
+            key={child.fullPath}
+            node={child}
+            depth={depth + 1}
+            onFileClick={onFileClick}
+          />
+        ))}
+    </div>
+  );
+}
+
+function TreeNodeRenderer({
+  node,
+  depth,
+  onFileClick,
+}: {
+  node: TreeNode;
+  depth: number;
+  onFileClick: (file: GitFileEntry) => void;
+}) {
+  if (node.type === "dir") {
+    return <TreeDirNode node={node} depth={depth} onFileClick={onFileClick} />;
+  }
+  return <TreeFileItem node={node} depth={depth} onFileClick={onFileClick} />;
+}
+
+const VIEW_MODE_OPTIONS: Array<{ label: string; value: "file" | "tree" }> = [
+  { label: "file", value: "file" },
+  { label: "tree", value: "tree" },
+];
+
+/* ---- Flat view components ---- */
 
 function FileGroup({
   label,
@@ -84,7 +227,7 @@ function FileGroup({
 
 export function GitSection() {
   const activeProjectPath = useSessionStore((s) => s.activeProjectPath);
-  const { statuses, sectionOpen, fetchStatus, toggleSection, openDiff } = useGitStore();
+  const { statuses, sectionOpen, fetchStatus, toggleSection, openDiff, viewMode, setViewMode } = useGitStore();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
   const [panelHeight, setPanelHeight] = useState(DEFAULT_HEIGHT);
@@ -159,6 +302,8 @@ export function GitSection() {
   const untracked =
     status?.files.filter((f) => !f.staged && f.status === "?") ?? [];
   const totalCount = staged.length + changes.length + untracked.length;
+  const allFiles = status?.files ?? [];
+  const treeNodes = useMemo(() => buildFileTree(allFiles), [allFiles]);
 
   return (
     <div
@@ -197,9 +342,27 @@ export function GitSection() {
                 <span className="git-branch-prefix">@</span>
                 <span className="git-branch-name">{status.branch}</span>
               </div>
+              {totalCount > 0 && (
+                <div className="git-view-toggle">
+                  <SegmentedControl
+                    value={viewMode}
+                    options={VIEW_MODE_OPTIONS}
+                    onChange={setViewMode}
+                  />
+                </div>
+              )}
               <div className="git-section-files">
                 {totalCount === 0 ? (
                   <div className="git-empty">Working tree clean</div>
+                ) : viewMode === "tree" ? (
+                  treeNodes.map((node) => (
+                    <TreeNodeRenderer
+                      key={node.fullPath}
+                      node={node}
+                      depth={0}
+                      onFileClick={(f) => openDiff(activeProjectPath, f)}
+                    />
+                  ))
                 ) : (
                   <>
                     <FileGroup

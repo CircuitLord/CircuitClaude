@@ -7,12 +7,14 @@ interface GitStore {
   loading: Record<string, boolean>;
   sectionOpen: boolean;
   collapsedGroups: Record<string, boolean>;
+  viewMode: "file" | "tree";
   diffFile: GitFileEntry | null;
   diffContent: string | null;
   diffLoading: boolean;
   fetchStatus: (projectPath: string) => Promise<void>;
   toggleSection: () => void;
   toggleGroup: (group: string) => void;
+  setViewMode: (mode: "file" | "tree") => void;
   openDiff: (projectPath: string, file: GitFileEntry) => Promise<void>;
   closeDiff: () => void;
 }
@@ -22,6 +24,7 @@ export const useGitStore = create<GitStore>((set) => ({
   loading: {},
   sectionOpen: true,
   collapsedGroups: {},
+  viewMode: "file",
   diffFile: null,
   diffContent: null,
   diffLoading: false,
@@ -52,6 +55,8 @@ export const useGitStore = create<GitStore>((set) => ({
         [group]: !state.collapsedGroups[group],
       },
     })),
+
+  setViewMode: (mode: "file" | "tree") => set({ viewMode: mode }),
 
   openDiff: async (projectPath: string, file: GitFileEntry) => {
     set({ diffFile: file, diffContent: null, diffLoading: true });
