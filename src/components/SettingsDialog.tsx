@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useLayoutEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useSettingsStore } from "../stores/settingsStore";
 import { DEFAULT_SETTINGS, ThemeName } from "../types";
 import { THEME_OPTIONS } from "../lib/themes";
@@ -34,13 +34,13 @@ const FONT_OPTIONS = [
 ];
 
 const CURSOR_STYLE_OPTIONS: Array<{ label: string; value: "bar" | "block" | "underline" }> = [
-  { label: "Bar", value: "bar" },
-  { label: "Block", value: "block" },
-  { label: "Underline", value: "underline" },
+  { label: "bar", value: "bar" },
+  { label: "block", value: "block" },
+  { label: "underline", value: "underline" },
 ];
 
 /* ------------------------------------------------------------------ */
-/*  Custom Stepper (replaces input[type=number])                      */
+/*  Custom Stepper — text +/-                                         */
 /* ------------------------------------------------------------------ */
 function Stepper({
   value,
@@ -63,9 +63,7 @@ function Stepper({
         onClick={() => onChange(Math.max(min, value - 1))}
         aria-label="Decrease"
       >
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-          <path d="M2.5 6h7" />
-        </svg>
+        -
       </button>
       <span className="settings-stepper-value">
         {value}{suffix && <span className="settings-stepper-suffix">{suffix}</span>}
@@ -76,16 +74,14 @@ function Stepper({
         onClick={() => onChange(Math.min(max, value + 1))}
         aria-label="Increase"
       >
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-          <path d="M6 2.5v7M2.5 6h7" />
-        </svg>
+        +
       </button>
     </div>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/*  Custom Toggle (replaces checkbox)                                 */
+/*  Toggle — text [x] / [ ]                                          */
 /* ------------------------------------------------------------------ */
 function Toggle({
   checked,
@@ -101,13 +97,13 @@ function Toggle({
       aria-checked={checked}
       onClick={() => onChange(!checked)}
     >
-      <span className="settings-toggle-thumb" />
+      {checked ? "[x]" : "[ ]"}
     </button>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/*  Custom Select (replaces native <select>)                          */
+/*  Custom Select — ASCII > trigger, * for selected                   */
 /* ------------------------------------------------------------------ */
 function CustomSelect<T extends string>({
   value,
@@ -138,13 +134,11 @@ function CustomSelect<T extends string>({
   return (
     <div className="settings-select" ref={ref}>
       <button
-        className={`settings-select-trigger ${open ? "settings-select-trigger--open" : ""}`}
+        className="settings-select-trigger"
         onClick={() => setOpen(!open)}
       >
+        <span className="settings-select-chevron">{">"}</span>
         <span className="settings-select-label">{selectedLabel}</span>
-        <svg className="settings-select-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M3 4.5L6 7.5L9 4.5" />
-        </svg>
       </button>
       {open && (
         <div className="settings-select-dropdown">
@@ -157,12 +151,10 @@ function CustomSelect<T extends string>({
                 setOpen(false);
               }}
             >
+              <span className="settings-select-option-marker">
+                {opt.value === value ? "*" : " "}
+              </span>
               {renderOption ? renderOption(opt) : opt.label}
-              {opt.value === value && (
-                <svg className="settings-select-check" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3.5 7.5L5.5 9.5L10.5 4.5" />
-                </svg>
-              )}
             </button>
           ))}
         </div>
@@ -172,7 +164,7 @@ function CustomSelect<T extends string>({
 }
 
 /* ------------------------------------------------------------------ */
-/*  Segmented Control (for cursor style — few options)                */
+/*  Segmented Control — bracket selection [bar] block underline       */
 /* ------------------------------------------------------------------ */
 function SegmentedControl<T extends string>({
   value,
@@ -183,51 +175,20 @@ function SegmentedControl<T extends string>({
   options: Array<{ label: string; value: T }>;
   onChange: (v: T) => void;
 }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const isInitial = useRef(true);
-  const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
-
-  useLayoutEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    const activeBtn = container.querySelector<HTMLButtonElement>(
-      `[data-value="${value}"]`
-    );
-    if (activeBtn) {
-      setIndicatorStyle({ left: activeBtn.offsetLeft, width: activeBtn.offsetWidth });
-    }
-    if (isInitial.current) {
-      requestAnimationFrame(() => {
-        isInitial.current = false;
-      });
-    }
-  }, [value]);
-
   return (
-    <div className="settings-segmented" ref={containerRef}>
-      <div
-        className="settings-segmented-indicator"
-        style={{
-          left: indicatorStyle.left,
-          width: indicatorStyle.width,
-          transition: isInitial.current ? "none" : undefined,
-        }}
-      />
-      {options.map((opt, i) => {
+    <div className="settings-segmented">
+      {options.map((opt) => {
         const isActive = opt.value === value;
-        const isAfterActive = i > 0 && options[i - 1].value === value;
         return (
           <button
             key={opt.value}
-            data-value={opt.value}
             className={[
               "settings-segmented-btn",
               isActive ? "settings-segmented-btn--active" : "",
-              isAfterActive ? "settings-segmented-btn--after-active" : "",
             ].filter(Boolean).join(" ")}
             onClick={() => onChange(opt.value)}
           >
-            {opt.label}
+            {isActive ? `[${opt.label}]` : ` ${opt.label} `}
           </button>
         );
       })}
@@ -280,11 +241,9 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
     <div className="dialog-overlay" onClick={onClose}>
       <div className="settings-dialog" onClick={(e) => e.stopPropagation()}>
         <div className="settings-dialog-header">
-          <h3>Settings</h3>
+          <span className="settings-dialog-header-title">settings</span>
           <button className="settings-dialog-close" onClick={onClose} aria-label="Close">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-              <path d="M3 3l8 8M11 3l-8 8" />
-            </svg>
+            :esc
           </button>
         </div>
 
@@ -292,96 +251,79 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
           <TerminalPreview />
 
           <div className="settings-section">
-            <div className="settings-section-title">Theme</div>
-            <div className="settings-section-rows">
-              <div className="settings-row">
-                <div className="settings-row-label">
-                  <span className="settings-row-name">Color Theme</span>
-                  <div className="settings-row-desc">Accent and surface colors</div>
-                </div>
-                <CustomSelect
-                  value={settings.theme}
-                  options={THEME_OPTIONS}
-                  renderOption={(opt) => {
-                    const accent = THEME_OPTIONS.find((t) => t.value === opt.value)?.accent;
-                    return (
-                      <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{
-                          width: 10,
-                          height: 10,
-                          borderRadius: "50%",
-                          background: accent,
-                          flexShrink: 0,
-                        }} />
-                        {opt.label}
-                      </span>
-                    );
-                  }}
-                  onChange={(v) => update({ theme: v as ThemeName })}
-                />
+            <div className="settings-section-title">~theme</div>
+            <div className="settings-row">
+              <div className="settings-row-label">
+                <span className="settings-row-name">color-theme</span>
               </div>
+              <CustomSelect
+                value={settings.theme}
+                options={THEME_OPTIONS}
+                renderOption={(opt) => {
+                  const accent = THEME_OPTIONS.find((t) => t.value === opt.value)?.accent;
+                  return (
+                    <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ color: accent, fontFamily: "var(--font-mono)" }}>#</span>
+                      {opt.label}
+                    </span>
+                  );
+                }}
+                onChange={(v) => update({ theme: v as ThemeName })}
+              />
             </div>
           </div>
 
           <div className="settings-section">
-            <div className="settings-section-title">Font</div>
-            <div className="settings-section-rows">
-              <div className="settings-row">
-                <div className="settings-row-label">
-                  <span className="settings-row-name">Font Family</span>
-                  <div className="settings-row-desc">Typeface for terminal sessions</div>
-                </div>
-                <CustomSelect
-                  value={settings.terminalFontFamily}
-                  options={FONT_OPTIONS}
-                  renderOption={(opt) => (
-                    <span style={{ fontFamily: opt.value }}>{opt.label}</span>
-                  )}
-                  onChange={(v) => update({ terminalFontFamily: v })}
-                />
+            <div className="settings-section-title">~font</div>
+            <div className="settings-row">
+              <div className="settings-row-label">
+                <span className="settings-row-name">font-family</span>
               </div>
+              <CustomSelect
+                value={settings.terminalFontFamily}
+                options={FONT_OPTIONS}
+                renderOption={(opt) => (
+                  <span style={{ fontFamily: opt.value }}>{opt.label}</span>
+                )}
+                onChange={(v) => update({ terminalFontFamily: v })}
+              />
+            </div>
 
-              <div className="settings-row">
-                <div className="settings-row-label">
-                  <span className="settings-row-name">Font Size</span>
-                  <div className="settings-row-desc">Size in pixels (10–24)</div>
-                </div>
-                <Stepper
-                  value={settings.terminalFontSize}
-                  min={10}
-                  max={24}
-                  suffix="px"
-                  onChange={(v) => update({ terminalFontSize: v })}
-                />
+            <div className="settings-row">
+              <div className="settings-row-label">
+                <span className="settings-row-name">font-size</span>
               </div>
+              <Stepper
+                value={settings.terminalFontSize}
+                min={10}
+                max={24}
+                suffix="px"
+                onChange={(v) => update({ terminalFontSize: v })}
+              />
             </div>
           </div>
 
           <div className="settings-section">
-            <div className="settings-section-title">Cursor</div>
-            <div className="settings-section-rows">
-              <div className="settings-row">
-                <div className="settings-row-label">
-                  <span className="settings-row-name">Cursor Style</span>
-                  <div className="settings-row-desc">Shape of the terminal cursor</div>
-                </div>
-                <SegmentedControl
-                  value={settings.terminalCursorStyle}
-                  options={CURSOR_STYLE_OPTIONS}
-                  onChange={(v) => update({ terminalCursorStyle: v })}
-                />
+            <div className="settings-section-title">~cursor</div>
+            <div className="settings-row">
+              <div className="settings-row-label">
+                <span className="settings-row-name">cursor-style</span>
               </div>
+              <SegmentedControl
+                value={settings.terminalCursorStyle}
+                options={CURSOR_STYLE_OPTIONS}
+                onChange={(v) => update({ terminalCursorStyle: v })}
+              />
+            </div>
 
-              <div className="settings-row">
-                <div className="settings-row-label">
-                  <span className="settings-row-name">Cursor Blink</span>
-                  <div className="settings-row-desc">Animate cursor on/off</div>
-                </div>
-                <Toggle
-                  checked={settings.terminalCursorBlink}
-                  onChange={(v) => update({ terminalCursorBlink: v })}
-                />
+            <div className="settings-row">
+              <div className="settings-row-label">
+                <span className="settings-row-name">cursor-blink</span>
               </div>
+              <Toggle
+                checked={settings.terminalCursorBlink}
+                onChange={(v) => update({ terminalCursorBlink: v })}
+              />
             </div>
           </div>
 
@@ -389,7 +331,7 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
             className="settings-reset-link"
             onClick={() => update(DEFAULT_SETTINGS)}
           >
-            Reset to defaults
+            :reset defaults
           </button>
         </div>
       </div>

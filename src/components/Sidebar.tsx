@@ -52,13 +52,22 @@ export function Sidebar() {
               onClick={() => handleSelectProject(p.path)}
               title={p.path}
             >
-              <span className="sidebar-entry-prefix">{">"}</span>
-              <span className="sidebar-entry-name">{p.name}</span>
-              {isThinking && <span className="sidebar-entry-alive">*</span>}
-              {needsAttention && <span className="sidebar-entry-waiting">?</span>}
-              {sessionCount > 0 && (
-                <span className="sidebar-entry-count">[{sessionCount}]</span>
-              )}
+              <div className="sidebar-entry-line1">
+                <span className="sidebar-entry-prefix">{">"}</span>
+                <span className="sidebar-entry-name">{p.name}</span>
+              </div>
+              <div className="sidebar-entry-status">
+                {isThinking ? (
+                  <span className="sidebar-entry-status-text alive"><span className="sidebar-entry-status-symbol">*</span> thinking</span>
+                ) : needsAttention ? (
+                  <span className="sidebar-entry-status-text waiting"><span className="sidebar-entry-status-symbol">?</span> waiting</span>
+                ) : (
+                  <span className="sidebar-entry-status-text idle">idle</span>
+                )}
+                {sessionCount > 0 && (
+                  <span className="sidebar-entry-count">[{sessionCount} {sessionCount === 1 ? "session" : "sessions"}]</span>
+                )}
+              </div>
             </div>
           );
         })}

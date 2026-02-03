@@ -8,7 +8,7 @@ CircuitClaude is a desktop terminal session manager for running multiple Claude 
 
 ## Notes
 
-This project should follow the UI style guide in system.md
+This project should follow the UI style guide in system.md. Make sure you check this anytime you're changing anything UI related.
 
 ## Commands
 

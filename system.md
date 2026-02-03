@@ -5,7 +5,7 @@ Terminal UI (TUI) aesthetic. The app manages CLI sessions, so the chrome should 
 ## Principles
 
 - Monospace everywhere (`--font-mono`) — no sans-serif in navigational chrome
-- ASCII characters replace SVG icons: `>` for selection, `*` for alive, `:` for command prefix, `+` for actions
+- ASCII characters replace SVG icons: `>` for selection, `*` for alive, `:` for clickable command, `+` for actions
 - Flat rows, not cards — no background, no border, no border-radius on list items
 - Labels read like paths or commands: `~/projects`, `:settings`, `+ new`
 - No uppercase transforms, no letter-spacing, normal font weight (400) for labels
@@ -39,6 +39,14 @@ Each navigable item is a flat row (36px tall), laid out as a single monospace li
 - `--text-tertiary` default, `--accent-text` on hover
 - Examples: `+ new`, `:settings`, `+` in header
 - SVG icons hidden via `display: none` if they exist in markup
+
+## `:` Command Prefix
+
+The `:` prefix is a clickable affordance — it always means the element is actionable. If text starts with `:`, the user can click it. If it doesn't, it's a static label.
+
+- **Clickable commands**: `:settings`, `:reset defaults`, `:esc` — these are buttons styled as plain text
+- **Static labels**: `settings` (dialog title), `~theme` (section heading) — no `:` prefix, no click handler
+- Never use `:` on non-interactive text. Never omit `:` on a text-only button that follows the command pattern.
 
 ## Section Headers
 
