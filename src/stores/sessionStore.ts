@@ -87,6 +87,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             projectName: ps.projectName,
             projectPath: ps.projectPath,
             sessionId: null,
+            claudeSessionId: ps.claudeSessionId,
             createdAt: ps.createdAt,
             restored: true,
           });
@@ -114,6 +115,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           id: s.id,
           projectName: s.projectName,
           projectPath: s.projectPath,
+          claudeSessionId: s.claudeSessionId,
           createdAt: s.createdAt,
         })),
       })

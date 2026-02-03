@@ -9,10 +9,20 @@ pub fn spawn_session(
     project_path: String,
     cols: u16,
     rows: u16,
+    claude_session_id: Option<String>,
+    resume_session_id: Option<String>,
     continue_session: Option<bool>,
     on_output: Channel<PtyOutputEvent>,
 ) -> Result<String, String> {
-    pty_manager.spawn(&project_path, cols, rows, continue_session.unwrap_or(false), on_output)
+    pty_manager.spawn(
+        &project_path,
+        cols,
+        rows,
+        claude_session_id,
+        resume_session_id,
+        continue_session.unwrap_or(false),
+        on_output,
+    )
 }
 
 #[tauri::command]
@@ -40,6 +50,12 @@ pub fn kill_session(
     session_id: String,
 ) -> Result<(), String> {
     pty_manager.kill(&session_id)
+}
+
+#[tauri::command]
+pub fn kill_all_sessions(pty_manager: State<'_, PtyManager>) -> Result<(), String> {
+    pty_manager.kill_all();
+    Ok(())
 }
 
 #[tauri::command]
@@ -91,4 +107,9 @@ pub fn delete_scrollback(
     tab_id: String,
 ) -> Result<(), String> {
     config::delete_scrollback(&app_handle, &tab_id)
+}
+
+#[tauri::command]
+pub fn exit_app(app_handle: tauri::AppHandle) {
+    app_handle.exit(0);
 }

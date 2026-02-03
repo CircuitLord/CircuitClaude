@@ -36,6 +36,8 @@ impl PtyManager {
         project_path: &str,
         cols: u16,
         rows: u16,
+        claude_session_id: Option<String>,
+        resume_session_id: Option<String>,
         continue_session: bool,
         on_output: Channel<PtyOutputEvent>,
     ) -> Result<SessionId, String> {
@@ -51,7 +53,11 @@ impl PtyManager {
             .map_err(|e| format!("Failed to open PTY: {}", e))?;
 
         let mut cmd = CommandBuilder::new("cmd.exe");
-        if continue_session {
+        if let Some(ref id) = resume_session_id {
+            cmd.args(["/c", "claude", "--resume", id]);
+        } else if let Some(ref id) = claude_session_id {
+            cmd.args(["/c", "claude", "--session-id", id]);
+        } else if continue_session {
             cmd.args(["/c", "claude", "--continue"]);
         } else {
             cmd.args(["/c", "claude"]);
@@ -108,12 +114,15 @@ impl PtyManager {
             }
 
             // Process exited - get exit code
+            // Use try_lock to avoid deadlock when kill_all() holds the mutex
             let exit_code = sessions_ref
-                .lock()
-                .unwrap()
-                .get_mut(&sid)
-                .and_then(|s| s.child.try_wait().ok().flatten())
-                .map(|status| status.exit_code());
+                .try_lock()
+                .ok()
+                .and_then(|mut guard| {
+                    guard.get_mut(&sid)
+                        .and_then(|s| s.child.try_wait().ok().flatten())
+                        .map(|status| status.exit_code())
+                });
 
             let _ = on_output.send(PtyOutputEvent::Exit(exit_code));
         });
@@ -159,5 +168,19 @@ impl PtyManager {
         } else {
             Ok(()) // Already removed
         }
+    }
+
+    pub fn kill_all(&self) {
+        let mut sessions = self.sessions.lock().unwrap();
+        for (_, mut session) in sessions.drain() {
+            let _ = session.child.kill();
+            // Dropping session closes master PTY handle → kills process tree
+        }
+    }
+}
+
+impl Drop for PtyManager {
+    fn drop(&mut self) {
+        self.kill_all();
     }
 }

@@ -6,13 +6,19 @@ export function spawnSession(
   cols: number,
   rows: number,
   onOutput: Channel<PtyOutputEvent>,
-  continueSession: boolean = false
+  options?: {
+    claudeSessionId?: string;
+    resumeSessionId?: string;
+    continueSession?: boolean;
+  }
 ): Promise<string> {
   return invoke<string>("spawn_session", {
     projectPath,
     cols,
     rows,
-    continueSession,
+    claudeSessionId: options?.claudeSessionId ?? null,
+    resumeSessionId: options?.resumeSessionId ?? null,
+    continueSession: options?.continueSession ?? false,
     onOutput,
   });
 }
@@ -37,4 +43,12 @@ export function resizeSession(
 
 export function killSession(sessionId: string): Promise<void> {
   return invoke("kill_session", { sessionId });
+}
+
+export function killAllSessions(): Promise<void> {
+  return invoke("kill_all_sessions");
+}
+
+export function exitApp(): Promise<void> {
+  return invoke("exit_app");
 }

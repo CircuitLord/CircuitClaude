@@ -15,6 +15,8 @@ pub struct PersistedSession {
     pub id: String,
     pub project_name: String,
     pub project_path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub claude_session_id: Option<String>,
     pub created_at: f64,
 }
 

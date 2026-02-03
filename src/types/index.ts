@@ -8,6 +8,7 @@ export interface TerminalSession {
   projectName: string;
   projectPath: string;
   sessionId: string | null; // PTY session ID from Rust
+  claudeSessionId?: string; // UUID passed to Claude CLI via --session-id / --resume
   createdAt: number;
   restored?: boolean;
 }
@@ -16,6 +17,7 @@ export interface PersistedSession {
   id: string;
   projectName: string;
   projectPath: string;
+  claudeSessionId?: string;
   createdAt: number;
 }
 

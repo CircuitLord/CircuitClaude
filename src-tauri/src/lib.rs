@@ -1,3 +1,5 @@
+use tauri::Manager;
+
 mod commands;
 mod config;
 mod pty_manager;
@@ -13,6 +15,7 @@ pub fn run() {
             commands::write_session,
             commands::resize_session,
             commands::kill_session,
+            commands::kill_all_sessions,
             commands::load_projects,
             commands::save_projects,
             commands::load_sessions_config,
@@ -20,7 +23,14 @@ pub fn run() {
             commands::save_scrollback,
             commands::load_scrollback,
             commands::delete_scrollback,
+            commands::exit_app,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            if let tauri::RunEvent::Exit = event {
+                let pty_manager = app.state::<pty_manager::PtyManager>();
+                pty_manager.kill_all();
+            }
+        });
 }

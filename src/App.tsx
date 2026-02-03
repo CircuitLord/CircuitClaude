@@ -5,9 +5,11 @@ import { ProjectHeader } from "./components/ProjectHeader";
 import { TerminalGrid } from "./components/TerminalGrid";
 import { EmptyState } from "./components/EmptyState";
 import { StatusBar } from "./components/StatusBar";
+import { WindowControls } from "./components/WindowControls";
 import { useSessionStore, generateTabId } from "./stores/sessionStore";
 import { useProjectStore } from "./stores/projectStore";
 import { loadSessionsConfig, saveSessionsConfig, saveScrollback } from "./lib/config";
+import { killAllSessions, exitApp } from "./lib/pty";
 import { serializeAllTerminals } from "./lib/terminalRegistry";
 import "./App.css";
 
@@ -48,7 +50,8 @@ function App() {
     const unlisten = getCurrentWindow().onCloseRequested(async (event) => {
       event.preventDefault();
       await saveAllSessionData();
-      getCurrentWindow().destroy();
+      await killAllSessions().catch(() => {});
+      await exitApp().catch(() => {});
     });
 
     // Auto-save interval
@@ -81,6 +84,7 @@ function App() {
       projectName: name,
       projectPath: activeProjectPath,
       sessionId: null,
+      claudeSessionId: crypto.randomUUID(),
       createdAt: Date.now(),
       restored: false,
     });
@@ -103,9 +107,14 @@ function App() {
             ) : null}
           </>
         ) : (
-          <div className="terminal-area">
-            <EmptyState />
-          </div>
+          <>
+            <div className="titlebar-fallback" data-tauri-drag-region>
+              <WindowControls />
+            </div>
+            <div className="terminal-area">
+              <EmptyState />
+            </div>
+          </>
         )}
         {/* Render all project grids simultaneously; only the active one is visible */}
         {projectsWithSessions.map((path) => (

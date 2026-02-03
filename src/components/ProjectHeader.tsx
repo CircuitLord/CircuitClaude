@@ -1,5 +1,6 @@
 import { useSessionStore, generateTabId } from "../stores/sessionStore";
 import { useProjectStore } from "../stores/projectStore";
+import { WindowControls } from "./WindowControls";
 
 function PlusIcon() {
   return (
@@ -37,6 +38,7 @@ export function ProjectHeader() {
       projectName: projectName ?? "Unknown",
       projectPath: activeProjectPath,
       sessionId: null,
+      claudeSessionId: crypto.randomUUID(),
       createdAt: Date.now(),
       restored: false,
     });
@@ -44,7 +46,7 @@ export function ProjectHeader() {
 
   return (
     <div className="project-header">
-      <div className="project-header-info">
+      <div className="project-header-info" data-tauri-drag-region>
         <span className="project-header-name">{projectName}</span>
         <span className="project-header-path">{activeProjectPath}</span>
       </div>
@@ -61,6 +63,7 @@ export function ProjectHeader() {
           <span>New Session</span>
         </button>
       </div>
+      <WindowControls />
     </div>
   );
 }

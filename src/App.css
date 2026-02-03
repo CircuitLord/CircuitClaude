@@ -202,11 +202,10 @@ body,
 .project-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border-subtle);
   height: var(--header-height);
-  padding: 0 16px;
+  padding: 0;
   user-select: none;
   flex-shrink: 0;
 }
@@ -217,6 +216,9 @@ body,
   gap: 10px;
   min-width: 0;
   overflow: hidden;
+  flex: 1;
+  padding: 0 16px;
+  height: 100%;
 }
 
 .project-header-name {
@@ -240,6 +242,7 @@ body,
   align-items: center;
   gap: 12px;
   flex-shrink: 0;
+  padding-right: 8px;
 }
 
 .project-header-count {
@@ -542,6 +545,63 @@ body,
 
 .empty-state-spawn:hover {
   background: #6d28d9;
+}
+
+/* ========================================================================
+   Window Controls (custom titlebar)
+   ======================================================================== */
+
+.window-controls {
+  display: flex;
+  align-items: stretch;
+  flex-shrink: 0;
+  height: 100%;
+}
+
+.window-control-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+  -webkit-app-region: no-drag;
+}
+
+.window-control-btn:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.window-control-btn:active {
+  background: var(--bg-overlay);
+}
+
+.window-control-close:hover {
+  background: #c42b1c;
+  color: #fff;
+}
+
+.window-control-close:active {
+  background: #b4271a;
+  color: #fff;
+}
+
+/* --- Fallback titlebar (when no project is active) --- */
+
+.titlebar-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  height: var(--header-height);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+  user-select: none;
 }
 
 /* ========================================================================

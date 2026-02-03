@@ -32,17 +32,19 @@ interface TerminalViewProps {
   tabId: string;
   projectPath: string;
   projectName: string;
+  claudeSessionId?: string;
   isRestored?: boolean;
   onClose: () => void;
 }
 
-export function TerminalView({ tabId, projectPath, projectName, isRestored, onClose }: TerminalViewProps) {
+export function TerminalView({ tabId, projectPath, projectName, claudeSessionId, isRestored, onClose }: TerminalViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const [title, setTitle] = useState(projectName);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const initializedRef = useRef(false);
+  const isRestoredRef = useRef(isRestored);
   const updateSessionPtyId = useSessionStore((s) => s.updateSessionPtyId);
   const clearRestoredFlag = useSessionStore((s) => s.clearRestoredFlag);
   const activeProjectPath = useSessionStore((s) => s.activeProjectPath);
@@ -108,18 +110,29 @@ export function TerminalView({ tabId, projectPath, projectName, isRestored, onCl
 
         const cols = terminal.cols;
         const rows = terminal.rows;
-        spawnSession(projectPath, cols, rows, channel, !!isRestored)
+        spawnSession(projectPath, cols, rows, channel,
+            isRestoredRef.current
+              ? claudeSessionId
+                ? { resumeSessionId: claudeSessionId }   // Restored with known ID → --resume <uuid>
+                : { continueSession: true }               // Legacy restored (no ID) → --continue
+              : { claudeSessionId }                       // New session → --session-id <uuid>
+          )
           .then((sid) => {
             sessionIdRef.current = sid;
             updateSessionPtyId(tabId, sid);
             clearRestoredFlag(tabId);
           })
           .catch((err) => {
-            terminal.write(`\r\n\x1b[31mFailed to spawn session: ${err}\x1b[0m\r\n`);
+            if (isRestoredRef.current) {
+              // Stale/invalid session — remove the terminal silently
+              onClose();
+            } else {
+              terminal.write(`\r\n\x1b[31mFailed to spawn session: ${err}\x1b[0m\r\n`);
+            }
           });
       };
 
-      if (isRestored) {
+      if (isRestoredRef.current) {
         loadScrollback(tabId)
           .then((data) => {
             terminal.write(data);
@@ -177,7 +190,8 @@ export function TerminalView({ tabId, projectPath, projectName, isRestored, onCl
       terminal.dispose();
       initializedRef.current = false;
     };
-  }, [projectPath, tabId, isRestored, updateSessionPtyId, clearRestoredFlag]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectPath, tabId, claudeSessionId]);
 
   // Re-fit terminal when this project becomes the active one (switching from display:none to display:flex)
   useEffect(() => {

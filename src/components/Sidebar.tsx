@@ -34,7 +34,7 @@ export function Sidebar() {
 
   return (
     <div className="sidebar">
-      <div className="sidebar-header">Projects</div>
+      <div className="sidebar-header" data-tauri-drag-region>Projects</div>
       <div className="sidebar-list">
         {projects.map((p) => {
           const sessionCount = sessions.filter(

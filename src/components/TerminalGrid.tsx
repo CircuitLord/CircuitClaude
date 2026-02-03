@@ -50,18 +50,10 @@ export function TerminalGrid({ projectPath }: TerminalGridProps) {
         tabId={s.id}
         projectPath={s.projectPath}
         projectName={s.projectName}
+        claudeSessionId={s.claudeSessionId}
         isRestored={s.restored}
         onClose={() => handleCloseSession(s.id)}
       />
-    );
-  }
-
-  // Single terminal: no panels needed
-  if (projectSessions.length === 1) {
-    return (
-      <div className="terminal-grid-container">
-        {renderTerminal(projectSessions[0])}
-      </div>
     );
   }
 
@@ -73,7 +65,7 @@ export function TerminalGrid({ projectPath }: TerminalGridProps) {
       <Group orientation="vertical">
         {rows.map((row, rowIdx) => (
           <RowPanel
-            key={row.map((s) => s.id).join(",")}
+            key={rowIdx}
             row={row}
             rowIdx={rowIdx}
             totalRows={rows.length}
@@ -99,21 +91,17 @@ function RowPanel({
   return (
     <>
       <Panel minSize={10}>
-        {row.length === 1 ? (
-          renderTerminal(row[0])
-        ) : (
-          <Group orientation="horizontal">
-            {row.map((s, colIdx) => (
-              <ColPanel
-                key={s.id}
-                session={s}
-                colIdx={colIdx}
-                totalCols={row.length}
-                renderTerminal={renderTerminal}
-              />
-            ))}
-          </Group>
-        )}
+        <Group orientation="horizontal">
+          {row.map((s, colIdx) => (
+            <ColPanel
+              key={s.id}
+              session={s}
+              colIdx={colIdx}
+              totalCols={row.length}
+              renderTerminal={renderTerminal}
+            />
+          ))}
+        </Group>
       </Panel>
       {rowIdx < totalRows - 1 && (
         <Separator className="resize-handle-horizontal" />
