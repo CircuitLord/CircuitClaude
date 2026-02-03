@@ -30,6 +30,27 @@ function CloseIcon() {
   );
 }
 
+/** Check the last few lines of the terminal buffer for interactive prompt patterns
+ *  (tool approval, option selection) that indicate Claude is waiting for user action. */
+function detectInteractivePrompt(terminal: Terminal): boolean {
+  const buffer = terminal.buffer.active;
+  const cursorLine = buffer.baseY + buffer.cursorY;
+  const lines: string[] = [];
+  for (let i = Math.max(0, cursorLine - 8); i <= cursorLine; i++) {
+    const line = buffer.getLine(i);
+    if (line) lines.push(line.translateToString());
+  }
+  const text = lines.join("\n");
+
+  // DEBUG: log what we're checking so we can see false positives
+  console.log("[prompt-detect] cursor:", cursorLine, "text:", JSON.stringify(text));
+
+  // Tool approval prompt (shows "Chat about this" as an option alongside Yes/No/Always)
+  if (/Chat about this/.test(text)) { console.log("[prompt-detect] matched: Chat about this"); return true; }
+
+  return false;
+}
+
 interface TerminalViewProps {
   tabId: string;
   projectPath: string;
@@ -49,8 +70,11 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
   const isRestoredRef = useRef(isRestored);
   const updateSessionPtyId = useSessionStore((s) => s.updateSessionPtyId);
   const clearRestoredFlag = useSessionStore((s) => s.clearRestoredFlag);
+  const setThinking = useSessionStore((s) => s.setThinking);
+  const setNeedsAttention = useSessionStore((s) => s.setNeedsAttention);
   const activeProjectPath = useSessionStore((s) => s.activeProjectPath);
   const settings = useSettingsStore((s) => s.settings);
+  const thinkingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!containerRef.current || initializedRef.current) return;
@@ -96,8 +120,20 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
         channel.onmessage = (event: PtyOutputEvent) => {
           if (event.type === "Data" && Array.isArray(event.data)) {
             terminal.write(new Uint8Array(event.data));
+            setThinking(tabId, true);
+            setNeedsAttention(tabId, false);
+            if (thinkingTimerRef.current) clearTimeout(thinkingTimerRef.current);
+            thinkingTimerRef.current = setTimeout(() => {
+              setThinking(tabId, false);
+              if (detectInteractivePrompt(terminal)) {
+                setNeedsAttention(tabId, true);
+              }
+            }, 2000);
           } else if (event.type === "Exit") {
             terminal.write("\r\n\x1b[90m[Process exited]\x1b[0m\r\n");
+            if (thinkingTimerRef.current) clearTimeout(thinkingTimerRef.current);
+            setThinking(tabId, false);
+            setNeedsAttention(tabId, false);
           }
         };
 
@@ -174,6 +210,9 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
       onResizeDisposable.dispose();
       onTitleDisposable.dispose();
       unregisterTerminal(tabId);
+      if (thinkingTimerRef.current) clearTimeout(thinkingTimerRef.current);
+      setThinking(tabId, false);
+      setNeedsAttention(tabId, false);
       // Kill PTY on unmount — this only happens when the session is actually removed,
       // not on project switch (which uses display:none instead of unmounting)
       if (sessionIdRef.current) {

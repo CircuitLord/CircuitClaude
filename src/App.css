@@ -227,7 +227,14 @@ body,
   flex-shrink: 0;
   color: var(--accent-text);
   margin-left: 4px;
-  animation: tui-blink 1.2s step-end infinite;
+  animation: tui-color-cycle 2.4s step-end infinite;
+}
+
+.sidebar-entry-waiting {
+  flex-shrink: 0;
+  color: #e5c07b;
+  margin-left: 4px;
+  animation: tui-blink 1.5s step-end infinite;
 }
 
 .sidebar-entry-count {
@@ -244,6 +251,14 @@ body,
 @keyframes tui-blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
+}
+
+@keyframes tui-color-cycle {
+  0%   { color: var(--text-tertiary); }
+  25%  { color: var(--accent-text); }
+  50%  { color: var(--accent); }
+  75%  { color: var(--accent-text); }
+  100% { color: var(--text-tertiary); }
 }
 
 /* --- Add Project Entry --- */

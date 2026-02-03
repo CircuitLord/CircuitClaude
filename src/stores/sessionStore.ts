@@ -5,12 +5,16 @@ interface SessionStore {
   sessions: TerminalSession[];
   activeSessionId: string | null;
   activeProjectPath: string | null;
+  thinkingSessions: Set<string>;
+  needsAttentionSessions: Set<string>;
   addSession: (session: TerminalSession) => void;
   removeSession: (id: string) => void;
   removeProjectSessions: (projectPath: string) => void;
   setActiveSession: (id: string | null) => void;
   setActiveProject: (path: string | null) => void;
   updateSessionPtyId: (id: string, sessionId: string) => void;
+  setThinking: (tabId: string, isThinking: boolean) => void;
+  setNeedsAttention: (tabId: string, needsAttention: boolean) => void;
   restoreFromConfig: (config: SessionsConfig) => void;
   toSessionsConfig: () => SessionsConfig;
   clearRestoredFlag: (id: string) => void;
@@ -24,6 +28,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   sessions: [],
   activeSessionId: null,
   activeProjectPath: null,
+  thinkingSessions: new Set(),
+  needsAttentionSessions: new Set(),
 
   addSession: (session) =>
     set((state) => ({
@@ -76,6 +82,28 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         s.id === id ? { ...s, sessionId } : s
       ),
     })),
+
+  setThinking: (tabId, isThinking) =>
+    set((state) => {
+      const next = new Set(state.thinkingSessions);
+      if (isThinking) {
+        next.add(tabId);
+      } else {
+        next.delete(tabId);
+      }
+      return { thinkingSessions: next };
+    }),
+
+  setNeedsAttention: (tabId, needsAttention) =>
+    set((state) => {
+      const next = new Set(state.needsAttentionSessions);
+      if (needsAttention) {
+        next.add(tabId);
+      } else {
+        next.delete(tabId);
+      }
+      return { needsAttentionSessions: next };
+    }),
 
   restoreFromConfig: (config) =>
     set(() => {

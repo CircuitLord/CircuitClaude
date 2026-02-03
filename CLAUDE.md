@@ -6,6 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 CircuitClaude is a desktop terminal session manager for running multiple Claude Code CLI sessions across different projects. Built with a React/TypeScript frontend and a Rust/Tauri v2 backend, it provides a tabbed terminal UI powered by xterm.js with PTY management via `portable-pty`.
 
+## Notes
+
+This project should follow the UI style guide in system.md
+
 ## Commands
 
 ```bash

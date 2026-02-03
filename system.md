@@ -55,6 +55,7 @@ Each navigable item is a flat row (36px tall), laid out as a single monospace li
 
 ## Animations
 
-- `tui-blink`: `step-end` timing, 1.2s cycle — hard on/off for alive indicators
+- `tui-blink`: `step-end` timing, 1.2s cycle — hard on/off for waiting indicators
+- `tui-color-cycle`: `step-end` timing, 2.4s cycle — steps through `--text-tertiary` → `--accent-text` → `--accent` → `--accent-text` for alive/thinking indicators. Character stays fully visible, only color changes.
 - Avoid `ease`, `ease-in-out`, or smooth fades on TUI elements
 - Transitions for hover/color changes stay at 0.1s (fast, not animated)

@@ -7,7 +7,7 @@ import { SettingsDialog } from "./SettingsDialog";
 
 export function Sidebar() {
   const { projects, loaded, load } = useProjectStore();
-  const { sessions, activeProjectPath, setActiveProject } = useSessionStore();
+  const { sessions, activeProjectPath, setActiveProject, thinkingSessions, needsAttentionSessions } = useSessionStore();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const handleAdd = useAddProject();
 
@@ -36,7 +36,8 @@ export function Sidebar() {
             (s) => s.projectPath === p.path
           );
           const sessionCount = projectSessions.length;
-          const hasAlive = projectSessions.some((s) => s.sessionId !== null);
+          const isThinking = projectSessions.some((s) => thinkingSessions.has(s.id));
+          const needsAttention = projectSessions.some((s) => needsAttentionSessions.has(s.id));
           const isActive = p.path === activeProjectPath;
 
           const entryClasses = [
@@ -53,7 +54,8 @@ export function Sidebar() {
             >
               <span className="sidebar-entry-prefix">{">"}</span>
               <span className="sidebar-entry-name">{p.name}</span>
-              {hasAlive && <span className="sidebar-entry-alive">*</span>}
+              {isThinking && <span className="sidebar-entry-alive">*</span>}
+              {needsAttention && <span className="sidebar-entry-waiting">?</span>}
               {sessionCount > 0 && (
                 <span className="sidebar-entry-count">[{sessionCount}]</span>
               )}
