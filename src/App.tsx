@@ -1,3 +1,5 @@
+import { useEffect, useRef } from "react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Sidebar } from "./components/Sidebar";
 import { ProjectHeader } from "./components/ProjectHeader";
 import { TerminalGrid } from "./components/TerminalGrid";
@@ -5,13 +7,67 @@ import { EmptyState } from "./components/EmptyState";
 import { StatusBar } from "./components/StatusBar";
 import { useSessionStore, generateTabId } from "./stores/sessionStore";
 import { useProjectStore } from "./stores/projectStore";
+import { loadSessionsConfig, saveSessionsConfig, saveScrollback } from "./lib/config";
+import { serializeAllTerminals } from "./lib/terminalRegistry";
 import "./App.css";
+
+async function saveAllSessionData() {
+  const config = useSessionStore.getState().toSessionsConfig();
+  const buffers = serializeAllTerminals();
+
+  // Save scrollback files in parallel, then save config
+  const scrollbackPromises = Array.from(buffers.entries()).map(
+    ([tabId, data]) => saveScrollback(tabId, data).catch(() => {})
+  );
+  await Promise.all(scrollbackPromises);
+  await saveSessionsConfig(config).catch(() => {});
+}
 
 function App() {
   const { sessions, activeProjectPath, addSession } = useSessionStore();
   const { projects } = useProjectStore();
+  const restoredRef = useRef(false);
 
-  const projectSessions = activeProjectPath
+  // Restore sessions on startup (once, after projects are loaded)
+  useEffect(() => {
+    if (restoredRef.current) return;
+    restoredRef.current = true;
+
+    loadSessionsConfig()
+      .then((config) => {
+        if (config && config.layouts.length > 0) {
+          useSessionStore.getState().restoreFromConfig(config);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Save on close + auto-save every 30s
+  useEffect(() => {
+    // Intercept window close
+    const unlisten = getCurrentWindow().onCloseRequested(async (event) => {
+      event.preventDefault();
+      await saveAllSessionData();
+      getCurrentWindow().destroy();
+    });
+
+    // Auto-save interval
+    const interval = setInterval(() => {
+      saveAllSessionData();
+    }, 30_000);
+
+    return () => {
+      clearInterval(interval);
+      unlisten.then((fn) => fn());
+    };
+  }, []);
+
+  // All unique project paths that have at least one session
+  const projectsWithSessions = [
+    ...new Set(sessions.map((s) => s.projectPath)),
+  ];
+
+  const activeProjectSessions = activeProjectPath
     ? sessions.filter((s) => s.projectPath === activeProjectPath)
     : [];
 
@@ -25,6 +81,8 @@ function App() {
       projectName: name,
       projectPath: activeProjectPath,
       sessionId: null,
+      createdAt: Date.now(),
+      restored: false,
     });
   }
 
@@ -35,22 +93,30 @@ function App() {
         {activeProjectPath ? (
           <>
             <ProjectHeader />
-            {projectSessions.length === 0 ? (
+            {activeProjectSessions.length === 0 ? (
               <div className="terminal-area">
                 <EmptyState
                   variant="no-sessions"
                   onSpawn={handleSpawnForProject}
                 />
               </div>
-            ) : (
-              <TerminalGrid />
-            )}
+            ) : null}
           </>
         ) : (
           <div className="terminal-area">
             <EmptyState />
           </div>
         )}
+        {/* Render all project grids simultaneously; only the active one is visible */}
+        {projectsWithSessions.map((path) => (
+          <div
+            key={path}
+            className="terminal-grid-wrapper"
+            style={{ display: path === activeProjectPath ? "flex" : "none" }}
+          >
+            <TerminalGrid projectPath={path} />
+          </div>
+        ))}
         <StatusBar />
       </div>
     </div>

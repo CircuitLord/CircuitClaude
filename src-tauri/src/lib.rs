@@ -15,6 +15,11 @@ pub fn run() {
             commands::kill_session,
             commands::load_projects,
             commands::save_projects,
+            commands::load_sessions_config,
+            commands::save_sessions_config,
+            commands::save_scrollback,
+            commands::load_scrollback,
+            commands::delete_scrollback,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

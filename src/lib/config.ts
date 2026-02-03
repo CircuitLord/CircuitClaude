@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { Project } from "../types";
+import { Project, SessionsConfig } from "../types";
 
 export function loadProjects(): Promise<Project[]> {
   return invoke<Project[]>("load_projects");
@@ -7,4 +7,24 @@ export function loadProjects(): Promise<Project[]> {
 
 export function saveProjects(projects: Project[]): Promise<void> {
   return invoke("save_projects", { projects });
+}
+
+export function loadSessionsConfig(): Promise<SessionsConfig | null> {
+  return invoke<SessionsConfig | null>("load_sessions_config");
+}
+
+export function saveSessionsConfig(config: SessionsConfig): Promise<void> {
+  return invoke("save_sessions_config", { config });
+}
+
+export function saveScrollback(tabId: string, data: string): Promise<void> {
+  return invoke("save_scrollback", { tabId, data });
+}
+
+export function loadScrollback(tabId: string): Promise<string> {
+  return invoke<string>("load_scrollback", { tabId });
+}
+
+export function deleteScrollback(tabId: string): Promise<void> {
+  return invoke("delete_scrollback", { tabId });
 }

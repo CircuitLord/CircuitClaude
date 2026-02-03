@@ -37,6 +37,8 @@ export function ProjectHeader() {
       projectName: projectName ?? "Unknown",
       projectPath: activeProjectPath,
       sessionId: null,
+      createdAt: Date.now(),
+      restored: false,
     });
   }
 

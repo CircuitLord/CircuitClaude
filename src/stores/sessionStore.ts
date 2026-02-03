@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { TerminalSession } from "../types";
+import { TerminalSession, SessionsConfig } from "../types";
 
 interface SessionStore {
   sessions: TerminalSession[];
@@ -11,14 +11,16 @@ interface SessionStore {
   setActiveSession: (id: string | null) => void;
   setActiveProject: (path: string | null) => void;
   updateSessionPtyId: (id: string, sessionId: string) => void;
+  restoreFromConfig: (config: SessionsConfig) => void;
+  toSessionsConfig: () => SessionsConfig;
+  clearRestoredFlag: (id: string) => void;
 }
 
-let nextId = 1;
 export function generateTabId(): string {
-  return `tab-${nextId++}`;
+  return crypto.randomUUID();
 }
 
-export const useSessionStore = create<SessionStore>((set) => ({
+export const useSessionStore = create<SessionStore>((set, get) => ({
   sessions: [],
   activeSessionId: null,
   activeProjectPath: null,
@@ -41,8 +43,6 @@ export const useSessionStore = create<SessionStore>((set) => ({
           : state.activeSessionId;
       // Stay on the same project even if last session is removed
       const activeProjectPath = state.activeProjectPath;
-      // But if the project has no sessions left and was the removed session's project,
-      // we still keep activeProjectPath so we show the project-scoped empty state
       return { sessions, activeSessionId, activeProjectPath };
     }),
 
@@ -74,6 +74,61 @@ export const useSessionStore = create<SessionStore>((set) => ({
     set((state) => ({
       sessions: state.sessions.map((s) =>
         s.id === id ? { ...s, sessionId } : s
+      ),
+    })),
+
+  restoreFromConfig: (config) =>
+    set(() => {
+      const sessions: TerminalSession[] = [];
+      for (const layout of config.layouts) {
+        for (const ps of layout.sessions) {
+          sessions.push({
+            id: ps.id,
+            projectName: ps.projectName,
+            projectPath: ps.projectPath,
+            sessionId: null,
+            createdAt: ps.createdAt,
+            restored: true,
+          });
+        }
+      }
+      return {
+        sessions,
+        activeProjectPath: config.activeProjectPath ?? null,
+        activeSessionId: config.activeSessionId ?? null,
+      };
+    }),
+
+  toSessionsConfig: () => {
+    const state = get();
+    const byProject = new Map<string, TerminalSession[]>();
+    for (const s of state.sessions) {
+      const list = byProject.get(s.projectPath) ?? [];
+      list.push(s);
+      byProject.set(s.projectPath, list);
+    }
+    const layouts = Array.from(byProject.entries()).map(
+      ([projectPath, sessions]) => ({
+        projectPath,
+        sessions: sessions.map((s) => ({
+          id: s.id,
+          projectName: s.projectName,
+          projectPath: s.projectPath,
+          createdAt: s.createdAt,
+        })),
+      })
+    );
+    return {
+      layouts,
+      activeProjectPath: state.activeProjectPath,
+      activeSessionId: state.activeSessionId,
+    };
+  },
+
+  clearRestoredFlag: (id) =>
+    set((state) => ({
+      sessions: state.sessions.map((s) =>
+        s.id === id ? { ...s, restored: undefined } : s
       ),
     })),
 }));

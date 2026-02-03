@@ -36,6 +36,7 @@ impl PtyManager {
         project_path: &str,
         cols: u16,
         rows: u16,
+        continue_session: bool,
         on_output: Channel<PtyOutputEvent>,
     ) -> Result<SessionId, String> {
         let pty_system = native_pty_system();
@@ -50,7 +51,11 @@ impl PtyManager {
             .map_err(|e| format!("Failed to open PTY: {}", e))?;
 
         let mut cmd = CommandBuilder::new("cmd.exe");
-        cmd.args(["/c", "claude"]);
+        if continue_session {
+            cmd.args(["/c", "claude", "--continue"]);
+        } else {
+            cmd.args(["/c", "claude"]);
+        }
         cmd.cwd(project_path);
 
         let child = pair

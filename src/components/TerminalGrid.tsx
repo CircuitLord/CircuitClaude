@@ -1,19 +1,34 @@
+import { Panel, Group, Separator } from "react-resizable-panels";
+import type { ReactNode } from "react";
 import { useSessionStore } from "../stores/sessionStore";
 import { TerminalView } from "./TerminalView";
 import { killSession } from "../lib/pty";
+import { deleteScrollback } from "../lib/config";
+import type { TerminalSession } from "../types";
 
-function getGridColumns(count: number): string {
-  if (count <= 1) return "1fr";
-  if (count <= 4) return "1fr 1fr";
-  if (count <= 6) return "1fr 1fr";
-  return "1fr 1fr 1fr";
+function getColumnCount(count: number): number {
+  if (count <= 1) return 1;
+  if (count <= 6) return 2;
+  return 3;
 }
 
-export function TerminalGrid() {
-  const { sessions, activeProjectPath, removeSession } = useSessionStore();
+function chunkArray<T>(arr: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) {
+    chunks.push(arr.slice(i, i + size));
+  }
+  return chunks;
+}
+
+interface TerminalGridProps {
+  projectPath: string;
+}
+
+export function TerminalGrid({ projectPath }: TerminalGridProps) {
+  const { sessions, removeSession } = useSessionStore();
 
   const projectSessions = sessions.filter(
-    (s) => s.projectPath === activeProjectPath
+    (s) => s.projectPath === projectPath
   );
 
   async function handleCloseSession(id: string) {
@@ -25,25 +40,105 @@ export function TerminalGrid() {
         // Session may already be dead
       }
     }
+    deleteScrollback(id).catch(() => {});
     removeSession(id);
   }
 
+  function renderTerminal(s: (typeof projectSessions)[number]) {
+    return (
+      <TerminalView
+        tabId={s.id}
+        projectPath={s.projectPath}
+        projectName={s.projectName}
+        isRestored={s.restored}
+        onClose={() => handleCloseSession(s.id)}
+      />
+    );
+  }
+
+  // Single terminal: no panels needed
+  if (projectSessions.length === 1) {
+    return (
+      <div className="terminal-grid-container">
+        {renderTerminal(projectSessions[0])}
+      </div>
+    );
+  }
+
+  const cols = getColumnCount(projectSessions.length);
+  const rows = chunkArray(projectSessions, cols);
+
   return (
-    <div
-      className="terminal-grid"
-      style={{
-        gridTemplateColumns: getGridColumns(projectSessions.length),
-      }}
-    >
-      {projectSessions.map((s) => (
-        <div key={s.id} className="grid-cell">
-          <TerminalView
-            tabId={s.id}
-            projectPath={s.projectPath}
-            onClose={() => handleCloseSession(s.id)}
+    <div className="terminal-grid-container">
+      <Group orientation="vertical">
+        {rows.map((row, rowIdx) => (
+          <RowPanel
+            key={row.map((s) => s.id).join(",")}
+            row={row}
+            rowIdx={rowIdx}
+            totalRows={rows.length}
+            renderTerminal={renderTerminal}
           />
-        </div>
-      ))}
+        ))}
+      </Group>
     </div>
+  );
+}
+
+function RowPanel({
+  row,
+  rowIdx,
+  totalRows,
+  renderTerminal,
+}: {
+  row: TerminalSession[];
+  rowIdx: number;
+  totalRows: number;
+  renderTerminal: (s: TerminalSession) => ReactNode;
+}) {
+  return (
+    <>
+      <Panel minSize={10}>
+        {row.length === 1 ? (
+          renderTerminal(row[0])
+        ) : (
+          <Group orientation="horizontal">
+            {row.map((s, colIdx) => (
+              <ColPanel
+                key={s.id}
+                session={s}
+                colIdx={colIdx}
+                totalCols={row.length}
+                renderTerminal={renderTerminal}
+              />
+            ))}
+          </Group>
+        )}
+      </Panel>
+      {rowIdx < totalRows - 1 && (
+        <Separator className="resize-handle-horizontal" />
+      )}
+    </>
+  );
+}
+
+function ColPanel({
+  session,
+  colIdx,
+  totalCols,
+  renderTerminal,
+}: {
+  session: TerminalSession;
+  colIdx: number;
+  totalCols: number;
+  renderTerminal: (s: TerminalSession) => ReactNode;
+}) {
+  return (
+    <>
+      <Panel minSize={10}>{renderTerminal(session)}</Panel>
+      {colIdx < totalCols - 1 && (
+        <Separator className="resize-handle-vertical" />
+      )}
+    </>
   );
 }

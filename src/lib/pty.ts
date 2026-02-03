@@ -5,12 +5,14 @@ export function spawnSession(
   projectPath: string,
   cols: number,
   rows: number,
-  onOutput: Channel<PtyOutputEvent>
+  onOutput: Channel<PtyOutputEvent>,
+  continueSession: boolean = false
 ): Promise<string> {
   return invoke<string>("spawn_session", {
     projectPath,
     cols,
     rows,
+    continueSession,
     onOutput,
   });
 }
