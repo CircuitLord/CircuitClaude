@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { useSettingsStore } from "../stores/settingsStore";
-import { DEFAULT_SETTINGS } from "../types";
+import { DEFAULT_SETTINGS, ThemeName } from "../types";
+import { THEME_OPTIONS } from "../lib/themes";
 
 export function GearIcon() {
   return (
@@ -289,6 +290,38 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
 
         <div className="settings-dialog-body">
           <TerminalPreview />
+
+          <div className="settings-section">
+            <div className="settings-section-title">Theme</div>
+            <div className="settings-section-rows">
+              <div className="settings-row">
+                <div className="settings-row-label">
+                  <span className="settings-row-name">Color Theme</span>
+                  <div className="settings-row-desc">Accent and surface colors</div>
+                </div>
+                <CustomSelect
+                  value={settings.theme}
+                  options={THEME_OPTIONS}
+                  renderOption={(opt) => {
+                    const accent = THEME_OPTIONS.find((t) => t.value === opt.value)?.accent;
+                    return (
+                      <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: "50%",
+                          background: accent,
+                          flexShrink: 0,
+                        }} />
+                        {opt.label}
+                      </span>
+                    );
+                  }}
+                  onChange={(v) => update({ theme: v as ThemeName })}
+                />
+              </div>
+            </div>
+          </div>
 
           <div className="settings-section">
             <div className="settings-section-title">Font</div>

@@ -10,6 +10,7 @@ import { loadScrollback } from "../lib/config";
 import { registerTerminal, unregisterTerminal } from "../lib/terminalRegistry";
 import { useSessionStore } from "../stores/sessionStore";
 import { useSettingsStore } from "../stores/settingsStore";
+import { THEMES } from "../lib/themes";
 import { PtyOutputEvent } from "../types";
 import "@xterm/xterm/css/xterm.css";
 
@@ -61,18 +62,7 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
       cursorStyle: currentSettings.terminalCursorStyle,
       fontSize: currentSettings.terminalFontSize,
       fontFamily: currentSettings.terminalFontFamily,
-      theme: {
-        background: "#09090f",
-        foreground: "#ededf0",
-        cursor: "#7c3aed",
-        cursorAccent: "#09090f",
-        selectionBackground: "rgba(124, 58, 237, 0.25)",
-        selectionForeground: "#ededf0",
-        black: "#09090f",
-        brightBlack: "#7e7e8e",
-        white: "#ededf0",
-        brightWhite: "#ffffff",
-      },
+      theme: THEMES[currentSettings.theme].xterm,
     });
 
     const fitAddon = new FitAddon();
@@ -215,8 +205,9 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
     terminal.options.fontFamily = settings.terminalFontFamily;
     terminal.options.cursorBlink = settings.terminalCursorBlink;
     terminal.options.cursorStyle = settings.terminalCursorStyle;
+    terminal.options.theme = THEMES[settings.theme].xterm;
     fitAddonRef.current?.fit();
-  }, [settings.terminalFontSize, settings.terminalFontFamily, settings.terminalCursorBlink, settings.terminalCursorStyle]);
+  }, [settings.terminalFontSize, settings.terminalFontFamily, settings.terminalCursorBlink, settings.terminalCursorStyle, settings.theme]);
 
   return (
     <div className="terminal-view">

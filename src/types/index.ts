@@ -49,7 +49,10 @@ export interface GitStatus {
   files: GitFileEntry[];
 }
 
+export type ThemeName = "midnight" | "ember" | "arctic" | "forest";
+
 export interface Settings {
+  theme: ThemeName;
   terminalFontSize: number;
   terminalFontFamily: string;
   terminalCursorStyle: "bar" | "block" | "underline";
@@ -57,6 +60,7 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
+  theme: "midnight",
   terminalFontSize: 15,
   terminalFontFamily: "'Cascadia Code', 'Consolas', 'Monaco', monospace",
   terminalCursorStyle: "bar",

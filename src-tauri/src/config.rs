@@ -109,9 +109,15 @@ pub fn delete_scrollback(app_handle: &tauri::AppHandle, tab_id: &str) -> Result<
     }
 }
 
+fn default_theme() -> String {
+    "midnight".to_string()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SettingsConfig {
+    #[serde(default = "default_theme")]
+    pub theme: String,
     pub terminal_font_size: f64,
     pub terminal_font_family: String,
     pub terminal_cursor_style: String,

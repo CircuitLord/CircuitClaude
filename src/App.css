@@ -27,9 +27,14 @@
   --text-tertiary:  #7e7e8e;
 
   /* Accent */
-  --accent:         #7c3aed;
-  --accent-muted:   rgba(124, 58, 237, 0.15);
-  --accent-text:    #a78bfa;
+  --accent:             #7c3aed;
+  --accent-muted:       rgba(124, 58, 237, 0.15);
+  --accent-text:        #a78bfa;
+  --accent-hover:       #6d28d9;
+  --accent-muted-hover: rgba(124, 58, 237, 0.25);
+
+  /* Terminal */
+  --terminal-border:    #2e2e3a;
 
   /* Git status colors */
   --git-modified:   #e5a50a;
@@ -41,8 +46,6 @@
   /* Layout */
   --sidebar-width:    256px;
   --header-height:    46px;
-  --statusbar-height: 32px;
-
   /* Font sizes */
   --text-xs:   13px;
   --text-sm:   14px;
@@ -486,7 +489,7 @@ body,
 }
 
 .project-header-spawn:hover {
-  background: rgba(124, 58, 237, 0.25);
+  background: var(--accent-muted-hover);
   border-color: var(--accent);
 }
 
@@ -561,7 +564,7 @@ body,
   flex-direction: column;
   width: 100%;
   height: 100%;
-  border: 2px solid #2e2e3a;
+  border: 2px solid var(--terminal-border);
   border-radius: 6px;
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(0, 0, 0, 0.1);
@@ -663,48 +666,6 @@ body,
 }
 
 /* ========================================================================
-   Status Bar
-   ======================================================================== */
-
-.status-bar {
-  height: var(--statusbar-height);
-  min-height: var(--statusbar-height);
-  background: var(--bg-surface);
-  border-top: 1px solid var(--border-subtle);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 14px;
-  font-size: var(--text-xs);
-  color: var(--text-tertiary);
-  font-family: var(--font-ui);
-  user-select: none;
-}
-
-.status-bar-left {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  overflow: hidden;
-}
-
-.status-bar-path {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-}
-
-.status-bar-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-  color: var(--text-tertiary);
-}
-
-/* ========================================================================
    Empty State
    ======================================================================== */
 
@@ -777,7 +738,7 @@ body,
 }
 
 .empty-state-spawn:hover {
-  background: #6d28d9;
+  background: var(--accent-hover);
 }
 
 /* ========================================================================
@@ -913,8 +874,8 @@ body,
 }
 
 .dialog-btn-primary:hover {
-  background: #6d28d9;
-  border-color: #6d28d9;
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 
 /* ========================================================================

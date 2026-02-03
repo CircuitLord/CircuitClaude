@@ -4,7 +4,6 @@ import { Sidebar } from "./components/Sidebar";
 import { ProjectHeader } from "./components/ProjectHeader";
 import { TerminalGrid } from "./components/TerminalGrid";
 import { EmptyState } from "./components/EmptyState";
-import { StatusBar } from "./components/StatusBar";
 import { WindowControls } from "./components/WindowControls";
 import { DiffViewer } from "./components/DiffViewer";
 import { useSessionStore, generateTabId } from "./stores/sessionStore";
@@ -131,7 +130,6 @@ function App() {
               <TerminalGrid projectPath={path} />
             </div>
           ))}
-          <StatusBar />
         </div>
       </div>
       <DiffViewer />
