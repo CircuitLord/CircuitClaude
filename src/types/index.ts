@@ -48,3 +48,17 @@ export interface GitStatus {
   branch: string;
   files: GitFileEntry[];
 }
+
+export interface Settings {
+  terminalFontSize: number;
+  terminalFontFamily: string;
+  terminalCursorStyle: "bar" | "block" | "underline";
+  terminalCursorBlink: boolean;
+}
+
+export const DEFAULT_SETTINGS: Settings = {
+  terminalFontSize: 15,
+  terminalFontFamily: "'Cascadia Code', 'Consolas', 'Monaco', monospace",
+  terminalCursorStyle: "bar",
+  terminalCursorBlink: true,
+};

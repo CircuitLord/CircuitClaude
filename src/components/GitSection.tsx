@@ -1,9 +1,12 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { useGitStore } from "../stores/gitStore";
 import { useSessionStore } from "../stores/sessionStore";
 import { GitFileEntry } from "../types";
 
 const POLL_INTERVAL = 7000;
+const DEFAULT_HEIGHT = 220;
+const MIN_HEIGHT = 38; // just the header
+const MIN_LIST_HEIGHT = 80; // minimum space for project list above
 
 function ChevronIcon({ open }: { open: boolean }) {
   return (
@@ -65,7 +68,7 @@ function RefreshIcon() {
   );
 }
 
-function statusColor(status: string): string {
+export function statusColor(status: string): string {
   switch (status) {
     case "M":
       return "var(--git-modified)";
@@ -92,10 +95,12 @@ function FileGroup({
   label,
   groupKey,
   files,
+  onFileClick,
 }: {
   label: string;
   groupKey: string;
   files: GitFileEntry[];
+  onFileClick: (file: GitFileEntry) => void;
 }) {
   const { collapsedGroups, toggleGroup } = useGitStore();
   const collapsed = collapsedGroups[groupKey] ?? false;
@@ -114,7 +119,12 @@ function FileGroup({
           {files.map((f, i) => {
             const { dir, name } = splitPath(f.path);
             return (
-              <div className="git-file-item" key={`${f.path}-${i}`} title={f.path}>
+              <div
+                className="git-file-item"
+                key={`${f.path}-${i}`}
+                title={f.path}
+                onClick={() => onFileClick(f)}
+              >
                 <span
                   className="git-file-status"
                   style={{ color: statusColor(f.status) }}
@@ -134,12 +144,54 @@ function FileGroup({
 
 export function GitSection() {
   const activeProjectPath = useSessionStore((s) => s.activeProjectPath);
-  const { statuses, sectionOpen, fetchStatus, toggleSection } = useGitStore();
+  const { statuses, sectionOpen, fetchStatus, toggleSection, openDiff } = useGitStore();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const sectionRef = useRef<HTMLDivElement>(null);
+  const [panelHeight, setPanelHeight] = useState(DEFAULT_HEIGHT);
+  const dragRef = useRef<{ startY: number; startHeight: number } | null>(null);
 
   const refresh = useCallback(() => {
     if (activeProjectPath) fetchStatus(activeProjectPath);
   }, [activeProjectPath, fetchStatus]);
+
+  // Resize drag handling
+  useEffect(() => {
+    function onMouseMove(e: MouseEvent) {
+      if (!dragRef.current || !sectionRef.current) return;
+      const delta = dragRef.current.startY - e.clientY;
+      const parentEl = sectionRef.current.parentElement;
+      const maxHeight = parentEl
+        ? parentEl.clientHeight - MIN_LIST_HEIGHT
+        : 600;
+      const newHeight = Math.min(
+        Math.max(MIN_HEIGHT, dragRef.current.startHeight + delta),
+        maxHeight
+      );
+      setPanelHeight(newHeight);
+    }
+
+    function onMouseUp() {
+      if (dragRef.current) {
+        dragRef.current = null;
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+      }
+    }
+
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+  }, []);
+
+  function onResizeStart(e: React.MouseEvent) {
+    e.preventDefault();
+    dragRef.current = { startY: e.clientY, startHeight: panelHeight };
+    document.body.style.cursor = "ns-resize";
+    document.body.style.userSelect = "none";
+  }
 
   // Fetch on mount / project change, and poll
   useEffect(() => {
@@ -169,7 +221,14 @@ export function GitSection() {
   const totalCount = staged.length + changes.length + untracked.length;
 
   return (
-    <div className="git-section">
+    <div
+      className="git-section"
+      ref={sectionRef}
+      style={{ height: sectionOpen ? panelHeight : undefined }}
+    >
+      {sectionOpen && (
+        <div className="git-resize-handle" onMouseDown={onResizeStart} />
+      )}
       <div className="git-section-header" onClick={toggleSection}>
         <ChevronIcon open={sectionOpen} />
         <span className="git-section-title">Source Control</span>
@@ -206,16 +265,19 @@ export function GitSection() {
                       label="Staged Changes"
                       groupKey="staged"
                       files={staged}
+                      onFileClick={(f) => openDiff(activeProjectPath, f)}
                     />
                     <FileGroup
                       label="Changes"
                       groupKey="changes"
                       files={changes}
+                      onFileClick={(f) => openDiff(activeProjectPath, f)}
                     />
                     <FileGroup
                       label="Untracked"
                       groupKey="untracked"
                       files={untracked}
+                      onFileClick={(f) => openDiff(activeProjectPath, f)}
                     />
                   </>
                 )}

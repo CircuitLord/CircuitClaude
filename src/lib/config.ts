@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { Project, SessionsConfig } from "../types";
+import { Project, SessionsConfig, Settings } from "../types";
 
 export function loadProjects(): Promise<Project[]> {
   return invoke<Project[]>("load_projects");
@@ -27,4 +27,12 @@ export function loadScrollback(tabId: string): Promise<string> {
 
 export function deleteScrollback(tabId: string): Promise<void> {
   return invoke("delete_scrollback", { tabId });
+}
+
+export function loadSettings(): Promise<Settings | null> {
+  return invoke<Settings | null>("load_settings");
+}
+
+export function saveSettings(settings: Settings): Promise<void> {
+  return invoke("save_settings", { settings });
 }

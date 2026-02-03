@@ -1,8 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useProjectStore } from "../stores/projectStore";
 import { useSessionStore } from "../stores/sessionStore";
 import { AddProjectDialog } from "./AddProjectDialog";
 import { GitSection } from "./GitSection";
+import { SettingsDialog, GearIcon } from "./SettingsDialog";
 
 function FolderIcon() {
   return (
@@ -24,6 +25,7 @@ function FolderIcon() {
 export function Sidebar() {
   const { projects, loaded, load } = useProjectStore();
   const { sessions, activeProjectPath, setActiveProject } = useSessionStore();
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     if (!loaded) load();
@@ -71,6 +73,11 @@ export function Sidebar() {
       </div>
       <AddProjectDialog />
       <GitSection />
+      <button className="sidebar-settings-btn" onClick={() => setSettingsOpen(true)}>
+        <GearIcon />
+        Settings
+      </button>
+      <SettingsDialog isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );
 }

@@ -1,26 +1,36 @@
 import { create } from "zustand";
-import { GitStatus } from "../types";
-import { getGitStatus } from "../lib/git";
+import { GitFileEntry, GitStatus } from "../types";
+import { getGitDiff, getGitStatus } from "../lib/git";
 
 interface GitStore {
   statuses: Record<string, GitStatus>;
   loading: Record<string, boolean>;
   sectionOpen: boolean;
   collapsedGroups: Record<string, boolean>;
+  diffFile: GitFileEntry | null;
+  diffContent: string | null;
+  diffLoading: boolean;
   fetchStatus: (projectPath: string) => Promise<void>;
   toggleSection: () => void;
   toggleGroup: (group: string) => void;
+  openDiff: (projectPath: string, file: GitFileEntry) => Promise<void>;
+  closeDiff: () => void;
 }
 
-export const useGitStore = create<GitStore>((set, get) => ({
+export const useGitStore = create<GitStore>((set) => ({
   statuses: {},
   loading: {},
   sectionOpen: true,
   collapsedGroups: {},
+  diffFile: null,
+  diffContent: null,
+  diffLoading: false,
 
   fetchStatus: async (projectPath: string) => {
-    if (get().loading[projectPath]) return;
-    set((state) => ({ loading: { ...state.loading, [projectPath]: true } }));
+    set((state) => {
+      if (state.loading[projectPath]) return state;
+      return { loading: { ...state.loading, [projectPath]: true } };
+    });
     try {
       const status = await getGitStatus(projectPath);
       set((state) => ({
@@ -42,4 +52,16 @@ export const useGitStore = create<GitStore>((set, get) => ({
         [group]: !state.collapsedGroups[group],
       },
     })),
+
+  openDiff: async (projectPath: string, file: GitFileEntry) => {
+    set({ diffFile: file, diffContent: null, diffLoading: true });
+    try {
+      const content = await getGitDiff(projectPath, file.path, file.staged, file.status);
+      set({ diffContent: content, diffLoading: false });
+    } catch {
+      set({ diffContent: null, diffLoading: false });
+    }
+  },
+
+  closeDiff: () => set({ diffFile: null, diffContent: null, diffLoading: false }),
 }));

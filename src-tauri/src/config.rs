@@ -108,3 +108,30 @@ pub fn delete_scrollback(app_handle: &tauri::AppHandle, tab_id: &str) -> Result<
         Ok(())
     }
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SettingsConfig {
+    pub terminal_font_size: f64,
+    pub terminal_font_family: String,
+    pub terminal_cursor_style: String,
+    pub terminal_cursor_blink: bool,
+}
+
+fn settings_path(app_handle: &tauri::AppHandle) -> PathBuf {
+    config_dir(app_handle).join("settings.json")
+}
+
+pub fn load_settings(app_handle: &tauri::AppHandle) -> Option<SettingsConfig> {
+    let path = settings_path(app_handle);
+    match fs::read_to_string(&path) {
+        Ok(contents) => serde_json::from_str(&contents).ok(),
+        Err(_) => None,
+    }
+}
+
+pub fn save_settings(app_handle: &tauri::AppHandle, settings: &SettingsConfig) -> Result<(), String> {
+    let path = settings_path(app_handle);
+    let json = serde_json::to_string_pretty(settings).map_err(|e| e.to_string())?;
+    fs::write(&path, json).map_err(|e| e.to_string())
+}

@@ -1,4 +1,4 @@
-use crate::config::{self, ProjectConfig, SessionsConfig};
+use crate::config::{self, ProjectConfig, SessionsConfig, SettingsConfig};
 use crate::git;
 use crate::pty_manager::{PtyManager, PtyOutputEvent};
 use tauri::ipc::Channel;
@@ -111,8 +111,26 @@ pub fn delete_scrollback(
 }
 
 #[tauri::command]
+pub fn load_settings(app_handle: tauri::AppHandle) -> Option<SettingsConfig> {
+    config::load_settings(&app_handle)
+}
+
+#[tauri::command]
+pub fn save_settings(
+    app_handle: tauri::AppHandle,
+    settings: SettingsConfig,
+) -> Result<(), String> {
+    config::save_settings(&app_handle, &settings)
+}
+
+#[tauri::command]
 pub fn get_git_status(project_path: String) -> git::GitStatus {
     git::get_status(&project_path)
+}
+
+#[tauri::command]
+pub fn get_git_diff(project_path: String, file_path: String, staged: bool, status: String) -> Result<String, String> {
+    git::get_diff(&project_path, &file_path, staged, &status)
 }
 
 #[tauri::command]

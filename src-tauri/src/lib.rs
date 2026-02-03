@@ -21,10 +21,13 @@ pub fn run() {
             commands::save_projects,
             commands::load_sessions_config,
             commands::save_sessions_config,
+            commands::load_settings,
+            commands::save_settings,
             commands::save_scrollback,
             commands::load_scrollback,
             commands::delete_scrollback,
             commands::get_git_status,
+            commands::get_git_diff,
             commands::exit_app,
         ])
         .build(tauri::generate_context!())

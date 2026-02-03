@@ -9,6 +9,7 @@ import { spawnSession, writeSession, resizeSession, killSession } from "../lib/p
 import { loadScrollback } from "../lib/config";
 import { registerTerminal, unregisterTerminal } from "../lib/terminalRegistry";
 import { useSessionStore } from "../stores/sessionStore";
+import { useSettingsStore } from "../stores/settingsStore";
 import { PtyOutputEvent } from "../types";
 import "@xterm/xterm/css/xterm.css";
 
@@ -48,16 +49,18 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
   const updateSessionPtyId = useSessionStore((s) => s.updateSessionPtyId);
   const clearRestoredFlag = useSessionStore((s) => s.clearRestoredFlag);
   const activeProjectPath = useSessionStore((s) => s.activeProjectPath);
+  const settings = useSettingsStore((s) => s.settings);
 
   useEffect(() => {
     if (!containerRef.current || initializedRef.current) return;
     initializedRef.current = true;
 
+    const currentSettings = useSettingsStore.getState().settings;
     const terminal = new Terminal({
-      cursorBlink: true,
-      cursorStyle: "bar",
-      fontSize: 15,
-      fontFamily: "'Cascadia Code', 'Consolas', 'Monaco', monospace",
+      cursorBlink: currentSettings.terminalCursorBlink,
+      cursorStyle: currentSettings.terminalCursorStyle,
+      fontSize: currentSettings.terminalFontSize,
+      fontFamily: currentSettings.terminalFontFamily,
       theme: {
         background: "#09090f",
         foreground: "#ededf0",
@@ -202,6 +205,18 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
     });
     return () => cancelAnimationFrame(raf);
   }, [activeProjectPath, projectPath]);
+
+  // Apply settings changes to live terminals
+  useEffect(() => {
+    const terminal = terminalRef.current;
+    if (!terminal) return;
+
+    terminal.options.fontSize = settings.terminalFontSize;
+    terminal.options.fontFamily = settings.terminalFontFamily;
+    terminal.options.cursorBlink = settings.terminalCursorBlink;
+    terminal.options.cursorStyle = settings.terminalCursorStyle;
+    fitAddonRef.current?.fit();
+  }, [settings.terminalFontSize, settings.terminalFontFamily, settings.terminalCursorBlink, settings.terminalCursorStyle]);
 
   return (
     <div className="terminal-view">

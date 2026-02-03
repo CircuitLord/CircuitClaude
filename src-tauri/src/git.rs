@@ -1,4 +1,5 @@
 use serde::Serialize;
+use std::fs;
 use std::process::Command;
 
 #[derive(Serialize, Clone)]
@@ -51,6 +52,44 @@ pub fn get_status(project_path: &str) -> GitStatus {
         branch,
         files,
     }
+}
+
+pub fn get_diff(project_path: &str, file_path: &str, staged: bool, status: &str) -> Result<String, String> {
+    if status == "?" {
+        // Untracked file: read contents and format as synthetic diff
+        let full_path = std::path::Path::new(project_path).join(file_path);
+        let contents = fs::read_to_string(&full_path)
+            .map_err(|e| format!("Failed to read file: {}", e))?;
+        let lines: Vec<&str> = contents.lines().collect();
+        let line_count = lines.len();
+        let mut diff = format!("--- /dev/null\n+++ b/{}\n@@ -0,0 +1,{} @@\n", file_path, line_count);
+        for line in lines {
+            diff.push('+');
+            diff.push_str(line);
+            diff.push('\n');
+        }
+        return Ok(diff);
+    }
+
+    let mut args = vec!["diff"];
+    if staged {
+        args.push("--cached");
+    }
+    args.push("--");
+    args.push(file_path);
+
+    let output = Command::new("git")
+        .args(&args)
+        .current_dir(project_path)
+        .output()
+        .map_err(|e| format!("Failed to run git diff: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("git diff failed: {}", stderr));
+    }
+
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 
 fn parse_porcelain(output: &str) -> Vec<GitFileEntry> {

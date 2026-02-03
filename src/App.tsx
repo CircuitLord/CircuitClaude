@@ -6,8 +6,10 @@ import { TerminalGrid } from "./components/TerminalGrid";
 import { EmptyState } from "./components/EmptyState";
 import { StatusBar } from "./components/StatusBar";
 import { WindowControls } from "./components/WindowControls";
+import { DiffViewer } from "./components/DiffViewer";
 import { useSessionStore, generateTabId } from "./stores/sessionStore";
 import { useProjectStore } from "./stores/projectStore";
+import { useSettingsStore } from "./stores/settingsStore";
 import { loadSessionsConfig, saveSessionsConfig, saveScrollback } from "./lib/config";
 import { killAllSessions, exitApp } from "./lib/pty";
 import { serializeAllTerminals } from "./lib/terminalRegistry";
@@ -34,6 +36,8 @@ function App() {
   useEffect(() => {
     if (restoredRef.current) return;
     restoredRef.current = true;
+
+    useSettingsStore.getState().load();
 
     loadSessionsConfig()
       .then((config) => {
@@ -91,44 +95,47 @@ function App() {
   }
 
   return (
-    <div className="app">
-      <Sidebar />
-      <div className="main-panel">
-        {activeProjectPath ? (
-          <>
-            <ProjectHeader />
-            {activeProjectSessions.length === 0 ? (
-              <div className="terminal-area">
-                <EmptyState
-                  variant="no-sessions"
-                  onSpawn={handleSpawnForProject}
-                />
+    <>
+      <div className="app">
+        <Sidebar />
+        <div className="main-panel">
+          {activeProjectPath ? (
+            <>
+              <ProjectHeader />
+              {activeProjectSessions.length === 0 ? (
+                <div className="terminal-area">
+                  <EmptyState
+                    variant="no-sessions"
+                    onSpawn={handleSpawnForProject}
+                  />
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <div className="titlebar-fallback" data-tauri-drag-region>
+                <WindowControls />
               </div>
-            ) : null}
-          </>
-        ) : (
-          <>
-            <div className="titlebar-fallback" data-tauri-drag-region>
-              <WindowControls />
+              <div className="terminal-area">
+                <EmptyState />
+              </div>
+            </>
+          )}
+          {/* Render all project grids simultaneously; only the active one is visible */}
+          {projectsWithSessions.map((path) => (
+            <div
+              key={path}
+              className="terminal-grid-wrapper"
+              style={{ display: path === activeProjectPath ? "flex" : "none" }}
+            >
+              <TerminalGrid projectPath={path} />
             </div>
-            <div className="terminal-area">
-              <EmptyState />
-            </div>
-          </>
-        )}
-        {/* Render all project grids simultaneously; only the active one is visible */}
-        {projectsWithSessions.map((path) => (
-          <div
-            key={path}
-            className="terminal-grid-wrapper"
-            style={{ display: path === activeProjectPath ? "flex" : "none" }}
-          >
-            <TerminalGrid projectPath={path} />
-          </div>
-        ))}
-        <StatusBar />
+          ))}
+          <StatusBar />
+        </div>
       </div>
-    </div>
+      <DiffViewer />
+    </>
   );
 }
 
