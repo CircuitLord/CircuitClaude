@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useProjectStore } from "../stores/projectStore";
 import { useSessionStore } from "../stores/sessionStore";
-import { useAddProject, AddProjectDialog } from "./AddProjectDialog";
+import { useAddProject } from "./AddProjectDialog";
 import { GitSection } from "./GitSection";
 import { SettingsDialog } from "./SettingsDialog";
 
@@ -25,7 +25,7 @@ export function Sidebar() {
         <span className="sidebar-header-label" data-tauri-drag-region>~/projects</span>
         <div className="sidebar-header-actions">
           <button className="sidebar-header-btn" onClick={handleAdd} title="Add project">
-            +
++ add
           </button>
         </div>
       </div>
@@ -71,7 +71,6 @@ export function Sidebar() {
             </div>
           );
         })}
-        <AddProjectDialog />
       </div>
       <GitSection />
       <button className="sidebar-settings-btn" onClick={() => setSettingsOpen(true)}>

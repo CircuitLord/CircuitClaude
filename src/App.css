@@ -125,21 +125,20 @@ body,
 }
 
 .sidebar-header-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  color: var(--text-tertiary);
+  background: var(--accent-muted);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 4px 10px;
+  color: var(--accent-text);
   cursor: pointer;
+  font-size: 13px;
   font-family: var(--font-mono);
-  font-size: 14px;
-  padding: 0 2px;
-  transition: color 0.1s;
+  transition: background 0.1s, border-color 0.1s;
 }
 
 .sidebar-header-btn:hover {
-  color: var(--accent-text);
+  background: var(--accent-muted-hover);
+  border-color: var(--accent);
 }
 
 .sidebar-list {
@@ -284,29 +283,6 @@ body,
   100% { color: var(--text-tertiary); }
 }
 
-/* --- Add Project Entry --- */
-
-.sidebar-add-card {
-  display: flex;
-  align-items: center;
-  height: 36px;
-  padding: 0 12px;
-  background: transparent;
-  border: none;
-  color: var(--text-tertiary);
-  cursor: pointer;
-  font-size: 13px;
-  font-family: var(--font-mono);
-  transition: color 0.1s;
-}
-
-.sidebar-add-card:hover {
-  color: var(--accent-text);
-}
-
-.sidebar-add-card svg {
-  display: none;
-}
 
 /* ========================================================================
    Git Section (sidebar) — TUI style
