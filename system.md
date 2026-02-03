@@ -35,10 +35,24 @@ Each navigable item is a flat row (36px tall), laid out as a single monospace li
 
 ## Action Buttons
 
-- Plain text, no SVG icons, no borders, no background
+Two tiers of action button, both monospace, no SVG icons.
+
+### Inline text buttons (low emphasis)
+
+- Plain text, no background, no border
 - `--text-tertiary` default, `--accent-text` on hover
-- Examples: `+ new`, `:settings`, `+` in header
+- Examples: `:settings`, `:esc`
 - SVG icons hidden via `display: none` if they exist in markup
+
+### Accent pill buttons (high emphasis)
+
+- Background `var(--accent-muted)`, text `var(--accent-text)`
+- `border: 1px solid transparent`, `border-radius: 4px`, `padding: 4px 10px`
+- 13px `--font-mono`, `cursor: pointer`
+- Hover: background `var(--accent-muted-hover)`, `border-color: var(--accent)`
+- Transition: `background 0.1s, border-color 0.1s`
+- Label starts with `+`: `+ add`, `+ new session`
+- Use for primary actions in headers, empty states, and anywhere a call-to-action needs more visual weight than a text button
 
 ## `:` Command Prefix
 

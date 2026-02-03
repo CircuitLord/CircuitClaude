@@ -1,8 +1,8 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::process::Command;
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct GitFileEntry {
     pub path: String,
@@ -90,6 +90,113 @@ pub fn get_diff(project_path: &str, file_path: &str, staged: bool, status: &str)
     }
 
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+pub fn commit(project_path: &str, files: &[String], message: &str) -> Result<String, String> {
+    // Stage selected files
+    let mut add_args = vec!["add", "--"];
+    let file_refs: Vec<&str> = files.iter().map(|s| s.as_str()).collect();
+    add_args.extend(file_refs);
+
+    let add_output = Command::new("git")
+        .args(&add_args)
+        .current_dir(project_path)
+        .output()
+        .map_err(|e| format!("Failed to run git add: {}", e))?;
+
+    if !add_output.status.success() {
+        let stderr = String::from_utf8_lossy(&add_output.stderr);
+        return Err(format!("git add failed: {}", stderr));
+    }
+
+    // Commit
+    let commit_output = Command::new("git")
+        .args(["commit", "-m", message])
+        .current_dir(project_path)
+        .output()
+        .map_err(|e| format!("Failed to run git commit: {}", e))?;
+
+    if !commit_output.status.success() {
+        let stderr = String::from_utf8_lossy(&commit_output.stderr);
+        return Err(format!("git commit failed: {}", stderr));
+    }
+
+    Ok(String::from_utf8_lossy(&commit_output.stdout).trim().to_string())
+}
+
+pub fn revert(project_path: &str, files: &[GitFileEntry]) -> Result<(), String> {
+    let mut untracked: Vec<&str> = Vec::new();
+    let mut staged: Vec<&str> = Vec::new();
+    let mut unstaged: Vec<&str> = Vec::new();
+
+    for f in files {
+        if f.status == "?" {
+            untracked.push(&f.path);
+        } else if f.staged {
+            staged.push(&f.path);
+        } else {
+            unstaged.push(&f.path);
+        }
+    }
+
+    // Revert untracked: git clean -f -- <paths>
+    if !untracked.is_empty() {
+        let mut args: Vec<&str> = vec!["clean", "-f", "--"];
+        args.extend(&untracked);
+        let output = Command::new("git")
+            .args(&args)
+            .current_dir(project_path)
+            .output()
+            .map_err(|e| format!("Failed to run git clean: {}", e))?;
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(format!("git clean failed: {}", stderr));
+        }
+    }
+
+    // Revert staged: unstage first, then restore
+    if !staged.is_empty() {
+        let mut unstage_args: Vec<&str> = vec!["restore", "--staged", "--"];
+        unstage_args.extend(&staged);
+        let output = Command::new("git")
+            .args(&unstage_args)
+            .current_dir(project_path)
+            .output()
+            .map_err(|e| format!("Failed to run git restore --staged: {}", e))?;
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(format!("git restore --staged failed: {}", stderr));
+        }
+
+        let mut restore_args: Vec<&str> = vec!["restore", "--"];
+        restore_args.extend(&staged);
+        let output = Command::new("git")
+            .args(&restore_args)
+            .current_dir(project_path)
+            .output()
+            .map_err(|e| format!("Failed to run git restore: {}", e))?;
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(format!("git restore failed: {}", stderr));
+        }
+    }
+
+    // Revert unstaged: git restore -- <paths>
+    if !unstaged.is_empty() {
+        let mut args: Vec<&str> = vec!["restore", "--"];
+        args.extend(&unstaged);
+        let output = Command::new("git")
+            .args(&args)
+            .current_dir(project_path)
+            .output()
+            .map_err(|e| format!("Failed to run git restore: {}", e))?;
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(format!("git restore failed: {}", stderr));
+        }
+    }
+
+    Ok(())
 }
 
 fn parse_porcelain(output: &str) -> Vec<GitFileEntry> {

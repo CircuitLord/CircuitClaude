@@ -49,7 +49,7 @@ export interface GitStatus {
   files: GitFileEntry[];
 }
 
-export type ThemeName = "midnight" | "ember" | "arctic" | "forest";
+export type ThemeName = "midnight" | "ember" | "arctic" | "forest" | "crimson";
 
 export interface Settings {
   theme: ThemeName;

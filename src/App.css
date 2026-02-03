@@ -12,14 +12,14 @@
 /* --- Tokens --- */
 :root {
   /* Surfaces (luminance-based elevation) */
-  --bg-base:      #09090f;
-  --bg-surface:   #0f0f17;
-  --bg-elevated:  #15151f;
-  --bg-overlay:   #1a1a26;
+  --bg-base:      #0a0a0e;
+  --bg-surface:   #101014;
+  --bg-elevated:  #16161b;
+  --bg-overlay:   #1b1b21;
 
   /* Borders */
-  --border-subtle:  #1a1a26;
-  --border-visible: #24242e;
+  --border-subtle:  #1c1c23;
+  --border-visible: #26262e;
 
   /* Text */
   --text-primary:   #ededf0;
@@ -34,7 +34,7 @@
   --accent-muted-hover: rgba(124, 58, 237, 0.25);
 
   /* Terminal */
-  --terminal-border:    #2e2e3a;
+  --terminal-border:    #2a2a34;
 
   /* Git status colors */
   --git-modified:   #e5a50a;
@@ -44,7 +44,7 @@
   --git-untracked:  #7e7e8e;
 
   /* Layout */
-  --sidebar-width:    256px;
+  --sidebar-width:    310px;
   --header-height:    46px;
   /* Font sizes */
   --text-xs:   13px;
@@ -283,6 +283,11 @@ body,
   100% { color: var(--text-tertiary); }
 }
 
+@keyframes tui-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
 
 /* ========================================================================
    Git Section (sidebar) — TUI style
@@ -349,29 +354,6 @@ body,
   margin-left: 4px;
 }
 
-.git-refresh-btn {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  background: transparent;
-  border: none;
-  color: var(--text-tertiary);
-  cursor: pointer;
-  font-family: var(--font-mono);
-  font-size: 14px;
-  padding: 0 2px;
-  opacity: 0;
-  transition: opacity 0.1s, color 0.1s;
-}
-
-.git-section-header:hover .git-refresh-btn {
-  opacity: 1;
-}
-
-.git-refresh-btn:hover {
-  color: var(--accent-text);
-}
-
 /* --- Section Body --- */
 
 .git-section-body {
@@ -394,28 +376,24 @@ body,
   border-radius: 2px;
 }
 
-/* --- Branch row (flat entry) --- */
+/* --- Branch Label --- */
 
-.git-section-branch {
-  display: flex;
+.git-branch-label {
+  display: inline-flex;
   align-items: center;
-  height: 28px;
-  padding: 0 12px;
+  margin-left: auto;
   font-size: 13px;
   color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  min-width: 0;
 }
 
 .git-branch-prefix {
-  width: 14px;
   flex-shrink: 0;
   color: var(--accent-text);
-}
-
-.git-branch-name {
   font-size: 13px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  margin-right: 2px;
 }
 
 .git-empty {
@@ -447,6 +425,10 @@ body,
   color: var(--text-primary);
 }
 
+.git-group-header--static {
+  cursor: default;
+}
+
 .git-group-chevron {
   width: 14px;
   flex-shrink: 0;
@@ -470,12 +452,13 @@ body,
   display: flex;
   align-items: center;
   height: 24px;
-  padding: 0 12px 0 26px;
+  padding: 0 12px 0 14px;
   font-size: 12px;
   cursor: pointer;
   min-width: 0;
   color: var(--text-secondary);
   transition: background 0.1s, color 0.1s;
+  position: relative;
 }
 
 .git-file-item:hover {
@@ -528,12 +511,14 @@ body,
   user-select: none;
   font-size: 12px;
   color: var(--text-secondary);
-  transition: background 0.1s, color 0.1s;
+  opacity: 0.7;
+  transition: background 0.1s, color 0.1s, opacity 0.1s;
 }
 
 .git-tree-dir-header:hover {
   background: var(--bg-elevated);
   color: var(--text-primary);
+  opacity: 1;
 }
 
 .git-tree-dir-name {
@@ -549,11 +534,181 @@ body,
   padding-right: 12px;
 }
 
+.git-tree-spacer {
+  width: 14px;
+  flex-shrink: 0;
+}
+
 .git-tree-staged {
   flex-shrink: 0;
   font-size: 11px;
   color: var(--git-added);
   margin-left: 6px;
+}
+
+/* --- File Checkboxes --- */
+
+.git-file-checkbox {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+  margin-right: 6px;
+  letter-spacing: -1px;
+  cursor: pointer;
+  user-select: none;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+}
+
+.git-file-checkbox--checked {
+  color: var(--accent-text);
+}
+
+/* --- Group Checkboxes --- */
+
+.git-group-checkbox {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+  margin-right: 6px;
+  letter-spacing: -1px;
+  cursor: pointer;
+  user-select: none;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+}
+
+.git-group-checkbox--checked {
+  color: var(--accent-text);
+}
+
+.git-group-checkbox--partial {
+  color: var(--text-secondary);
+}
+
+/* --- Per-file Revert Button --- */
+
+.git-file-revert-btn {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 0 2px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.1s, color 0.1s;
+}
+
+.git-file-item:hover .git-file-revert-btn {
+  opacity: 1;
+}
+
+.git-file-revert-btn:hover {
+  color: var(--git-deleted);
+}
+
+/* --- Inline Revert Confirm --- */
+
+.git-revert-confirm {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--git-deleted);
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  user-select: none;
+}
+
+.git-revert-confirm-y,
+.git-revert-confirm-n {
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+.git-revert-confirm-y:hover {
+  color: var(--text-primary);
+}
+
+.git-revert-confirm-n:hover {
+  color: var(--text-primary);
+}
+
+/* --- Action Bar (bottom of git section) --- */
+
+.git-action-bar {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border-subtle);
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.git-commit-input {
+  width: 100%;
+  padding: 4px 6px;
+  background: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: 2px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  outline: none;
+  transition: border-color 0.1s;
+  resize: none;
+}
+
+.git-commit-input:focus {
+  border-color: var(--accent);
+}
+
+.git-commit-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.git-commit-input:disabled {
+  opacity: 0.5;
+}
+
+.git-action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.git-action-btn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: color 0.1s;
+}
+
+.git-action-btn:hover:not(:disabled) {
+  color: var(--accent-text);
+}
+
+.git-action-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.git-action-btn--danger:hover:not(:disabled) {
+  color: var(--git-deleted);
+}
+
+.git-revert-confirm--bar {
+  font-size: 12px;
 }
 
 /* ========================================================================
@@ -701,10 +856,8 @@ body,
   flex-direction: column;
   width: 100%;
   height: 100%;
-  border: 2px solid var(--terminal-border);
-  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(0, 0, 0, 0.1);
 }
 
 .terminal-panel-cell {
@@ -716,11 +869,11 @@ body,
 .terminal-title-bar {
   display: flex;
   align-items: center;
-  height: 32px;
-  min-height: 32px;
-  padding: 0 10px 0 8px;
-  background: var(--bg-elevated);
-  border-bottom: 1px solid var(--border-visible);
+  height: 28px;
+  min-height: 28px;
+  padding: 0 12px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
   user-select: none;
 }
 
@@ -730,10 +883,10 @@ body,
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--text-sm);
-  font-weight: 500;
-  font-family: var(--font-ui);
-  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 400;
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
 }
 
 .terminal-title-close {
@@ -742,13 +895,14 @@ body,
   border: none;
   color: var(--text-tertiary);
   cursor: pointer;
-  padding: 2px;
+  padding: 0;
   margin-left: 4px;
-  border-radius: 4px;
+  font-size: 13px;
+  font-family: var(--font-mono);
   display: flex;
   align-items: center;
   opacity: 0;
-  transition: opacity 0.15s, color 0.1s, background 0.1s;
+  transition: opacity 0.1s, color 0.1s;
 }
 
 .terminal-title-bar:hover .terminal-title-close {
@@ -756,8 +910,7 @@ body,
 }
 
 .terminal-title-close:hover {
-  color: #ef4444;
-  background: rgba(239, 68, 68, 0.15);
+  color: var(--accent-text);
 }
 
 /* ========================================================================
@@ -811,7 +964,7 @@ body,
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: var(--text-secondary);
+  font-family: var(--font-mono);
 }
 
 .empty-state-content {
@@ -819,63 +972,36 @@ body,
   max-width: 320px;
 }
 
-.empty-state-icon {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 20px;
+.empty-state-ascii {
+  font-size: 24px;
   color: var(--text-tertiary);
-}
-
-.empty-state h2 {
-  font-size: var(--text-xl);
-  font-weight: 500;
-  color: var(--text-primary);
-  margin-bottom: 8px;
-}
-
-.empty-state p {
-  font-size: var(--text-base);
-  line-height: 1.6;
-  color: var(--text-secondary);
   margin-bottom: 16px;
 }
 
+.empty-state-cursor {
+  animation: tui-blink 1.2s step-end infinite;
+}
+
+.empty-state-label {
+  font-size: var(--text-base);
+  font-weight: 400;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+
+.empty-state-desc {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  margin-bottom: 20px;
+}
+
 .empty-state-hint {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   color: var(--text-tertiary);
 }
 
-.empty-state-kbd {
-  display: inline-block;
-  padding: 2px 6px;
-  font-size: var(--text-xs);
+.empty-state-action {
   font-family: var(--font-mono);
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-visible);
-  border-radius: 4px;
-  color: var(--text-secondary);
-}
-
-.empty-state-spawn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 9px 18px;
-  background: var(--accent);
-  border: none;
-  border-radius: 6px;
-  color: #fff;
-  cursor: pointer;
-  font-size: var(--text-base);
-  font-family: var(--font-ui);
-  transition: background 0.15s;
-}
-
-.empty-state-spawn:hover {
-  background: var(--accent-hover);
 }
 
 /* ========================================================================

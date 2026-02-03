@@ -14,21 +14,6 @@ import { THEMES } from "../lib/themes";
 import { PtyOutputEvent } from "../types";
 import "@xterm/xterm/css/xterm.css";
 
-function CloseIcon() {
-  return (
-    <svg
-      width="12"
-      height="12"
-      viewBox="0 0 12 12"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-    >
-      <path d="M3 3L9 9M9 3L3 9" />
-    </svg>
-  );
-}
 
 /** Check the last few lines of the terminal buffer for interactive prompt patterns
  *  (tool approval, option selection) that indicate Claude is waiting for user action. */
@@ -262,9 +247,7 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
     <div className="terminal-view">
       <div className="terminal-title-bar">
         <span className="terminal-title-text" title={title}>{title}</span>
-        <button className="terminal-title-close" onClick={onClose} title="Close session">
-          <CloseIcon />
-        </button>
+        <button className="terminal-title-close" onClick={onClose} title="Close session">x</button>
       </div>
       <div className="terminal-container" ref={containerRef} />
     </div>
