@@ -2,6 +2,7 @@ use tauri::Manager;
 
 mod commands;
 mod config;
+mod git;
 mod pty_manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -23,6 +24,7 @@ pub fn run() {
             commands::save_scrollback,
             commands::load_scrollback,
             commands::delete_scrollback,
+            commands::get_git_status,
             commands::exit_app,
         ])
         .build(tauri::generate_context!())

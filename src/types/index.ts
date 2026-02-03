@@ -36,3 +36,15 @@ export interface PtyOutputEvent {
   type: "Data" | "Exit";
   data: number[] | number | null;
 }
+
+export interface GitFileEntry {
+  path: string;
+  status: string; // "M", "A", "D", "R", "?"
+  staged: boolean;
+}
+
+export interface GitStatus {
+  isRepo: boolean;
+  branch: string;
+  files: GitFileEntry[];
+}

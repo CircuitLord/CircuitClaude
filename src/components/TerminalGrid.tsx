@@ -46,14 +46,16 @@ export function TerminalGrid({ projectPath }: TerminalGridProps) {
 
   function renderTerminal(s: (typeof projectSessions)[number]) {
     return (
-      <TerminalView
-        tabId={s.id}
-        projectPath={s.projectPath}
-        projectName={s.projectName}
-        claudeSessionId={s.claudeSessionId}
-        isRestored={s.restored}
-        onClose={() => handleCloseSession(s.id)}
-      />
+      <div className="terminal-panel-cell">
+        <TerminalView
+          tabId={s.id}
+          projectPath={s.projectPath}
+          projectName={s.projectName}
+          claudeSessionId={s.claudeSessionId}
+          isRestored={s.restored}
+          onClose={() => handleCloseSession(s.id)}
+        />
+      </div>
     );
   }
 

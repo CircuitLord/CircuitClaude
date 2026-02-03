@@ -1,4 +1,5 @@
 use crate::config::{self, ProjectConfig, SessionsConfig};
+use crate::git;
 use crate::pty_manager::{PtyManager, PtyOutputEvent};
 use tauri::ipc::Channel;
 use tauri::State;
@@ -107,6 +108,11 @@ pub fn delete_scrollback(
     tab_id: String,
 ) -> Result<(), String> {
     config::delete_scrollback(&app_handle, &tab_id)
+}
+
+#[tauri::command]
+pub fn get_git_status(project_path: String) -> git::GitStatus {
+    git::get_status(&project_path)
 }
 
 #[tauri::command]

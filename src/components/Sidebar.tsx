@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useProjectStore } from "../stores/projectStore";
 import { useSessionStore } from "../stores/sessionStore";
 import { AddProjectDialog } from "./AddProjectDialog";
+import { GitSection } from "./GitSection";
 
 function FolderIcon() {
   return (
@@ -69,6 +70,7 @@ export function Sidebar() {
         })}
       </div>
       <AddProjectDialog />
+      <GitSection />
     </div>
   );
 }
