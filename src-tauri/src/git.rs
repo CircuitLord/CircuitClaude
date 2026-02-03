@@ -199,6 +199,110 @@ pub fn revert(project_path: &str, files: &[GitFileEntry]) -> Result<(), String> 
     Ok(())
 }
 
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct DiffStat {
+    pub path: String,
+    pub insertions: u32,
+    pub deletions: u32,
+}
+
+pub fn get_diff_stats(project_path: &str, files: &[GitFileEntry]) -> Result<Vec<DiffStat>, String> {
+    let mut staged_paths: Vec<&str> = Vec::new();
+    let mut unstaged_paths: Vec<&str> = Vec::new();
+    let mut untracked: Vec<&GitFileEntry> = Vec::new();
+
+    for f in files {
+        if f.status == "?" {
+            untracked.push(f);
+        } else if f.staged {
+            staged_paths.push(&f.path);
+        } else {
+            unstaged_paths.push(&f.path);
+        }
+    }
+
+    let mut stats: Vec<DiffStat> = Vec::new();
+
+    // Staged files: git diff --cached --numstat -- <paths>
+    if !staged_paths.is_empty() {
+        let mut args: Vec<&str> = vec!["diff", "--cached", "--numstat", "--"];
+        args.extend(&staged_paths);
+        let output = Command::new("git")
+            .args(&args)
+            .current_dir(project_path)
+            .output()
+            .map_err(|e| format!("Failed to run git diff --cached --numstat: {}", e))?;
+        if output.status.success() {
+            stats.extend(parse_numstat(&String::from_utf8_lossy(&output.stdout)));
+        }
+    }
+
+    // Unstaged files: git diff --numstat -- <paths>
+    if !unstaged_paths.is_empty() {
+        let mut args: Vec<&str> = vec!["diff", "--numstat", "--"];
+        args.extend(&unstaged_paths);
+        let output = Command::new("git")
+            .args(&args)
+            .current_dir(project_path)
+            .output()
+            .map_err(|e| format!("Failed to run git diff --numstat: {}", e))?;
+        if output.status.success() {
+            stats.extend(parse_numstat(&String::from_utf8_lossy(&output.stdout)));
+        }
+    }
+
+    // Untracked files: count lines as insertions
+    for f in &untracked {
+        let full_path = std::path::Path::new(project_path).join(&f.path);
+        let insertions = match fs::read_to_string(&full_path) {
+            Ok(contents) => contents.lines().count() as u32,
+            Err(_) => 0,
+        };
+        stats.push(DiffStat {
+            path: f.path.clone(),
+            insertions,
+            deletions: 0,
+        });
+    }
+
+    Ok(stats)
+}
+
+pub fn push(project_path: &str) -> Result<String, String> {
+    let output = Command::new("git")
+        .args(["push"])
+        .current_dir(project_path)
+        .output()
+        .map_err(|e| format!("Failed to run git push: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("git push failed: {}", stderr));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    // git push often writes progress to stderr even on success
+    Ok(if stdout.is_empty() { stderr } else { stdout })
+}
+
+fn parse_numstat(output: &str) -> Vec<DiffStat> {
+    let mut stats = Vec::new();
+    for line in output.lines() {
+        let parts: Vec<&str> = line.split('\t').collect();
+        if parts.len() >= 3 {
+            stats.push(DiffStat {
+                // Binary files output "-" for counts
+                insertions: parts[0].parse::<u32>().unwrap_or(0),
+                deletions: parts[1].parse::<u32>().unwrap_or(0),
+                path: parts[2].to_string(),
+            });
+        }
+    }
+    stats
+}
+
 fn parse_porcelain(output: &str) -> Vec<GitFileEntry> {
     let mut files = Vec::new();
 

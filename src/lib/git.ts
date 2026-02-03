@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { GitFileEntry, GitStatus } from "../types";
+import { DiffStat, GitFileEntry, GitStatus } from "../types";
 
 export function getGitStatus(projectPath: string): Promise<GitStatus> {
   return invoke<GitStatus>("get_git_status", { projectPath });
@@ -15,4 +15,12 @@ export function gitCommit(projectPath: string, files: string[], message: string)
 
 export function gitRevert(projectPath: string, files: GitFileEntry[]): Promise<void> {
   return invoke<void>("git_revert", { projectPath, files });
+}
+
+export function getGitDiffStats(projectPath: string, files: GitFileEntry[]): Promise<DiffStat[]> {
+  return invoke<DiffStat[]>("get_git_diff_stats", { projectPath, files });
+}
+
+export function gitPush(projectPath: string): Promise<string> {
+  return invoke<string>("git_push", { projectPath });
 }

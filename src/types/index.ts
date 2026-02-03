@@ -49,6 +49,12 @@ export interface GitStatus {
   files: GitFileEntry[];
 }
 
+export interface DiffStat {
+  path: string;
+  insertions: number;
+  deletions: number;
+}
+
 export type ThemeName = "midnight" | "ember" | "arctic" | "forest" | "crimson";
 
 export type LayoutMode = "grid" | "tabs";

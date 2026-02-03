@@ -30,6 +30,8 @@ pub fn run() {
             commands::get_git_diff,
             commands::git_commit,
             commands::git_revert,
+            commands::get_git_diff_stats,
+            commands::git_push,
             commands::exit_app,
         ])
         .build(tauri::generate_context!())

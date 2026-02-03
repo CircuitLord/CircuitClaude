@@ -144,6 +144,16 @@ pub fn git_revert(project_path: String, files: Vec<git::GitFileEntry>) -> Result
 }
 
 #[tauri::command]
+pub fn get_git_diff_stats(project_path: String, files: Vec<git::GitFileEntry>) -> Result<Vec<git::DiffStat>, String> {
+    git::get_diff_stats(&project_path, &files)
+}
+
+#[tauri::command]
+pub fn git_push(project_path: String) -> Result<String, String> {
+    git::push(&project_path)
+}
+
+#[tauri::command]
 pub fn exit_app(app_handle: tauri::AppHandle) {
     app_handle.exit(0);
 }

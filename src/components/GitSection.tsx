@@ -3,6 +3,7 @@ import { useGitStore, fileKey } from "../stores/gitStore";
 import { useSessionStore } from "../stores/sessionStore";
 import { GitFileEntry } from "../types";
 import { SegmentedControl } from "./SegmentedControl";
+import { CommitDialog } from "./CommitDialog";
 
 const POLL_INTERVAL = 7000;
 const DEFAULT_HEIGHT = 190;
@@ -379,13 +380,11 @@ function FileGroup({
 function ActionBar({ projectPath }: { projectPath: string }) {
   const {
     selectedFiles,
-    commitMessage,
-    setCommitMessage,
-    commitSelected,
     committing,
     reverting,
     statuses,
     revertFiles,
+    openCommitDialog,
   } = useGitStore();
   const [revertConfirming, setRevertConfirming] = useState(false);
   const revertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -397,13 +396,8 @@ function ActionBar({ projectPath }: { projectPath: string }) {
   }, []);
 
   const selCount = Object.keys(selectedFiles).length;
-  const canCommit = selCount > 0 && commitMessage.trim().length > 0 && !committing;
+  const canOpenCommit = selCount > 0 && !committing;
   const canRevert = selCount > 0 && !reverting;
-
-  const handleCommit = () => {
-    if (!canCommit) return;
-    commitSelected(projectPath).catch(() => {});
-  };
 
   const handleRevertClick = () => {
     if (!canRevert) return;
@@ -427,25 +421,11 @@ function ActionBar({ projectPath }: { projectPath: string }) {
 
   return (
     <div className="git-action-bar">
-      <textarea
-        className="git-commit-input"
-        rows={2}
-        placeholder="> commit message..."
-        value={commitMessage}
-        onChange={(e) => setCommitMessage(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            handleCommit();
-          }
-        }}
-        disabled={committing}
-      />
       <div className="git-action-buttons">
         <button
           className="git-action-btn"
-          disabled={!canCommit}
-          onClick={handleCommit}
+          disabled={!canOpenCommit}
+          onClick={() => openCommitDialog(projectPath)}
         >
           :commit{selCount > 0 ? ` [${selCount}]` : ""}
         </button>
@@ -474,7 +454,7 @@ function ActionBar({ projectPath }: { projectPath: string }) {
 
 export function GitSection() {
   const activeProjectPath = useSessionStore((s) => s.activeProjectPath);
-  const { statuses, sectionOpen, fetchStatus, toggleSection, openDiff, viewMode, setViewMode, selectedFiles, toggleFileSelection, revertFiles } = useGitStore();
+  const { statuses, sectionOpen, fetchStatus, toggleSection, openDiff, viewMode, setViewMode, selectedFiles, toggleFileSelection, revertFiles, commitDialogOpen, closeCommitDialog } = useGitStore();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
   const [panelHeight, setPanelHeight] = useState(DEFAULT_HEIGHT);
@@ -656,6 +636,11 @@ export function GitSection() {
           {totalCount > 0 && <ActionBar projectPath={activeProjectPath} />}
         </>
       )}
+      <CommitDialog
+        isOpen={commitDialogOpen}
+        onClose={closeCommitDialog}
+        projectPath={activeProjectPath}
+      />
     </div>
   );
 }

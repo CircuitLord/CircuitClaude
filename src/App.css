@@ -646,35 +646,6 @@ body,
   flex-shrink: 0;
   border-top: 1px solid var(--border-subtle);
   padding: 8px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.git-commit-input {
-  width: 100%;
-  padding: 4px 6px;
-  background: var(--bg-base);
-  border: 1px solid var(--border-subtle);
-  border-radius: 2px;
-  color: var(--text-primary);
-  font-size: 12px;
-  font-family: var(--font-mono);
-  outline: none;
-  transition: border-color 0.1s;
-  resize: none;
-}
-
-.git-commit-input:focus {
-  border-color: var(--accent);
-}
-
-.git-commit-input::placeholder {
-  color: var(--text-tertiary);
-}
-
-.git-commit-input:disabled {
-  opacity: 0.5;
 }
 
 .git-action-buttons {
@@ -1499,6 +1470,170 @@ body,
 
 .sidebar-settings-prefix {
   margin-right: 0;
+}
+
+/* ========================================================================
+   Commit Dialog — TUI Style
+   ======================================================================== */
+
+.commit-dialog {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-visible);
+  border-radius: 2px;
+  width: 520px;
+  max-width: calc(100vw - 32px);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.commit-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 36px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.commit-dialog-header-title {
+  font-size: 13px;
+  font-weight: 400;
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+}
+
+.commit-dialog-close {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  font-weight: 400;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: color 0.1s;
+}
+
+.commit-dialog-close:hover {
+  color: var(--text-primary);
+}
+
+.commit-dialog-body {
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.commit-dialog-files {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.commit-dialog-files::-webkit-scrollbar {
+  width: 4px;
+}
+
+.commit-dialog-files::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.commit-dialog-files::-webkit-scrollbar-thumb {
+  background: var(--border-visible);
+  border-radius: 2px;
+}
+
+.commit-dialog-file {
+  display: flex;
+  align-items: center;
+  height: 24px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  min-width: 0;
+}
+
+.commit-dialog-file-status {
+  flex-shrink: 0;
+  width: 14px;
+  text-align: center;
+  font-weight: 400;
+  font-size: 12px;
+  margin-right: 6px;
+}
+
+.commit-dialog-file-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+
+.commit-dialog-file-stats {
+  flex-shrink: 0;
+  margin-left: 8px;
+  font-size: 11px;
+}
+
+.commit-dialog-stat-add {
+  color: var(--git-added);
+}
+
+.commit-dialog-stat-del {
+  color: var(--git-deleted);
+}
+
+.commit-dialog-stat-loading {
+  flex-shrink: 0;
+  margin-left: 8px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.commit-dialog-message {
+  width: 100%;
+  padding: 4px 6px;
+  background: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: 2px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  outline: none;
+  transition: border-color 0.1s;
+  resize: none;
+}
+
+.commit-dialog-message:focus {
+  border-color: var(--accent);
+}
+
+.commit-dialog-message::placeholder {
+  color: var(--text-tertiary);
+}
+
+.commit-dialog-message:disabled {
+  opacity: 0.5;
+}
+
+.commit-dialog-error {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--git-deleted);
+  background: rgba(248, 81, 73, 0.08);
+  padding: 4px 6px;
+  border-radius: 2px;
+}
+
+.commit-dialog-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 /* ========================================================================

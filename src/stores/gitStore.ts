@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import { GitFileEntry, GitStatus } from "../types";
-import { getGitDiff, getGitStatus, gitCommit, gitRevert } from "../lib/git";
+import { DiffStat, GitFileEntry, GitStatus } from "../types";
+import { getGitDiff, getGitDiffStats, getGitStatus, gitCommit, gitPush, gitRevert } from "../lib/git";
 
 export function fileKey(file: GitFileEntry): string {
   return `${file.path}:${file.staged}`;
@@ -19,6 +19,11 @@ interface GitStore {
   commitMessage: string;
   committing: boolean;
   reverting: boolean;
+  commitDialogOpen: boolean;
+  diffStats: DiffStat[];
+  diffStatsLoading: boolean;
+  commitError: string | null;
+  pushing: boolean;
   fetchStatus: (projectPath: string) => Promise<void>;
   toggleSection: () => void;
   toggleGroup: (group: string) => void;
@@ -32,6 +37,9 @@ interface GitStore {
   setCommitMessage: (msg: string) => void;
   commitSelected: (projectPath: string) => Promise<void>;
   revertFiles: (projectPath: string, files: GitFileEntry[]) => Promise<void>;
+  openCommitDialog: (projectPath: string) => Promise<void>;
+  closeCommitDialog: () => void;
+  commitAndPush: (projectPath: string) => Promise<void>;
 }
 
 function selectedCount(sel: Record<string, boolean>): number {
@@ -55,6 +63,11 @@ export const useGitStore = create<GitStore>((set, get) => ({
   commitMessage: "",
   committing: false,
   reverting: false,
+  commitDialogOpen: false,
+  diffStats: [],
+  diffStatsLoading: false,
+  commitError: null,
+  pushing: false,
 
   fetchStatus: async (projectPath: string) => {
     set((state) => {
@@ -157,13 +170,13 @@ export const useGitStore = create<GitStore>((set, get) => ({
     // Deduplicate paths (a file might appear in both staged + unstaged)
     const uniquePaths = [...new Set(filePaths)];
 
-    set({ committing: true });
+    set({ committing: true, commitError: null });
     try {
       await gitCommit(projectPath, uniquePaths, commitMessage.trim());
-      set({ selectedFiles: {}, commitMessage: "" });
+      set({ selectedFiles: {}, commitMessage: "", commitDialogOpen: false });
       await get().fetchStatus(projectPath);
     } catch (e) {
-      throw e;
+      set({ commitError: e instanceof Error ? e.message : String(e) });
     } finally {
       set({ committing: false });
     }
@@ -185,6 +198,60 @@ export const useGitStore = create<GitStore>((set, get) => ({
       throw e;
     } finally {
       set({ reverting: false });
+    }
+  },
+
+  openCommitDialog: async (projectPath: string) => {
+    const { selectedFiles: sel, statuses } = get();
+    const status = statuses[projectPath];
+    if (!status || selectedCount(sel) === 0) return;
+
+    set({ commitDialogOpen: true, diffStatsLoading: true, commitError: null, diffStats: [] });
+
+    // Collect selected GitFileEntry objects
+    const selectedEntries = status.files.filter((f) => sel[fileKey(f)]);
+
+    try {
+      const stats = await getGitDiffStats(projectPath, selectedEntries);
+      set({ diffStats: stats, diffStatsLoading: false });
+    } catch {
+      set({ diffStatsLoading: false });
+    }
+  },
+
+  closeCommitDialog: () => set({ commitDialogOpen: false, commitError: null }),
+
+  commitAndPush: async (projectPath: string) => {
+    const { selectedFiles: sel, commitMessage, statuses } = get();
+    if (selectedCount(sel) === 0 || !commitMessage.trim()) return;
+
+    const status = statuses[projectPath];
+    if (!status) return;
+
+    const filePaths: string[] = [];
+    for (const f of status.files) {
+      if (sel[fileKey(f)]) {
+        filePaths.push(f.path);
+      }
+    }
+    if (filePaths.length === 0) return;
+
+    const uniquePaths = [...new Set(filePaths)];
+
+    set({ committing: true, commitError: null });
+    try {
+      await gitCommit(projectPath, uniquePaths, commitMessage.trim());
+    } catch (e) {
+      set({ committing: false, commitError: e instanceof Error ? e.message : String(e) });
+      return;
+    }
+    set({ committing: false, pushing: true });
+    try {
+      await gitPush(projectPath);
+      set({ selectedFiles: {}, commitMessage: "", commitDialogOpen: false, pushing: false });
+      await get().fetchStatus(projectPath);
+    } catch (e) {
+      set({ pushing: false, commitError: `Push failed: ${e instanceof Error ? e.message : String(e)}` });
     }
   },
 }));
