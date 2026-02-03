@@ -75,6 +75,8 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
   const activeProjectPath = useSessionStore((s) => s.activeProjectPath);
   const settings = useSettingsStore((s) => s.settings);
   const thinkingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastInputTimeRef = useRef<number>(0);
+  const hasInteractedRef = useRef(false);
 
   useEffect(() => {
     if (!containerRef.current || initializedRef.current) return;
@@ -120,8 +122,14 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
         channel.onmessage = (event: PtyOutputEvent) => {
           if (event.type === "Data" && Array.isArray(event.data)) {
             terminal.write(new Uint8Array(event.data));
-            setThinking(tabId, true);
-            setNeedsAttention(tabId, false);
+
+            // Only show thinking after the user has interacted at least once,
+            // and not for output that's likely a keystroke echo (arrives <250ms after input)
+            const isEcho = (Date.now() - lastInputTimeRef.current) < 250;
+            if (hasInteractedRef.current && !isEcho) {
+              setThinking(tabId, true);
+              setNeedsAttention(tabId, false);
+            }
             if (thinkingTimerRef.current) clearTimeout(thinkingTimerRef.current);
             thinkingTimerRef.current = setTimeout(() => {
               setThinking(tabId, false);
@@ -179,6 +187,8 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
     // User input → PTY
     const onDataDisposable = terminal.onData((data) => {
       if (sessionIdRef.current) {
+        hasInteractedRef.current = true;
+        lastInputTimeRef.current = Date.now();
         const encoder = new TextEncoder();
         writeSession(sessionIdRef.current, encoder.encode(data)).catch(() => {});
       }

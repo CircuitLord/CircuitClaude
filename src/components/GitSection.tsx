@@ -4,7 +4,7 @@ import { useSessionStore } from "../stores/sessionStore";
 import { GitFileEntry } from "../types";
 
 const POLL_INTERVAL = 7000;
-const DEFAULT_HEIGHT = 220;
+const DEFAULT_HEIGHT = 190;
 const MIN_HEIGHT = 38; // just the header
 const MIN_LIST_HEIGHT = 80; // minimum space for project list above
 
