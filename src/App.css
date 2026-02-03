@@ -101,23 +101,52 @@ body,
   display: flex;
   flex-direction: column;
   user-select: none;
+  font-family: var(--font-mono);
 }
 
 .sidebar-header {
-  padding: 14px 16px;
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 36px;
+  padding: 0 12px;
+}
+
+.sidebar-header-label {
+  font-size: 13px;
+  font-weight: 400;
   color: var(--text-tertiary);
-  border-bottom: 1px solid var(--border-subtle);
+}
+
+.sidebar-header-actions {
+  display: flex;
+  align-items: center;
+  -webkit-app-region: no-drag;
+}
+
+.sidebar-header-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  padding: 0 2px;
+  transition: color 0.1s;
+}
+
+.sidebar-header-btn:hover {
+  color: var(--accent-text);
 }
 
 .sidebar-list {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  padding: 8px 0;
+  padding: 4px 0;
 }
 
 .sidebar-list::-webkit-scrollbar {
@@ -133,90 +162,116 @@ body,
   border-radius: 2px;
 }
 
-.sidebar-item {
+/* --- Sidebar Divider --- */
+
+.sidebar-divider {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 0 12px;
+}
+
+/* --- TUI Project Entries --- */
+
+.sidebar-entry {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 10px 14px;
-  margin: 2px 6px;
-  border-radius: 6px;
+  align-items: center;
+  height: 36px;
+  padding: 0 12px;
   cursor: pointer;
-  font-size: 15px;
   color: var(--text-secondary);
+  font-size: 13px;
+  position: relative;
   transition: background 0.1s, color 0.1s;
 }
 
-.sidebar-item:hover {
+.sidebar-entry:hover {
   background: var(--bg-elevated);
   color: var(--text-primary);
 }
 
-.sidebar-item.active {
+.sidebar-entry.active {
   background: var(--accent-muted);
   color: var(--text-primary);
 }
 
-.sidebar-item-icon {
-  flex-shrink: 0;
-  color: var(--text-tertiary);
-  display: flex;
-  align-items: center;
-  margin-top: 2px;
+.sidebar-entry.active::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 12px;
+  right: 12px;
+  height: 1px;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
 }
 
-.sidebar-item.active .sidebar-item-icon {
+.sidebar-entry-prefix {
+  width: 14px;
+  flex-shrink: 0;
+  color: transparent;
+}
+
+.sidebar-entry.active .sidebar-entry-prefix {
   color: var(--accent-text);
 }
 
-.sidebar-item-content {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
+.sidebar-entry-name {
   flex: 1;
-}
-
-.sidebar-item-name {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.sidebar-item-meta {
-  font-size: 12px;
-  color: var(--text-tertiary);
+.sidebar-entry-alive {
+  flex-shrink: 0;
+  color: var(--accent-text);
+  margin-left: 4px;
+  animation: tui-blink 1.2s step-end infinite;
 }
 
-/* Add Project Button */
-.sidebar-add-btn {
+.sidebar-entry-count {
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+  margin-left: 4px;
+  font-size: 12px;
+}
+
+.sidebar-entry.active .sidebar-entry-count {
+  color: var(--accent-text);
+}
+
+@keyframes tui-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* --- Add Project Entry --- */
+
+.sidebar-add-card {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
-  margin: 4px 6px 10px;
-  padding: 8px 12px;
+  height: 36px;
+  padding: 0 12px;
   background: transparent;
-  border: 1px dashed var(--border-visible);
-  border-radius: 6px;
+  border: none;
   color: var(--text-tertiary);
   cursor: pointer;
   font-size: 13px;
-  font-family: var(--font-ui);
-  transition: all 0.15s;
+  font-family: var(--font-mono);
+  transition: color 0.1s;
 }
 
-.sidebar-add-btn:hover {
-  background: var(--accent-muted);
+.sidebar-add-card:hover {
   color: var(--accent-text);
-  border-color: var(--accent);
 }
 
-.sidebar-add-btn svg {
-  flex-shrink: 0;
+.sidebar-add-card svg {
+  display: none;
 }
 
 /* ========================================================================
-   Git Section (sidebar)
+   Git Section (sidebar) — TUI style
    ======================================================================== */
 
 .git-section {
@@ -224,7 +279,6 @@ body,
   min-height: 0;
   display: flex;
   flex-direction: column;
-  border-top: 1px solid var(--border-subtle);
   overflow: hidden;
 }
 
@@ -248,35 +302,37 @@ body,
   background: var(--accent);
 }
 
+/* --- Section Header (matches ~/projects pattern) --- */
+
 .git-section-header {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 10px 14px;
+  height: 36px;
+  padding: 0 12px;
   cursor: pointer;
   user-select: none;
   flex-shrink: 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.git-section-chevron {
+  width: 14px;
+  flex-shrink: 0;
+  font-size: 13px;
+  color: var(--text-tertiary);
 }
 
 .git-section-title {
-  font-size: var(--text-xs);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  font-size: 13px;
+  font-weight: 400;
   color: var(--text-tertiary);
 }
 
 .git-section-badge {
-  font-size: 11px;
-  font-weight: 600;
-  min-width: 18px;
-  height: 18px;
-  line-height: 18px;
-  text-align: center;
-  border-radius: 9px;
-  background: var(--bg-elevated);
-  color: var(--text-secondary);
-  padding: 0 5px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-tertiary);
+  margin-left: 4px;
 }
 
 .git-refresh-btn {
@@ -287,10 +343,11 @@ body,
   border: none;
   color: var(--text-tertiary);
   cursor: pointer;
-  padding: 2px;
-  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  padding: 0 2px;
   opacity: 0;
-  transition: opacity 0.15s, color 0.1s, background 0.1s;
+  transition: opacity 0.1s, color 0.1s;
 }
 
 .git-section-header:hover .git-refresh-btn {
@@ -298,15 +355,16 @@ body,
 }
 
 .git-refresh-btn:hover {
-  color: var(--text-primary);
-  background: var(--bg-elevated);
+  color: var(--accent-text);
 }
+
+/* --- Section Body --- */
 
 .git-section-body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding-bottom: 8px;
+  padding: 4px 0;
 }
 
 .git-section-body::-webkit-scrollbar {
@@ -322,89 +380,107 @@ body,
   border-radius: 2px;
 }
 
+/* --- Branch row (flat entry) --- */
+
 .git-section-branch {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 14px 8px;
-  font-size: var(--text-sm);
+  height: 36px;
+  padding: 0 12px;
+  font-size: 13px;
   color: var(--text-secondary);
 }
 
+.git-branch-prefix {
+  width: 14px;
+  flex-shrink: 0;
+  color: var(--accent-text);
+}
+
 .git-branch-name {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
+  font-size: 13px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .git-empty {
-  padding: 8px 14px;
-  font-size: var(--text-sm);
+  padding: 0 12px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  font-size: 13px;
   color: var(--text-tertiary);
   font-style: italic;
 }
 
+/* --- File Group Headers (flat rows) --- */
+
 .git-group-header {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 14px;
+  height: 36px;
+  padding: 0 12px;
   cursor: pointer;
   user-select: none;
   color: var(--text-secondary);
-  font-size: var(--text-xs);
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 400;
+  transition: color 0.1s;
 }
 
 .git-group-header:hover {
   color: var(--text-primary);
 }
 
+.git-group-chevron {
+  width: 14px;
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+}
+
 .git-group-label {
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  flex: 1;
 }
 
 .git-group-count {
-  font-size: 11px;
-  font-weight: 600;
-  min-width: 16px;
-  height: 16px;
-  line-height: 16px;
-  text-align: center;
-  border-radius: 8px;
-  background: var(--bg-elevated);
+  font-size: 12px;
+  font-weight: 400;
   color: var(--text-tertiary);
-  padding: 0 4px;
+  margin-left: 4px;
 }
+
+/* --- File Items (flat rows) --- */
 
 .git-file-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 3px 14px 3px 28px;
-  font-size: var(--text-xs);
+  height: 36px;
+  padding: 0 12px 0 26px;
+  font-size: 13px;
   cursor: pointer;
   min-width: 0;
+  color: var(--text-secondary);
+  transition: background 0.1s, color 0.1s;
 }
 
 .git-file-item:hover {
   background: var(--bg-elevated);
+  color: var(--text-primary);
 }
 
 .git-file-status {
   flex-shrink: 0;
   width: 14px;
   text-align: center;
-  font-family: var(--font-mono);
-  font-weight: 600;
-  font-size: 12px;
+  font-weight: 400;
+  font-size: 13px;
+  margin-right: 8px;
 }
 
 .git-file-name {
-  font-family: var(--font-mono);
+  flex: 1;
+  min-width: 0;
   color: var(--text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -412,10 +488,10 @@ body,
 }
 
 .git-file-dir {
-  font-family: var(--font-mono);
   color: var(--text-tertiary);
   flex-shrink: 0;
   font-size: 12px;
+  margin-left: 4px;
 }
 
 /* ========================================================================
@@ -445,14 +521,15 @@ body,
 }
 
 .project-header-name {
-  font-size: var(--text-base);
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 400;
+  font-family: var(--font-mono);
   color: var(--text-primary);
   white-space: nowrap;
 }
 
 .project-header-path {
-  font-size: var(--text-xs);
+  font-size: 13px;
   font-family: var(--font-mono);
   color: var(--text-tertiary);
   overflow: hidden;
@@ -469,23 +546,21 @@ body,
 }
 
 .project-header-count {
-  font-size: var(--text-xs);
+  font-size: 13px;
+  font-family: var(--font-mono);
   color: var(--text-tertiary);
 }
 
 .project-header-spawn {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 12px;
   background: var(--accent-muted);
   border: 1px solid transparent;
-  border-radius: 5px;
+  border-radius: 4px;
+  padding: 4px 10px;
   color: var(--accent-text);
   cursor: pointer;
-  font-size: var(--text-sm);
-  font-family: var(--font-ui);
-  transition: background 0.15s, border-color 0.15s;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  transition: background 0.1s, border-color 0.1s;
 }
 
 .project-header-spawn:hover {
@@ -1345,26 +1420,29 @@ body,
 .sidebar-settings-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin: 0 6px 6px;
+  gap: 0;
+  margin: 0;
   padding: 8px 12px;
   background: transparent;
   border: none;
-  border-radius: 6px;
+  border-top: 1px solid var(--border-subtle);
   color: var(--text-tertiary);
   cursor: pointer;
-  font-size: var(--text-sm);
-  font-family: var(--font-ui);
-  transition: all 0.15s;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  transition: color 0.15s;
 }
 
 .sidebar-settings-btn:hover {
-  background: var(--bg-elevated);
-  color: var(--text-primary);
+  color: var(--accent-text);
 }
 
 .sidebar-settings-btn svg {
-  flex-shrink: 0;
+  display: none;
+}
+
+.sidebar-settings-prefix {
+  margin-right: 0;
 }
 
 /* ========================================================================

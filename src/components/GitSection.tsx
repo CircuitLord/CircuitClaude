@@ -8,66 +8,6 @@ const DEFAULT_HEIGHT = 220;
 const MIN_HEIGHT = 38; // just the header
 const MIN_LIST_HEIGHT = 80; // minimum space for project list above
 
-function ChevronIcon({ open }: { open: boolean }) {
-  return (
-    <svg
-      width="12"
-      height="12"
-      viewBox="0 0 12 12"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      style={{
-        transform: open ? "rotate(90deg)" : "rotate(0deg)",
-        transition: "transform 0.15s",
-      }}
-    >
-      <path d="M4.5 2.5L8 6L4.5 9.5" />
-    </svg>
-  );
-}
-
-function BranchIcon() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="5" cy="4" r="1.5" />
-      <circle cx="5" cy="12" r="1.5" />
-      <circle cx="11" cy="6" r="1.5" />
-      <path d="M5 5.5V10.5" />
-      <path d="M9.5 6C8 6 5 6 5 8.5" />
-    </svg>
-  );
-}
-
-function RefreshIcon() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M2.5 8a5.5 5.5 0 0 1 9.68-3.5M13.5 2v3h-3" />
-      <path d="M13.5 8a5.5 5.5 0 0 1-9.68 3.5M2.5 14v-3h3" />
-    </svg>
-  );
-}
-
 export function statusColor(status: string): string {
   switch (status) {
     case "M":
@@ -110,9 +50,9 @@ function FileGroup({
   return (
     <div className="git-group">
       <div className="git-group-header" onClick={() => toggleGroup(groupKey)}>
-        <ChevronIcon open={!collapsed} />
+        <span className="git-group-chevron">{collapsed ? ">" : "v"}</span>
         <span className="git-group-label">{label}</span>
-        <span className="git-group-count">{files.length}</span>
+        <span className="git-group-count">[{files.length}]</span>
       </div>
       {!collapsed && (
         <div className="git-group-items">
@@ -230,10 +170,10 @@ export function GitSection() {
         <div className="git-resize-handle" onMouseDown={onResizeStart} />
       )}
       <div className="git-section-header" onClick={toggleSection}>
-        <ChevronIcon open={sectionOpen} />
-        <span className="git-section-title">Source Control</span>
+        <span className="git-section-chevron">{sectionOpen ? "v" : ">"}</span>
+        <span className="git-section-title">~/source</span>
         {totalCount > 0 && (
-          <span className="git-section-badge">{totalCount}</span>
+          <span className="git-section-badge">[{totalCount}]</span>
         )}
         <button
           className="git-refresh-btn"
@@ -243,9 +183,10 @@ export function GitSection() {
           }}
           title="Refresh"
         >
-          <RefreshIcon />
+          ~
         </button>
       </div>
+      {sectionOpen && <div className="sidebar-divider" />}
       {sectionOpen && (
         <div className="git-section-body">
           {status && !status.isRepo ? (
@@ -253,7 +194,7 @@ export function GitSection() {
           ) : status ? (
             <>
               <div className="git-section-branch">
-                <BranchIcon />
+                <span className="git-branch-prefix">@</span>
                 <span className="git-branch-name">{status.branch}</span>
               </div>
               <div className="git-section-files">

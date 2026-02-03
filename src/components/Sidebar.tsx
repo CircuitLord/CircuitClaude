@@ -1,31 +1,15 @@
 import { useEffect, useState } from "react";
 import { useProjectStore } from "../stores/projectStore";
 import { useSessionStore } from "../stores/sessionStore";
-import { AddProjectDialog } from "./AddProjectDialog";
+import { useAddProject, AddProjectDialog } from "./AddProjectDialog";
 import { GitSection } from "./GitSection";
-import { SettingsDialog, GearIcon } from "./SettingsDialog";
-
-function FolderIcon() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M2 4.5C2 3.67 2.67 3 3.5 3H6l1.5 1.5H12.5C13.33 4.5 14 5.17 14 6V11.5C14 12.33 13.33 13 12.5 13H3.5C2.67 13 2 12.33 2 11.5V4.5Z" />
-    </svg>
-  );
-}
+import { SettingsDialog } from "./SettingsDialog";
 
 export function Sidebar() {
   const { projects, loaded, load } = useProjectStore();
   const { sessions, activeProjectPath, setActiveProject } = useSessionStore();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const handleAdd = useAddProject();
 
   useEffect(() => {
     if (!loaded) load();
@@ -37,45 +21,50 @@ export function Sidebar() {
 
   return (
     <div className="sidebar">
-      <div className="sidebar-header" data-tauri-drag-region>Projects</div>
+      <div className="sidebar-header" data-tauri-drag-region>
+        <span className="sidebar-header-label" data-tauri-drag-region>~/projects</span>
+        <div className="sidebar-header-actions">
+          <button className="sidebar-header-btn" onClick={handleAdd} title="Add project">
+            +
+          </button>
+        </div>
+      </div>
+      <div className="sidebar-divider" />
       <div className="sidebar-list">
         {projects.map((p) => {
-          const sessionCount = sessions.filter(
+          const projectSessions = sessions.filter(
             (s) => s.projectPath === p.path
-          ).length;
+          );
+          const sessionCount = projectSessions.length;
+          const hasAlive = projectSessions.some((s) => s.sessionId !== null);
           const isActive = p.path === activeProjectPath;
-          const sessionText =
-            sessionCount === 0
-              ? null
-              : sessionCount === 1
-                ? "1 session"
-                : `${sessionCount} sessions`;
+
+          const entryClasses = [
+            "sidebar-entry",
+            isActive && "active",
+          ].filter(Boolean).join(" ");
 
           return (
             <div
               key={p.path}
-              className={`sidebar-item ${isActive ? "active" : ""}`}
+              className={entryClasses}
               onClick={() => handleSelectProject(p.path)}
               title={p.path}
             >
-              <span className="sidebar-item-icon">
-                <FolderIcon />
-              </span>
-              <div className="sidebar-item-content">
-                <span className="sidebar-item-name">{p.name}</span>
-                {sessionText && (
-                  <span className="sidebar-item-meta">{sessionText}</span>
-                )}
-              </div>
+              <span className="sidebar-entry-prefix">{">"}</span>
+              <span className="sidebar-entry-name">{p.name}</span>
+              {hasAlive && <span className="sidebar-entry-alive">*</span>}
+              {sessionCount > 0 && (
+                <span className="sidebar-entry-count">[{sessionCount}]</span>
+              )}
             </div>
           );
         })}
+        <AddProjectDialog />
       </div>
-      <AddProjectDialog />
       <GitSection />
       <button className="sidebar-settings-btn" onClick={() => setSettingsOpen(true)}>
-        <GearIcon />
-        Settings
+        <span className="sidebar-settings-prefix">:</span>settings
       </button>
       <SettingsDialog isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>

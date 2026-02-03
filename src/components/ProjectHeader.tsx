@@ -2,22 +2,6 @@ import { useSessionStore, generateTabId } from "../stores/sessionStore";
 import { useProjectStore } from "../stores/projectStore";
 import { WindowControls } from "./WindowControls";
 
-function PlusIcon() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 14 14"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-    >
-      <path d="M7 3V11M3 7H11" />
-    </svg>
-  );
-}
-
 export function ProjectHeader() {
   const { activeProjectPath, sessions, addSession } = useSessionStore();
   const { projects } = useProjectStore();
@@ -51,16 +35,13 @@ export function ProjectHeader() {
         <span className="project-header-path">{activeProjectPath}</span>
       </div>
       <div className="project-header-actions">
-        <span className="project-header-count">
-          {sessionCount} session{sessionCount !== 1 ? "s" : ""}
-        </span>
+        <span className="project-header-count">[{sessionCount}]</span>
         <button
           className="project-header-spawn"
           onClick={handleSpawn}
           title="New session"
         >
-          <PlusIcon />
-          <span>New Session</span>
++ new session
         </button>
       </div>
       <WindowControls />

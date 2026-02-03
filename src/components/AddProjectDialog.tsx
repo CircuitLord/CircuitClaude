@@ -1,6 +1,26 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { useProjectStore } from "../stores/projectStore";
 
+export function useAddProject() {
+  const addProject = useProjectStore((s) => s.addProject);
+
+  async function handleAdd() {
+    const selected = await open({
+      directory: true,
+      multiple: false,
+      title: "Select project folder",
+    });
+
+    if (selected && typeof selected === "string") {
+      const parts = selected.replace(/\\/g, "/").split("/");
+      const name = parts[parts.length - 1] || selected;
+      await addProject({ name, path: selected });
+    }
+  }
+
+  return handleAdd;
+}
+
 function PlusIcon() {
   return (
     <svg
@@ -18,26 +38,12 @@ function PlusIcon() {
 }
 
 export function AddProjectDialog() {
-  const addProject = useProjectStore((s) => s.addProject);
-
-  async function handleAdd() {
-    const selected = await open({
-      directory: true,
-      multiple: false,
-      title: "Select project folder",
-    });
-
-    if (selected && typeof selected === "string") {
-      const parts = selected.replace(/\\/g, "/").split("/");
-      const name = parts[parts.length - 1] || selected;
-      await addProject({ name, path: selected });
-    }
-  }
+  const handleAdd = useAddProject();
 
   return (
-    <button className="sidebar-add-btn" onClick={handleAdd}>
+    <button className="sidebar-add-card" onClick={handleAdd}>
       <PlusIcon />
-      Add Project
+      + new
     </button>
   );
 }
