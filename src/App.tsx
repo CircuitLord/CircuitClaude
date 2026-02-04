@@ -7,12 +7,13 @@ import { TerminalTabs } from "./components/TerminalTabs";
 import { EmptyState } from "./components/EmptyState";
 import { WindowControls } from "./components/WindowControls";
 import { DiffViewer } from "./components/DiffViewer";
-import { useSessionStore, generateTabId } from "./stores/sessionStore";
-import { useProjectStore } from "./stores/projectStore";
+import { useSessionStore } from "./stores/sessionStore";
 import { useSettingsStore } from "./stores/settingsStore";
 import { loadSessionsConfig, saveSessionsConfig, saveScrollback } from "./lib/config";
 import { killAllSessions, exitApp } from "./lib/pty";
 import { serializeAllTerminals } from "./lib/terminalRegistry";
+import { spawnNewSession } from "./lib/sessions";
+import { useHotkeys } from "./hooks/useHotkeys";
 import "./App.css";
 
 async function saveAllSessionData() {
@@ -28,10 +29,10 @@ async function saveAllSessionData() {
 }
 
 function App() {
-  const { sessions, activeProjectPath, addSession } = useSessionStore();
-  const { projects } = useProjectStore();
+  const { sessions, activeProjectPath } = useSessionStore();
   const layoutMode = useSettingsStore((s) => s.settings.layoutMode);
   const restoredRef = useRef(false);
+  useHotkeys();
 
   // Restore sessions on startup (once, after projects are loaded)
   useEffect(() => {
@@ -80,19 +81,7 @@ function App() {
     : [];
 
   function handleSpawnForProject() {
-    if (!activeProjectPath) return;
-    const project = projects.find((p) => p.path === activeProjectPath);
-    const name = project?.name ?? activeProjectPath.split(/[/\\]/).pop() ?? "Unknown";
-    const id = generateTabId();
-    addSession({
-      id,
-      projectName: name,
-      projectPath: activeProjectPath,
-      sessionId: null,
-      claudeSessionId: crypto.randomUUID(),
-      createdAt: Date.now(),
-      restored: false,
-    });
+    spawnNewSession();
   }
 
   return (

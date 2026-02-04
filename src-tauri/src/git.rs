@@ -4,6 +4,15 @@ use std::io::Write;
 use std::os::windows::process::CommandExt;
 use std::process::{Command, Stdio};
 
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+/// Creates a `git` Command with CREATE_NO_WINDOW to prevent console flashes on Windows.
+fn git_cmd() -> Command {
+    let mut cmd = Command::new("git");
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    cmd
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct GitFileEntry {
@@ -21,7 +30,7 @@ pub struct GitStatus {
 }
 
 pub fn get_status(project_path: &str) -> GitStatus {
-    let branch = match Command::new("git")
+    let branch = match git_cmd()
         .args(["rev-parse", "--abbrev-ref", "HEAD"])
         .current_dir(project_path)
         .output()
@@ -38,7 +47,7 @@ pub fn get_status(project_path: &str) -> GitStatus {
         }
     };
 
-    let files = match Command::new("git")
+    let files = match git_cmd()
         .args(["status", "--porcelain=v1"])
         .current_dir(project_path)
         .output()
@@ -80,7 +89,7 @@ pub fn get_diff(project_path: &str, file_path: &str, staged: bool, status: &str)
     args.push("--");
     args.push(file_path);
 
-    let output = Command::new("git")
+    let output = git_cmd()
         .args(&args)
         .current_dir(project_path)
         .output()
@@ -100,7 +109,7 @@ pub fn commit(project_path: &str, files: &[String], message: &str) -> Result<Str
     let file_refs: Vec<&str> = files.iter().map(|s| s.as_str()).collect();
     add_args.extend(file_refs);
 
-    let add_output = Command::new("git")
+    let add_output = git_cmd()
         .args(&add_args)
         .current_dir(project_path)
         .output()
@@ -112,7 +121,7 @@ pub fn commit(project_path: &str, files: &[String], message: &str) -> Result<Str
     }
 
     // Commit
-    let commit_output = Command::new("git")
+    let commit_output = git_cmd()
         .args(["commit", "-m", message])
         .current_dir(project_path)
         .output()
@@ -145,7 +154,7 @@ pub fn revert(project_path: &str, files: &[GitFileEntry]) -> Result<(), String> 
     if !untracked.is_empty() {
         let mut args: Vec<&str> = vec!["clean", "-f", "--"];
         args.extend(&untracked);
-        let output = Command::new("git")
+        let output = git_cmd()
             .args(&args)
             .current_dir(project_path)
             .output()
@@ -160,7 +169,7 @@ pub fn revert(project_path: &str, files: &[GitFileEntry]) -> Result<(), String> 
     if !staged.is_empty() {
         let mut unstage_args: Vec<&str> = vec!["restore", "--staged", "--"];
         unstage_args.extend(&staged);
-        let output = Command::new("git")
+        let output = git_cmd()
             .args(&unstage_args)
             .current_dir(project_path)
             .output()
@@ -172,7 +181,7 @@ pub fn revert(project_path: &str, files: &[GitFileEntry]) -> Result<(), String> 
 
         let mut restore_args: Vec<&str> = vec!["restore", "--"];
         restore_args.extend(&staged);
-        let output = Command::new("git")
+        let output = git_cmd()
             .args(&restore_args)
             .current_dir(project_path)
             .output()
@@ -187,7 +196,7 @@ pub fn revert(project_path: &str, files: &[GitFileEntry]) -> Result<(), String> 
     if !unstaged.is_empty() {
         let mut args: Vec<&str> = vec!["restore", "--"];
         args.extend(&unstaged);
-        let output = Command::new("git")
+        let output = git_cmd()
             .args(&args)
             .current_dir(project_path)
             .output()
@@ -230,7 +239,7 @@ pub fn get_diff_stats(project_path: &str, files: &[GitFileEntry]) -> Result<Vec<
     if !staged_paths.is_empty() {
         let mut args: Vec<&str> = vec!["diff", "--cached", "--numstat", "--"];
         args.extend(&staged_paths);
-        let output = Command::new("git")
+        let output = git_cmd()
             .args(&args)
             .current_dir(project_path)
             .output()
@@ -244,7 +253,7 @@ pub fn get_diff_stats(project_path: &str, files: &[GitFileEntry]) -> Result<Vec<
     if !unstaged_paths.is_empty() {
         let mut args: Vec<&str> = vec!["diff", "--numstat", "--"];
         args.extend(&unstaged_paths);
-        let output = Command::new("git")
+        let output = git_cmd()
             .args(&args)
             .current_dir(project_path)
             .output()
@@ -272,7 +281,7 @@ pub fn get_diff_stats(project_path: &str, files: &[GitFileEntry]) -> Result<Vec<
 }
 
 pub fn push(project_path: &str) -> Result<String, String> {
-    let output = Command::new("git")
+    let output = git_cmd()
         .args(["push"])
         .current_dir(project_path)
         .output()
@@ -337,7 +346,7 @@ pub fn generate_commit_message(project_path: &str, files: &[GitFileEntry]) -> Re
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .creation_flags(0x08000000) // CREATE_NO_WINDOW
+        .creation_flags(CREATE_NO_WINDOW)
         .spawn()
         .map_err(|e| format!("Failed to launch Claude CLI: {}", e))?;
 

@@ -1,9 +1,10 @@
-import { useSessionStore, generateTabId } from "../stores/sessionStore";
+import { useSessionStore } from "../stores/sessionStore";
 import { useProjectStore } from "../stores/projectStore";
+import { spawnNewSession } from "../lib/sessions";
 import { WindowControls } from "./WindowControls";
 
 export function ProjectHeader() {
-  const { activeProjectPath, sessions, addSession } = useSessionStore();
+  const { activeProjectPath, sessions } = useSessionStore();
   const { projects } = useProjectStore();
 
   if (!activeProjectPath) return null;
@@ -13,20 +14,6 @@ export function ProjectHeader() {
   const sessionCount = sessions.filter(
     (s) => s.projectPath === activeProjectPath
   ).length;
-
-  function handleSpawn() {
-    if (!activeProjectPath) return;
-    const id = generateTabId();
-    addSession({
-      id,
-      projectName: projectName ?? "Unknown",
-      projectPath: activeProjectPath,
-      sessionId: null,
-      claudeSessionId: crypto.randomUUID(),
-      createdAt: Date.now(),
-      restored: false,
-    });
-  }
 
   return (
     <div className="project-header">
@@ -38,7 +25,7 @@ export function ProjectHeader() {
         <span className="project-header-count">[{sessionCount}]</span>
         <button
           className="project-header-spawn"
-          onClick={handleSpawn}
+          onClick={spawnNewSession}
           title="New session"
         >
 + new session

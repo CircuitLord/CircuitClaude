@@ -1338,6 +1338,20 @@ body,
   color: var(--accent-text);
 }
 
+/* --- Hotkey Kbd --- */
+
+.settings-hotkey-kbd {
+  font-size: 13px;
+  font-family: var(--font-mono);
+  font-weight: 400;
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 2px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
 /* --- Custom Select --- */
 
 .settings-select {

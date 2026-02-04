@@ -314,6 +314,34 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
             </div>
           </div>
 
+          <div className="settings-section">
+            <div className="settings-section-title">~hotkeys</div>
+            <div className="settings-row">
+              <div className="settings-row-label">
+                <span className="settings-row-name">new session</span>
+              </div>
+              <kbd className="settings-hotkey-kbd">ctrl+t</kbd>
+            </div>
+            <div className="settings-row">
+              <div className="settings-row-label">
+                <span className="settings-row-name">switch to tab n</span>
+              </div>
+              <kbd className="settings-hotkey-kbd">ctrl+1-9</kbd>
+            </div>
+            <div className="settings-row">
+              <div className="settings-row-label">
+                <span className="settings-row-name">close dialog</span>
+              </div>
+              <kbd className="settings-hotkey-kbd">esc</kbd>
+            </div>
+            <div className="settings-row">
+              <div className="settings-row-label">
+                <span className="settings-row-name">commit</span>
+              </div>
+              <kbd className="settings-hotkey-kbd">ctrl+enter</kbd>
+            </div>
+          </div>
+
           <button
             className="settings-reset-link"
             onClick={() => update(DEFAULT_SETTINGS)}
