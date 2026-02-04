@@ -6,7 +6,7 @@ import { SegmentedControl } from "./SegmentedControl";
 import { CommitDialog } from "./CommitDialog";
 
 const POLL_INTERVAL = 7000;
-const DEFAULT_HEIGHT = 190;
+const DEFAULT_RATIO = 0.5; // default to 50% of sidebar height
 const MIN_HEIGHT = 38; // just the header
 const MIN_LIST_HEIGHT = 80; // minimum space for project list above
 const REVERT_CONFIRM_TIMEOUT = 3000;
@@ -457,8 +457,30 @@ export function GitSection() {
   const { statuses, sectionOpen, fetchStatus, toggleSection, openDiff, viewMode, setViewMode, selectedFiles, toggleFileSelection, revertFiles, commitDialogOpen, closeCommitDialog } = useGitStore();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
-  const [panelHeight, setPanelHeight] = useState(DEFAULT_HEIGHT);
+  const [heightRatio, setHeightRatio] = useState(DEFAULT_RATIO);
+  const [parentHeight, setParentHeight] = useState(0);
   const dragRef = useRef<{ startY: number; startHeight: number } | null>(null);
+
+  // Track parent (sidebar) height via ResizeObserver
+  useEffect(() => {
+    const el = sectionRef.current?.parentElement;
+    if (!el) return;
+    setParentHeight(el.clientHeight);
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setParentHeight(entry.contentRect.height);
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [activeProjectPath]);
+
+  const panelHeight = parentHeight > 0
+    ? Math.min(
+        Math.max(MIN_HEIGHT, parentHeight * heightRatio),
+        parentHeight - MIN_LIST_HEIGHT
+      )
+    : MIN_HEIGHT;
 
   // Resize drag handling
   useEffect(() => {
@@ -466,14 +488,13 @@ export function GitSection() {
       if (!dragRef.current || !sectionRef.current) return;
       const delta = dragRef.current.startY - e.clientY;
       const parentEl = sectionRef.current.parentElement;
-      const maxHeight = parentEl
-        ? parentEl.clientHeight - MIN_LIST_HEIGHT
-        : 600;
+      const parentH = parentEl ? parentEl.clientHeight : 600;
+      const maxHeight = parentH - MIN_LIST_HEIGHT;
       const newHeight = Math.min(
         Math.max(MIN_HEIGHT, dragRef.current.startHeight + delta),
         maxHeight
       );
-      setPanelHeight(newHeight);
+      setHeightRatio(newHeight / parentH);
     }
 
     function onMouseUp() {

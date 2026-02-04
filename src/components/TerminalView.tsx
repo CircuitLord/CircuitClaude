@@ -59,6 +59,8 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
   const setThinking = useSessionStore((s) => s.setThinking);
   const setNeedsAttention = useSessionStore((s) => s.setNeedsAttention);
   const setSessionTitle = useSessionStore((s) => s.setSessionTitle);
+  const markInteracted = useSessionStore((s) => s.markInteracted);
+  const confirmRestore = useSessionStore((s) => s.confirmRestore);
   const activeProjectPath = useSessionStore((s) => s.activeProjectPath);
   const activeSessionId = useSessionStore((s) => s.activeSessionId);
   const settings = useSettingsStore((s) => s.settings);
@@ -69,6 +71,8 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
   useEffect(() => {
     if (!containerRef.current || initializedRef.current) return;
     initializedRef.current = true;
+    let cleanedUp = false;
+    let restoreTimer: ReturnType<typeof setTimeout> | null = null;
 
     const currentSettings = useSettingsStore.getState().settings;
     const terminal = new Terminal({
@@ -106,6 +110,7 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
       fitAddon.fit();
 
       const doSpawn = () => {
+        console.log("[TerminalView]", tabId, "doSpawn isRestored:", isRestoredRef.current, "claudeSessionId:", claudeSessionId);
         const channel = new Channel<PtyOutputEvent>();
         channel.onmessage = (event: PtyOutputEvent) => {
           if (event.type === "Data" && Array.isArray(event.data)) {
@@ -126,10 +131,18 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
               }
             }, 2000);
           } else if (event.type === "Exit") {
-            terminal.write("\r\n\x1b[90m[Process exited]\x1b[0m\r\n");
+            console.log("[TerminalView]", tabId, "Exit event. isRestored:", isRestoredRef.current, "hasInteracted:", hasInteractedRef.current);
             if (thinkingTimerRef.current) clearTimeout(thinkingTimerRef.current);
             setThinking(tabId, false);
             setNeedsAttention(tabId, false);
+            if (isRestoredRef.current && !hasInteractedRef.current) {
+              // Restored session exited before user interacted (e.g. invalid session ID) — close silently
+              console.log("[TerminalView]", tabId, "→ closing silently (restored + no interaction)");
+              onClose();
+            } else {
+              console.log("[TerminalView]", tabId, "→ showing [Process exited] message");
+              terminal.write("\r\n\x1b[90m[Process exited]\x1b[0m\r\n");
+            }
           }
         };
 
@@ -143,13 +156,29 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
               : { claudeSessionId }                       // New session → --session-id <uuid>
           )
           .then((sid) => {
+            if (cleanedUp) {
+              // Strict mode re-mount: this effect was cleaned up, kill the orphaned PTY
+              killSession(sid).catch(() => {});
+              return;
+            }
+            console.log("[TerminalView]", tabId, "spawn succeeded, ptyId:", sid);
             sessionIdRef.current = sid;
             updateSessionPtyId(tabId, sid);
             clearRestoredFlag(tabId);
+            if (isRestoredRef.current) {
+              // Fallback: confirm after 15s if title change never fires
+              restoreTimer = setTimeout(() => {
+                console.log("[TerminalView]", tabId, "confirmRestore (fallback timer)");
+                confirmRestore(tabId);
+              }, 15000);
+            }
           })
           .catch((err) => {
-            if (isRestoredRef.current) {
-              // Stale/invalid session — remove the terminal silently
+            if (cleanedUp) return;
+            console.log("[TerminalView]", tabId, "spawn FAILED:", String(err), "isRestored:", isRestoredRef.current);
+            const errStr = String(err);
+            if (isRestoredRef.current || /session.*already|already.*in use|no conversation found/i.test(errStr)) {
+              // Stale/invalid session or ID conflict — remove the terminal silently
               onClose();
             } else {
               terminal.write(`\r\n\x1b[31mFailed to spawn session: ${err}\x1b[0m\r\n`);
@@ -175,6 +204,7 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
     // User input → PTY
     const onDataDisposable = terminal.onData((data) => {
       if (sessionIdRef.current) {
+        if (!hasInteractedRef.current) markInteracted(tabId);
         hasInteractedRef.current = true;
         lastInputTimeRef.current = Date.now();
         const encoder = new TextEncoder();
@@ -191,10 +221,18 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
 
     // Capture terminal title changes (OSC 2 sequences from Claude CLI)
     // Strip leading non-ASCII decorative characters (spinner/star icons) from the title
+    // A title change is the definitive signal that Claude CLI is alive and interactive.
     const onTitleDisposable = terminal.onTitleChange((t) => {
       const clean = t.replace(/^[^\x20-\x7E]+\s*/, '').trim() || t;
       setTitle(clean);
       setSessionTitle(tabId, clean);
+      // Confirm restored session as soon as Claude CLI sets a title
+      if (isRestoredRef.current && restoreTimer) {
+        console.log("[TerminalView]", tabId, "confirmRestore (title change)");
+        clearTimeout(restoreTimer);
+        restoreTimer = null;
+        confirmRestore(tabId);
+      }
     });
 
     // ResizeObserver for container size changes — skip fit when hidden (zero dimensions)
@@ -208,12 +246,14 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
     resizeObserver.observe(containerRef.current);
 
     return () => {
+      cleanedUp = true;
       resizeObserver.disconnect();
       onDataDisposable.dispose();
       onResizeDisposable.dispose();
       onTitleDisposable.dispose();
       unregisterTerminal(tabId);
       if (thinkingTimerRef.current) clearTimeout(thinkingTimerRef.current);
+      if (restoreTimer) clearTimeout(restoreTimer);
       setThinking(tabId, false);
       setNeedsAttention(tabId, false);
       // Kill PTY on unmount — this only happens when the session is actually removed,

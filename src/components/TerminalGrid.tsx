@@ -30,6 +30,8 @@ export function TerminalGrid({ projectPath }: TerminalGridProps) {
   const projectSessions = sessions.filter(
     (s) => s.projectPath === projectPath
   );
+  const confirmedSessions = projectSessions.filter((s) => !s.restorePending);
+  const pendingSessions = projectSessions.filter((s) => s.restorePending);
 
   async function handleCloseSession(id: string) {
     const session = projectSessions.find((s) => s.id === id);
@@ -59,22 +61,36 @@ export function TerminalGrid({ projectPath }: TerminalGridProps) {
     );
   }
 
-  const cols = getColumnCount(projectSessions.length);
-  const rows = chunkArray(projectSessions, cols);
+  const cols = getColumnCount(confirmedSessions.length);
+  const rows = chunkArray(confirmedSessions, cols);
 
   return (
     <div className="terminal-grid-container">
-      <Group orientation="vertical">
-        {rows.map((row, rowIdx) => (
-          <RowPanel
-            key={rowIdx}
-            row={row}
-            rowIdx={rowIdx}
-            totalRows={rows.length}
-            renderTerminal={renderTerminal}
+      {confirmedSessions.length > 0 && (
+        <Group orientation="vertical">
+          {rows.map((row, rowIdx) => (
+            <RowPanel
+              key={rowIdx}
+              row={row}
+              rowIdx={rowIdx}
+              totalRows={rows.length}
+              renderTerminal={renderTerminal}
+            />
+          ))}
+        </Group>
+      )}
+      {pendingSessions.map((s) => (
+        <div key={s.id} style={{ display: "none" }}>
+          <TerminalView
+            tabId={s.id}
+            projectPath={s.projectPath}
+            projectName={s.projectName}
+            claudeSessionId={s.claudeSessionId}
+            isRestored={s.restored}
+            onClose={() => handleCloseSession(s.id)}
           />
-        ))}
-      </Group>
+        </div>
+      ))}
     </div>
   );
 }

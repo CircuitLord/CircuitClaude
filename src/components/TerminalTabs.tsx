@@ -12,10 +12,14 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
     useSessionStore();
 
   const projectSessions = sessions.filter((s) => s.projectPath === projectPath);
+  const confirmedSessions = projectSessions.filter((s) => !s.restorePending);
 
-  // If active session isn't in this project, fall back to first session
-  const activeInProject = projectSessions.find((s) => s.id === activeSessionId);
-  const visibleSessionId = activeInProject?.id ?? projectSessions[0]?.id ?? null;
+  console.log("[TerminalTabs]", projectPath, "total:", projectSessions.length, "confirmed:", confirmedSessions.length,
+    "pending:", projectSessions.filter((s) => s.restorePending).map((s) => s.id));
+
+  // If active session isn't in this project, fall back to first confirmed session
+  const activeInProject = confirmedSessions.find((s) => s.id === activeSessionId);
+  const visibleSessionId = activeInProject?.id ?? confirmedSessions[0]?.id ?? null;
 
   async function handleCloseSession(id: string) {
     const session = projectSessions.find((s) => s.id === id);
@@ -35,7 +39,7 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
   return (
     <div className="terminal-tabs-container">
       <div className="terminal-tabs-bar">
-        {projectSessions.map((s) => {
+        {confirmedSessions.map((s) => {
           const isActive = s.id === visibleSessionId;
           const isThinking = thinkingSessions.has(s.id);
           const needsAttention = needsAttentionSessions.has(s.id);
@@ -76,7 +80,7 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
           <div
             key={s.id}
             className="terminal-tabs-panel"
-            style={{ display: s.id === visibleSessionId ? "flex" : "none" }}
+            style={{ display: !s.restorePending && s.id === visibleSessionId ? "flex" : "none" }}
           >
             <TerminalView
               tabId={s.id}

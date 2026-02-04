@@ -11,6 +11,8 @@ export interface TerminalSession {
   claudeSessionId?: string; // UUID passed to Claude CLI via --session-id / --resume
   createdAt: number;
   restored?: boolean;
+  hasInteracted?: boolean;
+  restorePending?: boolean;
 }
 
 export interface PersistedSession {

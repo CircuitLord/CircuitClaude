@@ -17,6 +17,8 @@ interface SessionStore {
   setThinking: (tabId: string, isThinking: boolean) => void;
   setNeedsAttention: (tabId: string, needsAttention: boolean) => void;
   setSessionTitle: (tabId: string, title: string) => void;
+  markInteracted: (tabId: string) => void;
+  confirmRestore: (tabId: string) => void;
   restoreFromConfig: (config: SessionsConfig) => void;
   toSessionsConfig: () => SessionsConfig;
   clearRestoredFlag: (id: string) => void;
@@ -115,11 +117,26 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       return { sessionTitles: next };
     }),
 
+  markInteracted: (tabId) =>
+    set((state) => ({
+      sessions: state.sessions.map((s) =>
+        s.id === tabId ? { ...s, hasInteracted: true } : s
+      ),
+    })),
+
+  confirmRestore: (tabId) =>
+    set((state) => ({
+      sessions: state.sessions.map((s) =>
+        s.id === tabId ? { ...s, restorePending: undefined, hasInteracted: true } : s
+      ),
+    })),
+
   restoreFromConfig: (config) =>
     set(() => {
       const sessions: TerminalSession[] = [];
       for (const layout of config.layouts) {
         for (const ps of layout.sessions) {
+          console.log("[restore] session:", ps.id, "claudeSessionId:", ps.claudeSessionId, "→ restorePending: true");
           sessions.push({
             id: ps.id,
             projectName: ps.projectName,
@@ -128,6 +145,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             claudeSessionId: ps.claudeSessionId,
             createdAt: ps.createdAt,
             restored: true,
+            restorePending: true,
           });
         }
       }
@@ -142,6 +160,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     const state = get();
     const byProject = new Map<string, TerminalSession[]>();
     for (const s of state.sessions) {
+      if (!s.hasInteracted) continue;
       const list = byProject.get(s.projectPath) ?? [];
       list.push(s);
       byProject.set(s.projectPath, list);
