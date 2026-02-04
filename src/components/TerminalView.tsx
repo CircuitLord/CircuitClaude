@@ -27,11 +27,8 @@ function detectInteractivePrompt(terminal: Terminal): boolean {
   }
   const text = lines.join("\n");
 
-  // DEBUG: log what we're checking so we can see false positives
-  console.log("[prompt-detect] cursor:", cursorLine, "text:", JSON.stringify(text));
-
   // Tool approval prompt (shows "Chat about this" as an option alongside Yes/No/Always)
-  if (/Chat about this/.test(text)) { console.log("[prompt-detect] matched: Chat about this"); return true; }
+  if (/Chat about this/.test(text)) { return true; }
 
   return false;
 }
@@ -98,7 +95,7 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
       });
       terminal.loadAddon(webglAddon);
     } catch {
-      console.warn("WebGL renderer not available, falling back to DOM renderer");
+      // WebGL not available, fall back to DOM renderer
     }
 
     terminalRef.current = terminal;
@@ -110,7 +107,6 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
       fitAddon.fit();
 
       const doSpawn = () => {
-        console.log("[TerminalView]", tabId, "doSpawn isRestored:", isRestoredRef.current, "claudeSessionId:", claudeSessionId);
         const channel = new Channel<PtyOutputEvent>();
         channel.onmessage = (event: PtyOutputEvent) => {
           if (event.type === "Data" && Array.isArray(event.data)) {
@@ -131,16 +127,13 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
               }
             }, 2000);
           } else if (event.type === "Exit") {
-            console.log("[TerminalView]", tabId, "Exit event. isRestored:", isRestoredRef.current, "hasInteracted:", hasInteractedRef.current);
             if (thinkingTimerRef.current) clearTimeout(thinkingTimerRef.current);
             setThinking(tabId, false);
             setNeedsAttention(tabId, false);
             if (isRestoredRef.current && !hasInteractedRef.current) {
               // Restored session exited before user interacted (e.g. invalid session ID) — close silently
-              console.log("[TerminalView]", tabId, "→ closing silently (restored + no interaction)");
               onClose();
             } else {
-              console.log("[TerminalView]", tabId, "→ showing [Process exited] message");
               terminal.write("\r\n\x1b[90m[Process exited]\x1b[0m\r\n");
             }
           }
@@ -161,21 +154,18 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
               killSession(sid).catch(() => {});
               return;
             }
-            console.log("[TerminalView]", tabId, "spawn succeeded, ptyId:", sid);
             sessionIdRef.current = sid;
             updateSessionPtyId(tabId, sid);
             clearRestoredFlag(tabId);
             if (isRestoredRef.current) {
               // Fallback: confirm after 15s if title change never fires
               restoreTimer = setTimeout(() => {
-                console.log("[TerminalView]", tabId, "confirmRestore (fallback timer)");
                 confirmRestore(tabId);
               }, 15000);
             }
           })
           .catch((err) => {
             if (cleanedUp) return;
-            console.log("[TerminalView]", tabId, "spawn FAILED:", String(err), "isRestored:", isRestoredRef.current);
             const errStr = String(err);
             if (isRestoredRef.current || /session.*already|already.*in use|no conversation found/i.test(errStr)) {
               // Stale/invalid session or ID conflict — remove the terminal silently
@@ -228,7 +218,6 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
       setSessionTitle(tabId, clean);
       // Confirm restored session as soon as Claude CLI sets a title
       if (isRestoredRef.current && restoreTimer) {
-        console.log("[TerminalView]", tabId, "confirmRestore (title change)");
         clearTimeout(restoreTimer);
         restoreTimer = null;
         confirmRestore(tabId);

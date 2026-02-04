@@ -269,13 +269,9 @@ export const useGitStore = create<GitStore>((set, get) => ({
     set({ generatingMessage: true, commitError: null });
     try {
       const result = await generateCommitMessageIpc(projectPath, selectedEntries);
-      console.log("[generate] model:", result.model);
-      console.log("[generate] prompt:\n" + result.prompt);
-      console.log("[generate] result:", result.message);
       set({ commitMessage: result.message });
     } catch (e) {
       const err = e instanceof Error ? e.message : String(e);
-      console.error("[generate]", err);
       set({ commitError: err });
     } finally {
       set({ generatingMessage: false });

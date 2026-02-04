@@ -14,9 +14,6 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
   const projectSessions = sessions.filter((s) => s.projectPath === projectPath);
   const confirmedSessions = projectSessions.filter((s) => !s.restorePending);
 
-  console.log("[TerminalTabs]", projectPath, "total:", projectSessions.length, "confirmed:", confirmedSessions.length,
-    "pending:", projectSessions.filter((s) => s.restorePending).map((s) => s.id));
-
   // If active session isn't in this project, fall back to first confirmed session
   const activeInProject = confirmedSessions.find((s) => s.id === activeSessionId);
   const visibleSessionId = activeInProject?.id ?? confirmedSessions[0]?.id ?? null;

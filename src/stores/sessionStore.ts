@@ -136,7 +136,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       const sessions: TerminalSession[] = [];
       for (const layout of config.layouts) {
         for (const ps of layout.sessions) {
-          console.log("[restore] session:", ps.id, "claudeSessionId:", ps.claudeSessionId, "→ restorePending: true");
           sessions.push({
             id: ps.id,
             projectName: ps.projectName,
