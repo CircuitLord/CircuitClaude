@@ -154,6 +154,11 @@ pub fn git_push(project_path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
+pub fn generate_commit_message(project_path: String, files: Vec<git::GitFileEntry>) -> Result<git::GenerateResult, String> {
+    git::generate_commit_message(&project_path, &files)
+}
+
+#[tauri::command]
 pub fn exit_app(app_handle: tauri::AppHandle) {
     app_handle.exit(0);
 }

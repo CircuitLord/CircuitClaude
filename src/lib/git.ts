@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { DiffStat, GitFileEntry, GitStatus } from "../types";
+import { DiffStat, GenerateResult, GitFileEntry, GitStatus } from "../types";
 
 export function getGitStatus(projectPath: string): Promise<GitStatus> {
   return invoke<GitStatus>("get_git_status", { projectPath });
@@ -23,4 +23,8 @@ export function getGitDiffStats(projectPath: string, files: GitFileEntry[]): Pro
 
 export function gitPush(projectPath: string): Promise<string> {
   return invoke<string>("git_push", { projectPath });
+}
+
+export function generateCommitMessage(projectPath: string, files: GitFileEntry[]): Promise<GenerateResult> {
+  return invoke<GenerateResult>("generate_commit_message", { projectPath, files });
 }

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { DiffStat, GitFileEntry, GitStatus } from "../types";
-import { getGitDiff, getGitDiffStats, getGitStatus, gitCommit, gitPush, gitRevert } from "../lib/git";
+import { getGitDiff, getGitDiffStats, getGitStatus, gitCommit, gitPush, gitRevert, generateCommitMessage as generateCommitMessageIpc } from "../lib/git";
 
 export function fileKey(file: GitFileEntry): string {
   return `${file.path}:${file.staged}`;
@@ -24,6 +24,7 @@ interface GitStore {
   diffStatsLoading: boolean;
   commitError: string | null;
   pushing: boolean;
+  generatingMessage: boolean;
   fetchStatus: (projectPath: string) => Promise<void>;
   toggleSection: () => void;
   toggleGroup: (group: string) => void;
@@ -40,6 +41,7 @@ interface GitStore {
   openCommitDialog: (projectPath: string) => Promise<void>;
   closeCommitDialog: () => void;
   commitAndPush: (projectPath: string) => Promise<void>;
+  generateCommitMessage: (projectPath: string) => Promise<void>;
 }
 
 function selectedCount(sel: Record<string, boolean>): number {
@@ -68,6 +70,7 @@ export const useGitStore = create<GitStore>((set, get) => ({
   diffStatsLoading: false,
   commitError: null,
   pushing: false,
+  generatingMessage: false,
 
   fetchStatus: async (projectPath: string) => {
     set((state) => {
@@ -252,6 +255,30 @@ export const useGitStore = create<GitStore>((set, get) => ({
       await get().fetchStatus(projectPath);
     } catch (e) {
       set({ pushing: false, commitError: `Push failed: ${e instanceof Error ? e.message : String(e)}` });
+    }
+  },
+
+  generateCommitMessage: async (projectPath: string) => {
+    const { selectedFiles: sel, statuses } = get();
+    const status = statuses[projectPath];
+    if (!status || selectedCount(sel) === 0) return;
+
+    const selectedEntries = status.files.filter((f) => sel[fileKey(f)]);
+    if (selectedEntries.length === 0) return;
+
+    set({ generatingMessage: true, commitError: null });
+    try {
+      const result = await generateCommitMessageIpc(projectPath, selectedEntries);
+      console.log("[generate] model:", result.model);
+      console.log("[generate] prompt:\n" + result.prompt);
+      console.log("[generate] result:", result.message);
+      set({ commitMessage: result.message });
+    } catch (e) {
+      const err = e instanceof Error ? e.message : String(e);
+      console.error("[generate]", err);
+      set({ commitError: err });
+    } finally {
+      set({ generatingMessage: false });
     }
   },
 }));

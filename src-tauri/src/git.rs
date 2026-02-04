@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::process::Command;
+use std::io::Write;
+use std::os::windows::process::CommandExt;
+use std::process::{Command, Stdio};
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -285,6 +287,84 @@ pub fn push(project_path: &str) -> Result<String, String> {
     let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
     // git push often writes progress to stderr even on success
     Ok(if stdout.is_empty() { stderr } else { stdout })
+}
+
+const MAX_DIFF_CHARS: usize = 100_000;
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct GenerateResult {
+    pub prompt: String,
+    pub message: String,
+    pub model: String,
+}
+
+pub fn generate_commit_message(project_path: &str, files: &[GitFileEntry]) -> Result<GenerateResult, String> {
+    // Collect combined diffs from all selected files
+    let mut combined_diff = String::new();
+    for f in files {
+        match get_diff(project_path, &f.path, f.staged, &f.status) {
+            Ok(diff) => {
+                combined_diff.push_str(&diff);
+                combined_diff.push('\n');
+                if combined_diff.len() > MAX_DIFF_CHARS {
+                    combined_diff.truncate(MAX_DIFF_CHARS);
+                    combined_diff.push_str("\n... (truncated)\n");
+                    break;
+                }
+            }
+            Err(_) => continue,
+        }
+    }
+
+    if combined_diff.trim().is_empty() {
+        return Err("No diff content to generate a message from".to_string());
+    }
+
+    let prompt = format!(
+        "Generate a concise git commit message for the following diff. \
+         Output ONLY the commit message, nothing else. No quotes, no prefixes, no explanation. \
+         Use imperative mood (e.g. \"Add feature\" not \"Added feature\"). \
+         Keep the first line under 72 characters. If needed, add a blank line then bullet points for details.\n\n{}",
+        combined_diff
+    );
+
+    let model = "claude-haiku-4-5-20251001";
+
+    let mut child = Command::new("cmd.exe")
+        .args(["/c", "claude", "-p", "--model", model])
+        .current_dir(project_path)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .creation_flags(0x08000000) // CREATE_NO_WINDOW
+        .spawn()
+        .map_err(|e| format!("Failed to launch Claude CLI: {}", e))?;
+
+    {
+        let mut stdin: std::process::ChildStdin = child.stdin.take()
+            .ok_or_else(|| "Failed to open Claude CLI stdin".to_string())?;
+        stdin.write_all(prompt.as_bytes())
+            .map_err(|e| format!("Failed to write to Claude CLI stdin: {}", e))?;
+    }
+
+    let output = child
+        .wait_with_output()
+        .map_err(|e| format!("Failed to wait for Claude CLI: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        let detail = if !stderr.is_empty() { stderr } else { stdout };
+        return Err(format!("Claude CLI failed (exit {}): {}", output.status, detail));
+    }
+
+    let message = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if message.is_empty() {
+        return Err("Claude CLI returned an empty response".to_string());
+    }
+
+    Ok(GenerateResult { prompt, message, model: model.to_string() })
 }
 
 fn parse_numstat(output: &str) -> Vec<DiffStat> {

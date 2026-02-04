@@ -22,6 +22,8 @@ export function CommitDialog({ isOpen, onClose, projectPath }: CommitDialogProps
     diffStats,
     diffStatsLoading,
     commitError,
+    generatingMessage,
+    generateCommitMessage,
   } = useGitStore();
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -48,7 +50,7 @@ export function CommitDialog({ isOpen, onClose, projectPath }: CommitDialogProps
   const status = statuses[projectPath];
   const selectedEntries = status?.files.filter((f) => selectedFiles[fileKey(f)]) ?? [];
   const selCount = selectedEntries.length;
-  const canCommit = selCount > 0 && commitMessage.trim().length > 0 && !committing && !pushing;
+  const canCommit = selCount > 0 && commitMessage.trim().length > 0 && !committing && !pushing && !generatingMessage;
 
   // Build a lookup for diff stats by path
   const statsMap = new Map<string, DiffStat>();
@@ -98,10 +100,19 @@ export function CommitDialog({ isOpen, onClose, projectPath }: CommitDialogProps
               );
             })}
           </div>
+          <div className="commit-dialog-generate-row">
+            <button
+              className={`git-action-btn${generatingMessage ? " commit-dialog-generating" : ""}`}
+              disabled={committing || pushing || generatingMessage || diffStatsLoading}
+              onClick={() => generateCommitMessage(projectPath)}
+            >
+              {generatingMessage ? ":generating..." : ":generate"}
+            </button>
+          </div>
           <textarea
             ref={textareaRef}
             className="commit-dialog-message"
-            rows={3}
+            rows={6}
             placeholder="> commit message..."
             value={commitMessage}
             onChange={(e) => setCommitMessage(e.target.value)}
@@ -111,7 +122,7 @@ export function CommitDialog({ isOpen, onClose, projectPath }: CommitDialogProps
                 handleCommit();
               }
             }}
-            disabled={busy}
+            disabled={busy || generatingMessage}
           />
           {commitError && (
             <div className="commit-dialog-error">{commitError}</div>

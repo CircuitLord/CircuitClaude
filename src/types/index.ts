@@ -57,6 +57,12 @@ export interface DiffStat {
   deletions: number;
 }
 
+export interface GenerateResult {
+  prompt: string;
+  message: string;
+  model: string;
+}
+
 export type ThemeName = "midnight" | "ember" | "arctic" | "forest" | "crimson";
 
 export type LayoutMode = "grid" | "tabs";

@@ -1613,6 +1613,19 @@ body,
   border-color: var(--accent);
 }
 
+.commit-dialog-message::-webkit-scrollbar {
+  width: 4px;
+}
+
+.commit-dialog-message::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.commit-dialog-message::-webkit-scrollbar-thumb {
+  background: var(--border-visible);
+  border-radius: 2px;
+}
+
 .commit-dialog-message::placeholder {
   color: var(--text-tertiary);
 }
@@ -1628,6 +1641,15 @@ body,
   background: rgba(248, 81, 73, 0.08);
   padding: 4px 6px;
   border-radius: 2px;
+}
+
+.commit-dialog-generate-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.commit-dialog-generating {
+  animation: tui-waiting-pulse 1.5s step-end infinite;
 }
 
 .commit-dialog-actions {
