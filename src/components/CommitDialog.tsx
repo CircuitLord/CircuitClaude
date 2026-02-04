@@ -102,7 +102,7 @@ export function CommitDialog({ isOpen, onClose, projectPath }: CommitDialogProps
           </div>
           <div className="commit-dialog-generate-row">
             <button
-              className={`git-action-btn${generatingMessage ? " commit-dialog-generating" : ""}`}
+              className={`commit-dialog-generate-btn${generatingMessage ? " commit-dialog-generating" : ""}`}
               disabled={committing || pushing || generatingMessage || diffStatsLoading}
               onClick={() => generateCommitMessage(projectPath)}
             >

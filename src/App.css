@@ -1648,6 +1648,28 @@ body,
   justify-content: flex-end;
 }
 
+.commit-dialog-generate-btn {
+  background: var(--accent-muted);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 4px 10px;
+  color: var(--accent-text);
+  cursor: pointer;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.commit-dialog-generate-btn:hover:not(:disabled) {
+  background: var(--accent-muted-hover);
+  border-color: var(--accent);
+}
+
+.commit-dialog-generate-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 .commit-dialog-generating {
   animation: tui-waiting-pulse 1.5s step-end infinite;
 }

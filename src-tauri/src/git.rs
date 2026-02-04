@@ -332,7 +332,7 @@ pub fn generate_commit_message(project_path: &str, files: &[GitFileEntry]) -> Re
     let model = "claude-haiku-4-5-20251001";
 
     let mut child = Command::new("cmd.exe")
-        .args(["/c", "claude", "-p", "--model", model])
+        .args(["/c", "claude", "-p", "--no-session-persistence", "--model", model])
         .current_dir(project_path)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
