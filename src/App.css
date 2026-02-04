@@ -121,6 +121,7 @@ body,
 .sidebar-header-actions {
   display: flex;
   align-items: center;
+  gap: 6px;
   -webkit-app-region: no-drag;
 }
 
@@ -286,6 +287,137 @@ body,
 @keyframes tui-blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
+}
+
+/* --- Edit Mode --- */
+
+.sidebar-header-text-btn {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  padding: 4px 6px;
+  transition: color 0.1s;
+  -webkit-app-region: no-drag;
+}
+
+.sidebar-header-text-btn:hover {
+  color: var(--accent-text);
+}
+
+.sidebar-entry--edit {
+  cursor: default;
+}
+
+.sidebar-entry--edit.dragging {
+  opacity: 0.25;
+}
+
+.sidebar-entry--edit.confirming {
+  cursor: default;
+}
+
+/* Drag handle — replaces > prefix in edit mode */
+.sidebar-entry-drag-handle {
+  width: 14px;
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+  cursor: grab;
+  font-size: 13px;
+  padding: 4px 0;
+  margin: -4px 0;
+}
+
+.sidebar-entry--edit:hover .sidebar-entry-drag-handle {
+  color: var(--text-secondary);
+}
+
+/* Delete button — right-aligned x */
+.sidebar-entry-delete {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  padding: 0 2px;
+  margin-left: auto;
+  transition: color 0.1s;
+}
+
+.sidebar-entry-delete:hover {
+  color: var(--git-deleted);
+}
+
+/* Inline confirmation: remove? y/n */
+.sidebar-entry-confirm {
+  display: flex;
+  align-items: center;
+  padding-left: 14px;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.sidebar-entry-confirm-text {
+  color: var(--git-deleted);
+  margin-right: 4px;
+}
+
+.sidebar-entry-confirm-btn {
+  background: none;
+  border: none;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0 2px;
+  transition: color 0.1s;
+}
+
+.sidebar-entry-confirm-yes {
+  color: var(--git-deleted);
+}
+
+.sidebar-entry-confirm-yes:hover {
+  color: #ff6b6b;
+}
+
+.sidebar-entry-confirm-no {
+  color: var(--text-tertiary);
+}
+
+.sidebar-entry-confirm-no:hover {
+  color: var(--text-primary);
+}
+
+.sidebar-entry-confirm-sep {
+  color: var(--text-tertiary);
+}
+
+/* Drop indicator lines */
+.sidebar-entry.drop-before::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 12px;
+  right: 12px;
+  height: 1px;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
+  z-index: 1;
+}
+
+.sidebar-entry.drop-after::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 12px;
+  right: 12px;
+  height: 1px;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
+  z-index: 1;
 }
 
 
@@ -823,12 +955,33 @@ body,
    ======================================================================== */
 
 .terminal-view {
+  position: relative;
   display: flex;
   flex-direction: column;
   width: 100%;
   height: 100%;
   border: 1px solid var(--border-subtle);
   overflow: hidden;
+}
+
+.terminal-status-line {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 2px 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-tertiary);
+  background: var(--bg-elevated);
+  border-top: 1px solid var(--border-subtle);
+  pointer-events: none;
+  animation: status-line-in 0s step-end forwards;
+}
+
+@keyframes status-line-in {
+  from { opacity: 1; }
+  to   { opacity: 1; }
 }
 
 .terminal-panel-cell {

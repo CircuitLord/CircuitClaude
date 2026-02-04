@@ -8,6 +8,7 @@ interface ProjectStore {
   load: () => Promise<void>;
   addProject: (project: Project) => Promise<void>;
   removeProject: (path: string) => Promise<void>;
+  reorderProjects: (paths: string[]) => Promise<void>;
 }
 
 export const useProjectStore = create<ProjectStore>((set, get) => ({
@@ -31,5 +32,13 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     const updated = get().projects.filter((p) => p.path !== path);
     await saveProjects(updated);
     set({ projects: updated });
+  },
+
+  reorderProjects: async (paths: string[]) => {
+    const current = get().projects;
+    const byPath = new Map(current.map((p) => [p.path, p]));
+    const reordered = paths.map((path) => byPath.get(path)!).filter(Boolean);
+    await saveProjects(reordered);
+    set({ projects: reordered });
   },
 }));

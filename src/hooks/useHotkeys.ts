@@ -11,9 +11,11 @@ export function useHotkeys() {
     function handleKeyDown(e: KeyboardEvent) {
       // Skip when dialog/overlay is open
       if (document.querySelector(".dialog-overlay") || document.querySelector(".diff-overlay")) return;
-      // Skip if focus is in an input/textarea
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      // Skip if focus is in an input/textarea (but not xterm's internal textarea)
+      const target = e.target as HTMLElement;
+      const tag = target?.tagName;
+      if (tag === "INPUT" || tag === "SELECT") return;
+      if (tag === "TEXTAREA" && !target.closest(".xterm")) return;
 
       // Ctrl+T — new session
       if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key === "t") {

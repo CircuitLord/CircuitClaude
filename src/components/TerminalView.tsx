@@ -64,6 +64,8 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
   const thinkingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastInputTimeRef = useRef<number>(0);
   const hasInteractedRef = useRef(false);
+  const [showCopied, setShowCopied] = useState(false);
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!containerRef.current || initializedRef.current) return;
@@ -224,6 +226,19 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
       }
     });
 
+    // Copy selection to clipboard on drag-select, then clear highlight
+    const onSelectionDisposable = terminal.onSelectionChange(() => {
+      const selection = terminal.getSelection();
+      if (selection) {
+        navigator.clipboard.writeText(selection).then(() => {
+          terminal.clearSelection();
+          if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+          setShowCopied(true);
+          copiedTimerRef.current = setTimeout(() => setShowCopied(false), 1500);
+        }).catch(() => {});
+      }
+    });
+
     // ResizeObserver for container size changes — skip fit when hidden (zero dimensions)
     const resizeObserver = new ResizeObserver((entries) => {
       const entry = entries[0];
@@ -240,8 +255,10 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
       onDataDisposable.dispose();
       onResizeDisposable.dispose();
       onTitleDisposable.dispose();
+      onSelectionDisposable.dispose();
       unregisterTerminal(tabId);
       if (thinkingTimerRef.current) clearTimeout(thinkingTimerRef.current);
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
       if (restoreTimer) clearTimeout(restoreTimer);
       setThinking(tabId, false);
       setNeedsAttention(tabId, false);
@@ -291,6 +308,9 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
         </div>
       )}
       <div className="terminal-container" ref={containerRef} />
+      {showCopied && (
+        <div className="terminal-status-line">copied to clipboard</div>
+      )}
     </div>
   );
 }
