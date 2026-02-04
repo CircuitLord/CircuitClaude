@@ -1,6 +1,9 @@
 import { create } from "zustand";
-import { Project } from "../types";
+import { Project, ThemeName } from "../types";
 import { loadProjects, saveProjects } from "../lib/config";
+import { THEMES } from "../lib/themes";
+
+const THEME_NAMES = Object.keys(THEMES) as ThemeName[];
 
 interface ProjectStore {
   projects: Project[];
@@ -9,6 +12,7 @@ interface ProjectStore {
   addProject: (project: Project) => Promise<void>;
   removeProject: (path: string) => Promise<void>;
   reorderProjects: (paths: string[]) => Promise<void>;
+  updateProjectTheme: (path: string, theme: ThemeName) => Promise<void>;
 }
 
 export const useProjectStore = create<ProjectStore>((set, get) => ({
@@ -17,6 +21,27 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
   load: async () => {
     const projects = await loadProjects();
+
+    // Migration: if all projects have the serde default "midnight" theme,
+    // distribute varied themes across them
+    const allMidnight = projects.length > 0 && projects.every((p) => !p.theme || p.theme === "midnight");
+    if (allMidnight) {
+      for (let i = 0; i < projects.length; i++) {
+        projects[i] = { ...projects[i], theme: THEME_NAMES[i % THEME_NAMES.length] };
+      }
+      await saveProjects(projects);
+    } else {
+      // Ensure every project has a valid theme
+      let needsSave = false;
+      for (let i = 0; i < projects.length; i++) {
+        if (!projects[i].theme || !THEMES[projects[i].theme]) {
+          projects[i] = { ...projects[i], theme: "midnight" };
+          needsSave = true;
+        }
+      }
+      if (needsSave) await saveProjects(projects);
+    }
+
     set({ projects, loaded: true });
   },
 
@@ -40,5 +65,13 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     const reordered = paths.map((path) => byPath.get(path)!).filter(Boolean);
     await saveProjects(reordered);
     set({ projects: reordered });
+  },
+
+  updateProjectTheme: async (path: string, theme: ThemeName) => {
+    const updated = get().projects.map((p) =>
+      p.path === path ? { ...p, theme } : p
+    );
+    await saveProjects(updated);
+    set({ projects: updated });
   },
 }));

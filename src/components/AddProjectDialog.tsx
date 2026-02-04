@@ -1,5 +1,6 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { useProjectStore } from "../stores/projectStore";
+import { getNextProjectTheme } from "../lib/themes";
 
 export function useAddProject() {
   const addProject = useProjectStore((s) => s.addProject);
@@ -14,7 +15,8 @@ export function useAddProject() {
     if (selected && typeof selected === "string") {
       const parts = selected.replace(/\\/g, "/").split("/");
       const name = parts[parts.length - 1] || selected;
-      await addProject({ name, path: selected });
+      const theme = getNextProjectTheme(useProjectStore.getState().projects);
+      await addProject({ name, path: selected, theme });
     }
   }
 

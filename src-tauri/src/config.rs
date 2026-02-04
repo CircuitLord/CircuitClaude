@@ -3,10 +3,16 @@ use std::fs;
 use std::path::PathBuf;
 use tauri::Manager;
 
+fn default_project_theme() -> String {
+    "midnight".to_string()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectConfig {
     pub name: String,
     pub path: String,
+    #[serde(default = "default_project_theme")]
+    pub theme: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

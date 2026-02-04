@@ -10,6 +10,7 @@ import { loadScrollback } from "../lib/config";
 import { registerTerminal, unregisterTerminal } from "../lib/terminalRegistry";
 import { useSessionStore } from "../stores/sessionStore";
 import { useSettingsStore } from "../stores/settingsStore";
+import { useProjectStore } from "../stores/projectStore";
 import { THEMES } from "../lib/themes";
 import { PtyOutputEvent } from "../types";
 import "@xterm/xterm/css/xterm.css";
@@ -21,7 +22,7 @@ function detectInteractivePrompt(terminal: Terminal): boolean {
   const buffer = terminal.buffer.active;
   const cursorLine = buffer.baseY + buffer.cursorY;
   const lines: string[] = [];
-  for (let i = Math.max(0, cursorLine - 8); i <= cursorLine; i++) {
+  for (let i = Math.max(0, cursorLine - 20); i <= cursorLine; i++) {
     const line = buffer.getLine(i);
     if (line) lines.push(line.translateToString());
   }
@@ -29,6 +30,13 @@ function detectInteractivePrompt(terminal: Terminal): boolean {
 
   // Tool approval prompt (shows "Chat about this" as an option alongside Yes/No/Always)
   if (/Chat about this/.test(text)) { return true; }
+
+  // Command execution permission prompts
+  if (/Do you want to proceed\?/.test(text)) { return true; }
+  if (/Do you want to allow/.test(text)) { return true; }
+
+  // Plan mode completion prompt
+  if (/Would you like to proceed\?/.test(text)) { return true; }
 
   return false;
 }
@@ -61,6 +69,9 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
   const activeProjectPath = useSessionStore((s) => s.activeProjectPath);
   const activeSessionId = useSessionStore((s) => s.activeSessionId);
   const settings = useSettingsStore((s) => s.settings);
+  const projectTheme = useProjectStore(
+    (s) => s.projects.find((p) => p.path === projectPath)?.theme ?? "midnight"
+  );
   const thinkingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastInputTimeRef = useRef<number>(0);
   const hasInteractedRef = useRef(false);
@@ -74,12 +85,13 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
     let restoreTimer: ReturnType<typeof setTimeout> | null = null;
 
     const currentSettings = useSettingsStore.getState().settings;
+    const currentProjectTheme = useProjectStore.getState().projects.find((p) => p.path === projectPath)?.theme ?? "midnight";
     const terminal = new Terminal({
       cursorBlink: currentSettings.terminalCursorBlink,
       cursorStyle: currentSettings.terminalCursorStyle,
       fontSize: currentSettings.terminalFontSize,
       fontFamily: currentSettings.terminalFontFamily,
-      theme: THEMES[currentSettings.theme].xterm,
+      theme: THEMES[currentProjectTheme].xterm,
     });
 
     const fitAddon = new FitAddon();
@@ -295,9 +307,9 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
     terminal.options.fontFamily = settings.terminalFontFamily;
     terminal.options.cursorBlink = settings.terminalCursorBlink;
     terminal.options.cursorStyle = settings.terminalCursorStyle;
-    terminal.options.theme = THEMES[settings.theme].xterm;
+    terminal.options.theme = THEMES[projectTheme].xterm;
     fitAddonRef.current?.fit();
-  }, [settings.terminalFontSize, settings.terminalFontFamily, settings.terminalCursorBlink, settings.terminalCursorStyle, settings.theme]);
+  }, [settings.terminalFontSize, settings.terminalFontFamily, settings.terminalCursorBlink, settings.terminalCursorStyle, projectTheme]);
 
   return (
     <div className="terminal-view">

@@ -9,10 +9,12 @@ import { WindowControls } from "./components/WindowControls";
 import { DiffViewer } from "./components/DiffViewer";
 import { useSessionStore } from "./stores/sessionStore";
 import { useSettingsStore } from "./stores/settingsStore";
+import { useProjectStore } from "./stores/projectStore";
 import { loadSessionsConfig, saveSessionsConfig, saveScrollback } from "./lib/config";
 import { killAllSessions, exitApp } from "./lib/pty";
 import { serializeAllTerminals } from "./lib/terminalRegistry";
 import { spawnNewSession } from "./lib/sessions";
+import { applyThemeToDOM } from "./lib/themes";
 import { useHotkeys } from "./hooks/useHotkeys";
 import "./App.css";
 
@@ -30,6 +32,7 @@ async function saveAllSessionData() {
 
 function App() {
   const { sessions, activeProjectPath } = useSessionStore();
+  const projects = useProjectStore((s) => s.projects);
   const layoutMode = useSettingsStore((s) => s.settings.layoutMode);
   const restoredRef = useRef(false);
   useHotkeys();
@@ -39,16 +42,41 @@ function App() {
     if (restoredRef.current) return;
     restoredRef.current = true;
 
-    useSettingsStore.getState().load();
+    // Prevent animation flash on first paint
+    document.documentElement.classList.add("no-transition");
 
-    loadSessionsConfig()
+    Promise.all([
+      useSettingsStore.getState().load(),
+      useProjectStore.getState().load(),
+    ])
+      .then(() => loadSessionsConfig())
       .then((config) => {
         if (config && config.layouts.length > 0) {
           useSessionStore.getState().restoreFromConfig(config);
         }
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        // Remove no-transition guard after first theme is applied
+        requestAnimationFrame(() => {
+          document.documentElement.classList.remove("no-transition");
+        });
+      });
   }, []);
+
+  // Apply project theme when active project changes
+  useEffect(() => {
+    if (!activeProjectPath) {
+      // No project selected — apply default theme from settings
+      const defaultTheme = useSettingsStore.getState().settings.theme;
+      applyThemeToDOM(defaultTheme);
+      return;
+    }
+    const project = projects.find((p) => p.path === activeProjectPath);
+    if (project?.theme) {
+      applyThemeToDOM(project.theme);
+    }
+  }, [activeProjectPath, projects]);
 
   // Save on close + auto-save every 30s
   useEffect(() => {

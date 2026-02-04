@@ -2,6 +2,7 @@ import { useSessionStore } from "../stores/sessionStore";
 import { TerminalView } from "./TerminalView";
 import { killSession } from "../lib/pty";
 import { deleteScrollback } from "../lib/config";
+import { spawnNewSession } from "../lib/sessions";
 
 interface TerminalTabsProps {
   projectPath: string;
@@ -71,6 +72,13 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
             </button>
           );
         })}
+        <button
+          className="terminal-tab-add"
+          onClick={() => spawnNewSession()}
+          title="New session"
+        >
+          +
+        </button>
       </div>
       <div className="terminal-tabs-panels">
         {projectSessions.map((s) => (

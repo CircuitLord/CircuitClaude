@@ -4,15 +4,18 @@ import { useSessionStore } from "../stores/sessionStore";
 import { useAddProject } from "./AddProjectDialog";
 import { GitSection } from "./GitSection";
 import { SettingsDialog } from "./SettingsDialog";
+import { THEMES, THEME_OPTIONS } from "../lib/themes";
+import type { ThemeName } from "../types";
 
 export function Sidebar() {
-  const { projects, loaded, load, removeProject, reorderProjects } = useProjectStore();
+  const { projects, loaded, load, removeProject, reorderProjects, updateProjectTheme } = useProjectStore();
   const { sessions, activeProjectPath, setActiveProject, thinkingSessions, needsAttentionSessions } = useSessionStore();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
+  const [themeDropdownPath, setThemeDropdownPath] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const dropIndexRef = useRef<number | null>(null);
   const handleAdd = useAddProject();
@@ -128,6 +131,32 @@ export function Sidebar() {
     setDropIndex(null);
   }
 
+  function handleToggleThemeDropdown(path: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    setThemeDropdownPath(themeDropdownPath === path ? null : path);
+  }
+
+  function handleSelectTheme(path: string, theme: ThemeName, e: React.MouseEvent) {
+    e.stopPropagation();
+    updateProjectTheme(path, theme);
+    setThemeDropdownPath(null);
+  }
+
+  // Close theme dropdown on outside click
+  useEffect(() => {
+    if (!themeDropdownPath) return;
+    function handleClick() {
+      setThemeDropdownPath(null);
+    }
+    window.addEventListener("click", handleClick);
+    return () => window.removeEventListener("click", handleClick);
+  }, [themeDropdownPath]);
+
+  // Close theme dropdown when exiting edit mode
+  useEffect(() => {
+    if (!editMode) setThemeDropdownPath(null);
+  }, [editMode]);
+
   return (
     <div className="sidebar">
       <div className="sidebar-header" data-tauri-drag-region>
@@ -199,6 +228,31 @@ export function Sidebar() {
                       {"\u2261"}
                     </span>
                     <span className="sidebar-entry-name">{p.name}</span>
+                    <div className="sidebar-theme-select" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        className="sidebar-entry-theme-swatch"
+                        onClick={(e) => handleToggleThemeDropdown(p.path, e)}
+                        title="Change theme"
+                        style={{ color: THEMES[p.theme]?.accent ?? THEMES.midnight.accent }}
+                      >
+                        #
+                      </button>
+                      {themeDropdownPath === p.path && (
+                        <div className="sidebar-theme-dropdown">
+                          {THEME_OPTIONS.map((opt) => (
+                            <button
+                              key={opt.value}
+                              className={`sidebar-theme-option${opt.value === p.theme ? " sidebar-theme-option--active" : ""}`}
+                              onClick={(e) => handleSelectTheme(p.path, opt.value, e)}
+                            >
+                              <span className="sidebar-theme-option-marker">{opt.value === p.theme ? ">" : " "}</span>
+                              <span className="sidebar-theme-option-swatch" style={{ color: opt.accent }}>#</span>
+                              <span className="sidebar-theme-option-label">{opt.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                     <button
                       className="sidebar-entry-delete"
                       onClick={(e) => handleDeleteClick(p.path, e)}

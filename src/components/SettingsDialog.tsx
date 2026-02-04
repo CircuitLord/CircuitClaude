@@ -241,7 +241,7 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
             <div className="settings-section-title">~theme</div>
             <div className="settings-row">
               <div className="settings-row-label">
-                <span className="settings-row-name">color-theme</span>
+                <span className="settings-row-name">default-theme</span>
               </div>
               <CustomSelect
                 value={settings.theme}

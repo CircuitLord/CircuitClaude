@@ -3,6 +3,28 @@
    Linear / Raycast inspired. Monochrome + single purple accent.
    ======================================================================== */
 
+/* --- @property registrations (makes custom properties animatable) --- */
+@property --bg-base            { syntax: '<color>'; inherits: true; initial-value: #0a0a0e; }
+@property --bg-surface         { syntax: '<color>'; inherits: true; initial-value: #101014; }
+@property --bg-elevated        { syntax: '<color>'; inherits: true; initial-value: #16161b; }
+@property --bg-overlay         { syntax: '<color>'; inherits: true; initial-value: #1b1b21; }
+@property --border-subtle      { syntax: '<color>'; inherits: true; initial-value: #1c1c23; }
+@property --border-visible     { syntax: '<color>'; inherits: true; initial-value: #26262e; }
+@property --text-primary       { syntax: '<color>'; inherits: true; initial-value: #ededf0; }
+@property --text-secondary     { syntax: '<color>'; inherits: true; initial-value: #9898a6; }
+@property --text-tertiary      { syntax: '<color>'; inherits: true; initial-value: #7e7e8e; }
+@property --accent             { syntax: '<color>'; inherits: true; initial-value: #7c3aed; }
+@property --accent-text        { syntax: '<color>'; inherits: true; initial-value: #a78bfa; }
+@property --accent-hover       { syntax: '<color>'; inherits: true; initial-value: #6d28d9; }
+@property --accent-muted       { syntax: '<color>'; inherits: true; initial-value: rgba(124, 58, 237, 0.15); }
+@property --accent-muted-hover { syntax: '<color>'; inherits: true; initial-value: rgba(124, 58, 237, 0.25); }
+@property --terminal-border    { syntax: '<color>'; inherits: true; initial-value: #2a2a34; }
+
+/* Startup guard: prevent animation flash on first paint */
+html.no-transition, html.no-transition * {
+  transition: none !important;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -11,6 +33,23 @@
 
 /* --- Tokens --- */
 :root {
+  /* Theme transition (custom properties are animatable via @property) */
+  transition:
+    --bg-base 300ms ease,
+    --bg-surface 300ms ease,
+    --bg-elevated 300ms ease,
+    --bg-overlay 300ms ease,
+    --border-subtle 300ms ease,
+    --border-visible 300ms ease,
+    --text-primary 300ms ease,
+    --text-secondary 300ms ease,
+    --text-tertiary 300ms ease,
+    --accent 300ms ease,
+    --accent-muted 300ms ease,
+    --accent-text 300ms ease,
+    --accent-hover 300ms ease,
+    --accent-muted-hover 300ms ease,
+    --terminal-border 300ms ease;
   /* Surfaces (luminance-based elevation) */
   --bg-base:      #0a0a0e;
   --bg-surface:   #101014;
@@ -334,6 +373,79 @@ body,
   color: var(--text-secondary);
 }
 
+/* Theme swatch — colored # in edit mode */
+.sidebar-entry-theme-swatch {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  padding: 0 4px;
+  transition: opacity 0.1s;
+}
+
+.sidebar-entry-theme-swatch:hover {
+  opacity: 0.7;
+}
+
+/* Theme dropdown (edit mode) */
+.sidebar-theme-select {
+  position: relative;
+  margin-left: auto;
+}
+
+.sidebar-theme-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 120px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-visible);
+  border-radius: 2px;
+  padding: 2px 0;
+  z-index: 10;
+}
+
+.sidebar-theme-option {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 4px 8px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  text-align: left;
+  transition: color 0.1s, background 0.1s;
+  white-space: nowrap;
+}
+
+.sidebar-theme-option:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.sidebar-theme-option--active {
+  color: var(--text-primary);
+}
+
+.sidebar-theme-option-marker {
+  width: 1ch;
+  flex-shrink: 0;
+  color: var(--accent-text);
+}
+
+.sidebar-theme-option-swatch {
+  flex-shrink: 0;
+}
+
+.sidebar-theme-option-label {
+  flex: 1;
+}
+
 /* Delete button — right-aligned x */
 .sidebar-entry-delete {
   background: none;
@@ -343,7 +455,7 @@ body,
   font-family: var(--font-mono);
   font-size: 13px;
   padding: 0 2px;
-  margin-left: auto;
+  margin-left: 4px;
   transition: color 0.1s;
 }
 
@@ -2189,6 +2301,28 @@ body,
 
 .terminal-tab-close:hover {
   color: var(--accent-text);
+}
+
+.terminal-tab-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  min-width: 36px;
+  height: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 15px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: color 0.1s, background 0.1s;
+  flex-shrink: 0;
+}
+
+.terminal-tab-add:hover {
+  color: var(--accent-text);
+  background: var(--bg-elevated);
 }
 
 .terminal-tabs-panels {

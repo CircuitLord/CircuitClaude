@@ -1,6 +1,7 @@
 export interface Project {
   name: string;
   path: string;
+  theme: ThemeName;
 }
 
 export interface TerminalSession {
@@ -63,7 +64,7 @@ export interface GenerateResult {
   model: string;
 }
 
-export type ThemeName = "midnight" | "ember" | "arctic" | "forest" | "crimson";
+export type ThemeName = "midnight" | "ember" | "arctic" | "forest" | "crimson" | "sakura" | "amber";
 
 export type LayoutMode = "grid" | "tabs";
 
