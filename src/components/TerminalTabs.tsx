@@ -53,11 +53,11 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
               </span>
               <span className="terminal-tab-name">{sessionTitles.get(s.id) ?? s.projectName}</span>
               <span className="terminal-tab-trailing">
-                {isThinking && (
-                  <span className="terminal-tab-status terminal-tab-thinking">*</span>
-                )}
-                {needsAttention && !isThinking && (
+                {needsAttention && (
                   <span className="terminal-tab-status terminal-tab-attention">?</span>
+                )}
+                {isThinking && !needsAttention && (
+                  <span className="terminal-tab-status terminal-tab-thinking">*</span>
                 )}
                 <span
                   className="terminal-tab-close"

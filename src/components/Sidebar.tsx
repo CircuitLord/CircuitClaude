@@ -292,10 +292,10 @@ export function Sidebar() {
                 <span className="sidebar-entry-name">{p.name}</span>
               </div>
               <div className="sidebar-entry-status">
-                {isThinking ? (
-                  <span className="sidebar-entry-status-text alive"><span className="sidebar-entry-status-symbol">*</span> thinking</span>
-                ) : needsAttention ? (
+                {needsAttention ? (
                   <span className="sidebar-entry-status-text waiting"><span className="sidebar-entry-status-symbol">?</span> waiting</span>
+                ) : isThinking ? (
+                  <span className="sidebar-entry-status-text alive"><span className="sidebar-entry-status-symbol">*</span> thinking</span>
                 ) : (
                   <span className="sidebar-entry-status-text idle">idle</span>
                 )}

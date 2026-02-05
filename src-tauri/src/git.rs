@@ -48,7 +48,7 @@ pub fn get_status(project_path: &str) -> GitStatus {
     };
 
     let files = match git_cmd()
-        .args(["status", "--porcelain=v1"])
+        .args(["status", "--porcelain=v1", "-uall"])
         .current_dir(project_path)
         .output()
     {
@@ -404,9 +404,22 @@ fn parse_porcelain(output: &str) -> Vec<GitFileEntry> {
         let worktree_status = line.as_bytes()[1] as char;
         let path = line[3..].to_string();
 
+        // Strip quotes that git adds around paths with spaces or special chars
+        let path = if path.starts_with('"') && path.ends_with('"') {
+            path[1..path.len() - 1].to_string()
+        } else {
+            path
+        };
+
         // Handle renames: "R  old -> new"
         let path = if let Some(pos) = path.find(" -> ") {
-            path[pos + 4..].to_string()
+            let new_path = path[pos + 4..].to_string();
+            // The new path portion may also be quoted
+            if new_path.starts_with('"') && new_path.ends_with('"') {
+                new_path[1..new_path.len() - 1].to_string()
+            } else {
+                new_path
+            }
         } else {
             path
         };

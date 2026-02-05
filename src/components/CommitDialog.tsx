@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useGitStore, fileKey } from "../stores/gitStore";
-import { statusColor } from "./GitSection";
+import { statusColor, displayStatus } from "./GitSection";
 import { DiffStat } from "../types";
 
 interface CommitDialogProps {
@@ -84,7 +84,7 @@ export function CommitDialog({ isOpen, onClose, projectPath }: CommitDialogProps
               return (
                 <div className="commit-dialog-file" key={`${f.path}:${f.staged}`}>
                   <span className="commit-dialog-file-status" style={{ color: statusColor(f.status) }}>
-                    {f.status}
+                    {displayStatus(f.status)}
                   </span>
                   <span className="commit-dialog-file-path">{f.path}</span>
                   {diffStatsLoading ? (

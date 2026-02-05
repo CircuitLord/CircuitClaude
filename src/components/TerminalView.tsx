@@ -77,6 +77,7 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
   const hasInteractedRef = useRef(false);
   const [showCopied, setShowCopied] = useState(false);
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const promptCheckPendingRef = useRef(false);
 
   useEffect(() => {
     if (!containerRef.current || initializedRef.current) return;
@@ -131,13 +132,29 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
             const isEcho = (Date.now() - lastInputTimeRef.current) < 250;
             if (hasInteractedRef.current && !isEcho) {
               setThinking(tabId, true);
-              setNeedsAttention(tabId, false);
+              // Don't clear needsAttention here — Claude CLI status line updates
+              // arrive while prompts are displayed; clearing on data would immediately
+              // erase the "?" indicator. User input or the silence timer handles clearing.
+            }
+            // Periodic prompt check while data flows (every 500ms) — catches prompts
+            // even when Claude CLI status line updates prevent the 2s silence window
+            if (hasInteractedRef.current && !promptCheckPendingRef.current) {
+              promptCheckPendingRef.current = true;
+              setTimeout(() => {
+                promptCheckPendingRef.current = false;
+                if (detectInteractivePrompt(terminal)) {
+                  setNeedsAttention(tabId, true);
+                  setThinking(tabId, false);
+                }
+              }, 500);
             }
             if (thinkingTimerRef.current) clearTimeout(thinkingTimerRef.current);
             thinkingTimerRef.current = setTimeout(() => {
               setThinking(tabId, false);
               if (detectInteractivePrompt(terminal)) {
                 setNeedsAttention(tabId, true);
+              } else {
+                setNeedsAttention(tabId, false);
               }
             }, 2000);
           } else if (event.type === "Exit") {
@@ -211,6 +228,7 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
         if (!hasInteractedRef.current) markInteracted(tabId);
         hasInteractedRef.current = true;
         lastInputTimeRef.current = Date.now();
+        setNeedsAttention(tabId, false);
         const encoder = new TextEncoder();
         writeSession(sessionIdRef.current, encoder.encode(data)).catch(() => {});
       }

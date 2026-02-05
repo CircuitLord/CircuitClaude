@@ -22,10 +22,14 @@ export function statusColor(status: string): string {
     case "R":
       return "var(--git-renamed)";
     case "?":
-      return "var(--git-untracked)";
+      return "var(--git-added)";
     default:
       return "var(--text-tertiary)";
   }
+}
+
+export function displayStatus(status: string): string {
+  return status === "?" ? "A" : status;
 }
 
 function splitPath(filePath: string): { dir: string; name: string } {
@@ -236,7 +240,7 @@ function TreeFileItem({
         }}
       />
       <span className="git-file-status" style={{ color: statusColor(f.status) }}>
-        {f.status}
+        {displayStatus(f.status)}
       </span>
       <span className="git-file-name">{node.name}</span>
       {f.staged && <span className="git-tree-staged">S</span>}
@@ -361,7 +365,7 @@ function FileGroup({
                   className="git-file-status"
                   style={{ color: statusColor(f.status) }}
                 >
-                  {f.status}
+                  {displayStatus(f.status)}
                 </span>
                 <span className="git-file-name">{name}</span>
                 {dir && <span className="git-file-dir">{dir}</span>}
@@ -637,7 +641,7 @@ export function GitSection() {
                                     className="git-file-status"
                                     style={{ color: statusColor(f.status) }}
                                   >
-                                    {f.status}
+                                    {displayStatus(f.status)}
                                   </span>
                                   <span className="git-file-name">{name}</span>
                                   {dir && <span className="git-file-dir">{dir}</span>}
