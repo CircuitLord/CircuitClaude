@@ -1,5 +1,5 @@
 import type { ITheme } from "@xterm/xterm";
-import type { ThemeName } from "../types";
+import type { ThemeName, SyntaxThemeName } from "../types";
 
 interface ThemeDefinition {
   label: string;
@@ -263,6 +263,82 @@ export function applyThemeToDOM(themeName: ThemeName): void {
 }
 
 const THEME_NAMES: ThemeName[] = Object.keys(THEMES) as ThemeName[];
+
+/* ------------------------------------------------------------------ */
+/*  Syntax Highlighting Themes                                        */
+/* ------------------------------------------------------------------ */
+
+interface SyntaxPalette {
+  keyword: string;
+  function: string;
+  string: string;
+  number: string;
+  comment: string;
+  regexp: string;
+  meta: string;
+  name: string;
+}
+
+interface SyntaxThemeDefinition {
+  label: string;
+  palette: SyntaxPalette;
+}
+
+export const SYNTAX_THEMES: Record<SyntaxThemeName, SyntaxThemeDefinition> = {
+  "github-dark": {
+    label: "GitHub Dark",
+    palette: {
+      keyword:  "#ff7b72",
+      function: "#d2a8ff",
+      string:   "#a5d6ff",
+      number:   "#79c0ff",
+      comment:  "#8b949e",
+      regexp:   "#7ee787",
+      meta:     "#8b949e",
+      name:     "#7ee787",
+    },
+  },
+  monokai: {
+    label: "Monokai",
+    palette: {
+      keyword:  "#f92672",
+      function: "#a6e22e",
+      string:   "#e6db74",
+      number:   "#ae81ff",
+      comment:  "#75715e",
+      regexp:   "#e6db74",
+      meta:     "#75715e",
+      name:     "#f8f8f2",
+    },
+  },
+  "tokyo-night": {
+    label: "Tokyo Night",
+    palette: {
+      keyword:  "#bb9af7",
+      function: "#7aa2f7",
+      string:   "#9ece6a",
+      number:   "#ff9e64",
+      comment:  "#565f89",
+      regexp:   "#b4f9f8",
+      meta:     "#565f89",
+      name:     "#73daca",
+    },
+  },
+};
+
+export const SYNTAX_THEME_OPTIONS: Array<{ label: string; value: SyntaxThemeName }> =
+  (Object.keys(SYNTAX_THEMES) as SyntaxThemeName[]).map((key) => ({
+    label: SYNTAX_THEMES[key].label,
+    value: key,
+  }));
+
+export function applySyntaxThemeToDOM(themeName: SyntaxThemeName): void {
+  const theme = SYNTAX_THEMES[themeName] ?? SYNTAX_THEMES["github-dark"];
+  const root = document.documentElement;
+  for (const [token, color] of Object.entries(theme.palette)) {
+    root.style.setProperty(`--hljs-${token}`, color);
+  }
+}
 
 /** Pick the least-used theme among existing projects. */
 export function getNextProjectTheme(existingProjects: Array<{ theme: ThemeName }>): ThemeName {

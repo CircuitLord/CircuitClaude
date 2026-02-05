@@ -14,7 +14,7 @@ import { loadSessionsConfig, saveSessionsConfig, saveScrollback } from "./lib/co
 import { killAllSessions, exitApp } from "./lib/pty";
 import { serializeAllTerminals } from "./lib/terminalRegistry";
 import { spawnNewSession } from "./lib/sessions";
-import { applyThemeToDOM } from "./lib/themes";
+import { applyThemeToDOM, applySyntaxThemeToDOM } from "./lib/themes";
 import { useHotkeys } from "./hooks/useHotkeys";
 import "./App.css";
 
@@ -77,6 +77,12 @@ function App() {
       applyThemeToDOM(project.theme);
     }
   }, [activeProjectPath, projects]);
+
+  // Apply syntax highlighting theme
+  const syntaxTheme = useSettingsStore((s) => s.settings.syntaxTheme);
+  useEffect(() => {
+    applySyntaxThemeToDOM(syntaxTheme);
+  }, [syntaxTheme]);
 
   // Save on close + auto-save every 30s
   useEffect(() => {

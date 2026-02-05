@@ -2139,36 +2139,36 @@ body,
 
 .diff-content .hljs-keyword, .companion-code .hljs-keyword,
 .diff-content .hljs-selector-tag, .companion-code .hljs-selector-tag,
-.diff-content .hljs-built_in, .companion-code .hljs-built_in { color: #ff7b72; }
+.diff-content .hljs-built_in, .companion-code .hljs-built_in { color: var(--hljs-keyword, #ff7b72); }
 
 .diff-content .hljs-type, .companion-code .hljs-type,
 .diff-content .hljs-title.class_, .companion-code .hljs-title.class_,
 .diff-content .hljs-title.class_.inherited__, .companion-code .hljs-title.class_.inherited__,
-.diff-content .hljs-title.function_, .companion-code .hljs-title.function_ { color: #d2a8ff; }
+.diff-content .hljs-title.function_, .companion-code .hljs-title.function_ { color: var(--hljs-function, #d2a8ff); }
 
 .diff-content .hljs-string, .companion-code .hljs-string,
 .diff-content .hljs-template-variable, .companion-code .hljs-template-variable,
-.diff-content .hljs-addition, .companion-code .hljs-addition { color: #a5d6ff; }
+.diff-content .hljs-addition, .companion-code .hljs-addition { color: var(--hljs-string, #a5d6ff); }
 
 .diff-content .hljs-attr, .companion-code .hljs-attr,
 .diff-content .hljs-variable, .companion-code .hljs-variable,
 .diff-content .hljs-selector-attr, .companion-code .hljs-selector-attr,
-.diff-content .hljs-selector-pseudo, .companion-code .hljs-selector-pseudo { color: #79c0ff; }
+.diff-content .hljs-selector-pseudo, .companion-code .hljs-selector-pseudo { color: var(--hljs-number, #79c0ff); }
 
 .diff-content .hljs-number, .companion-code .hljs-number,
-.diff-content .hljs-literal, .companion-code .hljs-literal { color: #79c0ff; }
+.diff-content .hljs-literal, .companion-code .hljs-literal { color: var(--hljs-number, #79c0ff); }
 
 .diff-content .hljs-comment, .companion-code .hljs-comment,
-.diff-content .hljs-quote, .companion-code .hljs-quote { color: #8b949e; font-style: italic; }
+.diff-content .hljs-quote, .companion-code .hljs-quote { color: var(--hljs-comment, #8b949e); font-style: italic; }
 
-.diff-content .hljs-regexp, .companion-code .hljs-regexp { color: #7ee787; }
+.diff-content .hljs-regexp, .companion-code .hljs-regexp { color: var(--hljs-regexp, #7ee787); }
 
 .diff-content .hljs-meta, .companion-code .hljs-meta,
-.diff-content .hljs-tag, .companion-code .hljs-tag { color: #8b949e; }
+.diff-content .hljs-tag, .companion-code .hljs-tag { color: var(--hljs-meta, #8b949e); }
 
 .diff-content .hljs-name, .companion-code .hljs-name,
 .diff-content .hljs-selector-id, .companion-code .hljs-selector-id,
-.diff-content .hljs-selector-class, .companion-code .hljs-selector-class { color: #7ee787; }
+.diff-content .hljs-selector-class, .companion-code .hljs-selector-class { color: var(--hljs-name, #7ee787); }
 
 .diff-content .hljs-params, .companion-code .hljs-params { color: inherit; }
 .diff-content .hljs-punctuation, .companion-code .hljs-punctuation { color: inherit; }
@@ -2350,11 +2350,12 @@ body,
 }
 
 .terminal-tabs-panels {
-  flex: 1;
+  height: 100%;
   min-height: 0;
   overflow: hidden;
   padding: 8px 10px 10px;
   background: var(--bg-base);
+  box-sizing: border-box;
 }
 
 .terminal-tabs-panel {
@@ -2555,10 +2556,10 @@ body,
   color: inherit;
 }
 
-/* Inline code */
-.companion-message code {
+/* Inline code (exclude code inside pre blocks) */
+.companion-message :not(pre) > code {
   background: var(--bg-elevated);
-  color: var(--accent-text);
+  color: var(--text-secondary);
   font-size: 12px;
   font-family: var(--font-mono);
   padding: 1px 4px;

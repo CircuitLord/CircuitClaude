@@ -66,10 +66,13 @@ export interface GenerateResult {
 
 export type ThemeName = "midnight" | "ember" | "arctic" | "forest" | "crimson" | "sakura" | "amber";
 
+export type SyntaxThemeName = "github-dark" | "monokai" | "tokyo-night";
+
 export type LayoutMode = "grid" | "tabs";
 
 export interface Settings {
   theme: ThemeName;
+  syntaxTheme: SyntaxThemeName;
   layoutMode: LayoutMode;
   terminalFontSize: number;
   terminalFontFamily: string;
@@ -79,6 +82,7 @@ export interface Settings {
 
 export const DEFAULT_SETTINGS: Settings = {
   theme: "midnight",
+  syntaxTheme: "github-dark",
   layoutMode: "grid",
   terminalFontSize: 15,
   terminalFontFamily: "'Cascadia Code', 'Consolas', 'Monaco', monospace",

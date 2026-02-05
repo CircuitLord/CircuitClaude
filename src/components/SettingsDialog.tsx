@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useSettingsStore } from "../stores/settingsStore";
-import { DEFAULT_SETTINGS, ThemeName, LayoutMode } from "../types";
-import { THEME_OPTIONS } from "../lib/themes";
+import { DEFAULT_SETTINGS, ThemeName, SyntaxThemeName, LayoutMode } from "../types";
+import { THEME_OPTIONS, SYNTAX_THEME_OPTIONS } from "../lib/themes";
 import { SegmentedControl } from "./SegmentedControl";
 
 const LAYOUT_OPTIONS: Array<{ label: string; value: LayoutMode }> = [
@@ -256,6 +256,20 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                   );
                 }}
                 onChange={(v) => update({ theme: v as ThemeName })}
+              />
+            </div>
+          </div>
+
+          <div className="settings-section">
+            <div className="settings-section-title">~syntax</div>
+            <div className="settings-row">
+              <div className="settings-row-label">
+                <span className="settings-row-name">syntax-theme</span>
+              </div>
+              <CustomSelect
+                value={settings.syntaxTheme}
+                options={SYNTAX_THEME_OPTIONS}
+                onChange={(v) => update({ syntaxTheme: v as SyntaxThemeName })}
               />
             </div>
           </div>

@@ -119,6 +119,10 @@ fn default_theme() -> String {
     "midnight".to_string()
 }
 
+fn default_syntax_theme() -> String {
+    "github-dark".to_string()
+}
+
 fn default_layout_mode() -> String {
     "grid".to_string()
 }
@@ -128,6 +132,8 @@ fn default_layout_mode() -> String {
 pub struct SettingsConfig {
     #[serde(default = "default_theme")]
     pub theme: String,
+    #[serde(default = "default_syntax_theme")]
+    pub syntax_theme: String,
     #[serde(default = "default_layout_mode")]
     pub layout_mode: String,
     pub terminal_font_size: f64,
