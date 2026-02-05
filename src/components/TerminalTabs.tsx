@@ -1,5 +1,7 @@
+import { Panel, Group, Separator } from "react-resizable-panels";
 import { useSessionStore } from "../stores/sessionStore";
 import { TerminalView } from "./TerminalView";
+import { CompanionPanel } from "./CompanionPanel";
 import { killSession } from "../lib/pty";
 import { deleteScrollback } from "../lib/config";
 import { spawnNewSession } from "../lib/sessions";
@@ -9,7 +11,7 @@ interface TerminalTabsProps {
 }
 
 export function TerminalTabs({ projectPath }: TerminalTabsProps) {
-  const { sessions, activeSessionId, setActiveSession, removeSession, thinkingSessions, needsAttentionSessions, sessionTitles } =
+  const { sessions, activeSessionId, setActiveSession, removeSession, thinkingSessions, needsAttentionSessions, sessionTitles, companionVisible } =
     useSessionStore();
 
   const projectSessions = sessions.filter((s) => s.projectPath === projectPath);
@@ -33,6 +35,30 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
   }
 
   if (projectSessions.length === 0) return null;
+
+  const activeSession = confirmedSessions.find((s) => s.id === visibleSessionId);
+
+  const terminalPanels = (
+    <div className="terminal-tabs-panels">
+      {projectSessions.map((s) => (
+        <div
+          key={s.id}
+          className="terminal-tabs-panel"
+          style={{ display: !s.restorePending && s.id === visibleSessionId ? "flex" : "none" }}
+        >
+          <TerminalView
+            tabId={s.id}
+            projectPath={s.projectPath}
+            projectName={s.projectName}
+            claudeSessionId={s.claudeSessionId}
+            isRestored={s.restored}
+            hideTitleBar
+            onClose={() => handleCloseSession(s.id)}
+          />
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <div className="terminal-tabs-container">
@@ -80,25 +106,22 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
           +
         </button>
       </div>
-      <div className="terminal-tabs-panels">
-        {projectSessions.map((s) => (
-          <div
-            key={s.id}
-            className="terminal-tabs-panel"
-            style={{ display: !s.restorePending && s.id === visibleSessionId ? "flex" : "none" }}
-          >
-            <TerminalView
-              tabId={s.id}
-              projectPath={s.projectPath}
-              projectName={s.projectName}
-              claudeSessionId={s.claudeSessionId}
-              isRestored={s.restored}
-              hideTitleBar
-              onClose={() => handleCloseSession(s.id)}
-            />
-          </div>
-        ))}
-      </div>
+      <Group orientation="horizontal" className="terminal-tabs-split">
+        <Panel minSize={30}>
+          {terminalPanels}
+        </Panel>
+        {companionVisible && (
+          <>
+            <Separator className="resize-handle-vertical" />
+            <Panel defaultSize={35} minSize={15}>
+              <CompanionPanel
+                projectPath={projectPath}
+                claudeSessionId={activeSession?.claudeSessionId}
+              />
+            </Panel>
+          </>
+        )}
+      </Group>
     </div>
   );
 }

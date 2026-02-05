@@ -4,7 +4,7 @@ import { spawnNewSession } from "../lib/sessions";
 import { WindowControls } from "./WindowControls";
 
 export function ProjectHeader() {
-  const { activeProjectPath, sessions } = useSessionStore();
+  const { activeProjectPath, sessions, companionVisible, toggleCompanion } = useSessionStore();
   const { projects } = useProjectStore();
 
   if (!activeProjectPath) return null;
@@ -23,6 +23,13 @@ export function ProjectHeader() {
       </div>
       <div className="project-header-actions">
         <span className="project-header-count">[{sessionCount}]</span>
+        <button
+          className={`project-header-companion-toggle ${companionVisible ? "project-header-companion-toggle--active" : ""}`}
+          onClick={toggleCompanion}
+          title="Toggle output panel"
+        >
+:output
+        </button>
         <button
           className="project-header-spawn"
           onClick={spawnNewSession}

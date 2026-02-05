@@ -1000,6 +1000,25 @@ body,
   border-color: var(--accent);
 }
 
+.project-header-companion-toggle {
+  background: none;
+  border: none;
+  padding: 0 2px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  transition: color 0.1s;
+}
+
+.project-header-companion-toggle:hover {
+  color: var(--accent-text);
+}
+
+.project-header-companion-toggle--active {
+  color: var(--accent-text);
+}
+
 /* ========================================================================
    Terminal Grid
    ======================================================================== */
@@ -2118,41 +2137,41 @@ body,
 .diff-content .diff-line-add > .diff-ln-text { color: #afd8af; }
 .diff-content .diff-line-del > .diff-ln-text { color: #f0a8a4; }
 
-.diff-content .hljs-keyword,
-.diff-content .hljs-selector-tag,
-.diff-content .hljs-built_in { color: #ff7b72; }
+.diff-content .hljs-keyword, .companion-code .hljs-keyword,
+.diff-content .hljs-selector-tag, .companion-code .hljs-selector-tag,
+.diff-content .hljs-built_in, .companion-code .hljs-built_in { color: #ff7b72; }
 
-.diff-content .hljs-type,
-.diff-content .hljs-title.class_,
-.diff-content .hljs-title.class_.inherited__,
-.diff-content .hljs-title.function_ { color: #d2a8ff; }
+.diff-content .hljs-type, .companion-code .hljs-type,
+.diff-content .hljs-title.class_, .companion-code .hljs-title.class_,
+.diff-content .hljs-title.class_.inherited__, .companion-code .hljs-title.class_.inherited__,
+.diff-content .hljs-title.function_, .companion-code .hljs-title.function_ { color: #d2a8ff; }
 
-.diff-content .hljs-string,
-.diff-content .hljs-template-variable,
-.diff-content .hljs-addition { color: #a5d6ff; }
+.diff-content .hljs-string, .companion-code .hljs-string,
+.diff-content .hljs-template-variable, .companion-code .hljs-template-variable,
+.diff-content .hljs-addition, .companion-code .hljs-addition { color: #a5d6ff; }
 
-.diff-content .hljs-attr,
-.diff-content .hljs-variable,
-.diff-content .hljs-selector-attr,
-.diff-content .hljs-selector-pseudo { color: #79c0ff; }
+.diff-content .hljs-attr, .companion-code .hljs-attr,
+.diff-content .hljs-variable, .companion-code .hljs-variable,
+.diff-content .hljs-selector-attr, .companion-code .hljs-selector-attr,
+.diff-content .hljs-selector-pseudo, .companion-code .hljs-selector-pseudo { color: #79c0ff; }
 
-.diff-content .hljs-number,
-.diff-content .hljs-literal { color: #79c0ff; }
+.diff-content .hljs-number, .companion-code .hljs-number,
+.diff-content .hljs-literal, .companion-code .hljs-literal { color: #79c0ff; }
 
-.diff-content .hljs-comment,
-.diff-content .hljs-quote { color: #8b949e; font-style: italic; }
+.diff-content .hljs-comment, .companion-code .hljs-comment,
+.diff-content .hljs-quote, .companion-code .hljs-quote { color: #8b949e; font-style: italic; }
 
-.diff-content .hljs-regexp { color: #7ee787; }
+.diff-content .hljs-regexp, .companion-code .hljs-regexp { color: #7ee787; }
 
-.diff-content .hljs-meta,
-.diff-content .hljs-tag { color: #8b949e; }
+.diff-content .hljs-meta, .companion-code .hljs-meta,
+.diff-content .hljs-tag, .companion-code .hljs-tag { color: #8b949e; }
 
-.diff-content .hljs-name,
-.diff-content .hljs-selector-id,
-.diff-content .hljs-selector-class { color: #7ee787; }
+.diff-content .hljs-name, .companion-code .hljs-name,
+.diff-content .hljs-selector-id, .companion-code .hljs-selector-id,
+.diff-content .hljs-selector-class, .companion-code .hljs-selector-class { color: #7ee787; }
 
-.diff-content .hljs-params { color: inherit; }
-.diff-content .hljs-punctuation { color: inherit; }
+.diff-content .hljs-params, .companion-code .hljs-params { color: inherit; }
+.diff-content .hljs-punctuation, .companion-code .hljs-punctuation { color: inherit; }
 
 .diff-line-hunk {
   color: var(--accent-text);
@@ -2359,4 +2378,199 @@ body,
   opacity: 0.5;
   box-shadow: 0 0 8px var(--accent);
   z-index: 1;
+}
+
+.terminal-tabs-split {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ========================================================================
+   Companion Panel
+   ======================================================================== */
+
+.companion-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-surface);
+  border-left: 1px solid var(--border-subtle);
+}
+
+.companion-header {
+  display: flex;
+  align-items: center;
+  height: 36px;
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+  border-bottom: 1px solid var(--border-subtle);
+  user-select: none;
+}
+
+.companion-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-visible) transparent;
+}
+
+.companion-body::-webkit-scrollbar {
+  width: 4px;
+}
+
+.companion-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.companion-body::-webkit-scrollbar-thumb {
+  background: var(--border-visible);
+  border-radius: 2px;
+}
+
+.companion-empty {
+  padding: 32px 12px;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+.companion-message {
+  padding: 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+/* Markdown content typography */
+.companion-message p,
+.companion-message li,
+.companion-message td,
+.companion-message th,
+.companion-message blockquote {
+  font-size: 13px;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  line-height: 1.6;
+}
+
+.companion-message p {
+  margin-bottom: 8px;
+}
+
+.companion-message p:last-child {
+  margin-bottom: 0;
+}
+
+.companion-message h1,
+.companion-message h2,
+.companion-message h3,
+.companion-message h4,
+.companion-message h5,
+.companion-message h6 {
+  font-size: 13px;
+  font-family: var(--font-mono);
+  font-weight: 400;
+  color: var(--accent-text);
+  margin-bottom: 8px;
+  margin-top: 12px;
+}
+
+.companion-message h1:first-child,
+.companion-message h2:first-child,
+.companion-message h3:first-child {
+  margin-top: 0;
+}
+
+.companion-message ul,
+.companion-message ol {
+  padding-left: 20px;
+  margin-bottom: 8px;
+}
+
+.companion-message li {
+  margin-bottom: 2px;
+}
+
+.companion-message blockquote {
+  border-left: 2px solid var(--border-visible);
+  padding-left: 12px;
+  margin: 8px 0;
+  color: var(--text-secondary);
+}
+
+.companion-message hr {
+  border: none;
+  border-top: 1px solid var(--border-subtle);
+  margin: 12px 0;
+}
+
+.companion-message table {
+  border-collapse: collapse;
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.companion-message th,
+.companion-message td {
+  border: 1px solid var(--border-subtle);
+  padding: 4px 8px;
+}
+
+.companion-message th {
+  background: var(--bg-elevated);
+  color: var(--accent-text);
+}
+
+.companion-message a {
+  color: var(--accent-text);
+  text-decoration: none;
+}
+
+.companion-message a:hover {
+  text-decoration: underline;
+}
+
+/* Code blocks */
+.companion-code {
+  background: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: 3px;
+  padding: 8px 12px;
+  margin: 8px 0;
+  overflow-x: auto;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.companion-code code {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+  color: inherit;
+}
+
+/* Inline code */
+.companion-message code {
+  background: var(--bg-elevated);
+  color: var(--accent-text);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  padding: 1px 4px;
+  border-radius: 2px;
+}
+
+.companion-message strong {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.companion-message em {
+  font-style: italic;
+  color: var(--text-secondary);
 }

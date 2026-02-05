@@ -8,6 +8,8 @@ interface SessionStore {
   thinkingSessions: Set<string>;
   needsAttentionSessions: Set<string>;
   sessionTitles: Map<string, string>;
+  companionVisible: boolean;
+  toggleCompanion: () => void;
   addSession: (session: TerminalSession) => void;
   removeSession: (id: string) => void;
   removeProjectSessions: (projectPath: string) => void;
@@ -35,6 +37,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   thinkingSessions: new Set(),
   needsAttentionSessions: new Set(),
   sessionTitles: new Map(),
+  companionVisible: false,
+  toggleCompanion: () => set((state) => ({ companionVisible: !state.companionVisible })),
 
   addSession: (session) =>
     set((state) => ({
@@ -159,7 +163,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     const state = get();
     const byProject = new Map<string, TerminalSession[]>();
     for (const s of state.sessions) {
-      if (!s.hasInteracted) continue;
+      if (!s.hasInteracted && !s.restored && !s.restorePending) continue;
       const list = byProject.get(s.projectPath) ?? [];
       list.push(s);
       byProject.set(s.projectPath, list);

@@ -2,6 +2,7 @@ use tauri::Manager;
 
 mod commands;
 mod config;
+mod conversation;
 mod git;
 mod pty_manager;
 
@@ -33,6 +34,8 @@ pub fn run() {
             commands::get_git_diff_stats,
             commands::git_push,
             commands::generate_commit_message,
+            commands::read_conversation,
+            commands::get_conversation_mtime,
             commands::exit_app,
         ])
         .build(tauri::generate_context!())

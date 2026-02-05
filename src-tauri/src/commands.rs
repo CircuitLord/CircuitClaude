@@ -1,4 +1,5 @@
 use crate::config::{self, ProjectConfig, SessionsConfig, SettingsConfig};
+use crate::conversation;
 use crate::git;
 use crate::pty_manager::{PtyManager, PtyOutputEvent};
 use tauri::ipc::Channel;
@@ -156,6 +157,23 @@ pub fn git_push(project_path: String) -> Result<String, String> {
 #[tauri::command]
 pub fn generate_commit_message(project_path: String, files: Vec<git::GitFileEntry>) -> Result<git::GenerateResult, String> {
     git::generate_commit_message(&project_path, &files)
+}
+
+#[tauri::command]
+pub fn read_conversation(
+    project_path: String,
+    session_id: Option<String>,
+) -> Result<conversation::ConversationResponse, String> {
+    conversation::read_conversation(&project_path, session_id.as_deref())
+        .ok_or_else(|| "No conversation file found".to_string())
+}
+
+#[tauri::command]
+pub fn get_conversation_mtime(
+    project_path: String,
+    session_id: Option<String>,
+) -> Option<f64> {
+    conversation::get_mtime(&project_path, session_id.as_deref())
 }
 
 #[tauri::command]

@@ -1,7 +1,7 @@
 import { useEffect, useCallback, useMemo } from "react";
-import hljs from "highlight.js/lib/common";
 import { useGitStore } from "../stores/gitStore";
 import { statusColor } from "./GitSection";
+import { highlightCode, detectLanguage } from "../lib/highlight";
 
 interface DiffLine {
   prefix: string;
@@ -10,28 +10,6 @@ interface DiffLine {
   oldNum: number | null;
   newNum: number | null;
   highlight: boolean;
-}
-
-const EXT_TO_LANG: Record<string, string> = {
-  js: "javascript", jsx: "javascript", mjs: "javascript", cjs: "javascript",
-  ts: "typescript", tsx: "typescript", mts: "typescript",
-  py: "python", rb: "ruby", rs: "rust", go: "go",
-  java: "java", kt: "kotlin", cs: "csharp",
-  c: "c", cpp: "cpp", cc: "cpp", h: "c", hpp: "cpp",
-  css: "css", scss: "scss", less: "less",
-  html: "xml", htm: "xml", xml: "xml", svg: "xml",
-  json: "json", yaml: "yaml", yml: "yaml", toml: "ini",
-  md: "markdown", sql: "sql", sh: "bash", bash: "bash", zsh: "bash",
-  php: "php", swift: "swift", lua: "lua", r: "r",
-  makefile: "makefile", dockerfile: "dockerfile",
-};
-
-function detectLanguage(path: string): string | undefined {
-  const name = path.split(/[/\\]/).pop()?.toLowerCase() ?? "";
-  if (name === "makefile") return "makefile";
-  if (name === "dockerfile") return "dockerfile";
-  const ext = name.split(".").pop() ?? "";
-  return EXT_TO_LANG[ext];
 }
 
 function parseLines(raw: string): DiffLine[] {
@@ -64,18 +42,6 @@ function parseLines(raw: string): DiffLine[] {
   }
 
   return result;
-}
-
-function highlightCode(code: string, language: string | undefined): string {
-  if (!code) return "";
-  try {
-    if (language && hljs.getLanguage(language)) {
-      return hljs.highlight(code, { language, ignoreIllegals: true }).value;
-    }
-    return hljs.highlightAuto(code).value;
-  } catch {
-    return code.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  }
 }
 
 export function DiffViewer() {
