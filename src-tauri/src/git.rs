@@ -47,7 +47,7 @@ pub fn get_status(project_path: &str) -> GitStatus {
         }
     };
 
-    let files = match git_cmd()
+    let mut files = match git_cmd()
         .args(["status", "--porcelain=v1", "-uall"])
         .current_dir(project_path)
         .output()
@@ -57,6 +57,14 @@ pub fn get_status(project_path: &str) -> GitStatus {
         }
         _ => Vec::new(),
     };
+
+    // Mark untracked entries that are nested git repos
+    let base = std::path::Path::new(project_path);
+    for f in &mut files {
+        if f.status == "?" && base.join(&f.path).join(".git").exists() {
+            f.status = "S".to_string();
+        }
+    }
 
     GitStatus {
         is_repo: true,
@@ -417,6 +425,9 @@ fn parse_porcelain(output: &str) -> Vec<GitFileEntry> {
         } else {
             path
         };
+
+        // Strip trailing slash from directory entries (e.g. nested git repos)
+        let path = path.trim_end_matches('/').to_string();
 
         // Handle renames: "R  old -> new"
         let path = if let Some(pos) = path.find(" -> ") {

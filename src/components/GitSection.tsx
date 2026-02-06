@@ -23,13 +23,17 @@ export function statusColor(status: string): string {
       return "var(--git-renamed)";
     case "?":
       return "var(--git-added)";
+    case "S":
+      return "var(--text-tertiary)";
     default:
       return "var(--text-tertiary)";
   }
 }
 
 export function displayStatus(status: string): string {
-  return status === "?" ? "A" : status;
+  if (status === "?") return "A";
+  if (status === "S") return "~";
+  return status;
 }
 
 function splitPath(filePath: string): { dir: string; name: string } {
@@ -194,7 +198,22 @@ function buildFileTree(files: GitFileEntry[]): TreeNode[] {
     return [...dirs, ...fileNodes];
   }
 
-  return sortNodes(root);
+  return compactTree(sortNodes(root));
+}
+
+/** Collapse single-child directory chains into combined paths (e.g. "src/lib/") */
+function compactTree(nodes: TreeNode[]): TreeNode[] {
+  return nodes.map((node) => {
+    if (node.type === "file") return node;
+    node.children = compactTree(node.children);
+    while (node.children.length === 1 && node.children[0].type === "dir") {
+      const child = node.children[0];
+      node.name = node.name + "/" + child.name;
+      node.fullPath = child.fullPath;
+      node.children = child.children;
+    }
+    return node;
+  });
 }
 
 function countFiles(node: TreeNode): number {

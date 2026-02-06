@@ -43,7 +43,7 @@ export interface PtyOutputEvent {
 
 export interface GitFileEntry {
   path: string;
-  status: string; // "M", "A", "D", "R", "?"
+  status: string; // "M", "A", "D", "R", "?", "S" (subrepo)
   staged: boolean;
 }
 

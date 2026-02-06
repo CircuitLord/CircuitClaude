@@ -721,7 +721,7 @@ body,
 
 .git-file-name {
   flex: 1;
-  min-width: 0;
+  min-width: 40px;
   color: var(--text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -729,10 +729,7 @@ body,
 }
 
 .git-file-dir {
-  color: var(--text-tertiary);
-  flex-shrink: 0;
-  font-size: 12px;
-  margin-left: 4px;
+  display: none;
 }
 
 /* --- View Mode Toggle --- */
@@ -998,6 +995,22 @@ body,
 .project-header-spawn:hover {
   background: var(--accent-muted-hover);
   border-color: var(--accent);
+}
+
+.project-header-text-btn {
+  background: none;
+  border: none;
+  padding: 0 2px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  transition: color 0.1s;
+  -webkit-app-region: no-drag;
+}
+
+.project-header-text-btn:hover {
+  color: var(--accent-text);
 }
 
 .project-header-companion-toggle {
@@ -2628,4 +2641,251 @@ body,
 .companion-message em {
   font-style: italic;
   color: var(--text-secondary);
+}
+
+/* ========================================================================
+   CLAUDE.md Editor — TUI Style
+   ======================================================================== */
+
+.claude-md-editor {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-visible);
+  border-radius: 2px;
+  width: 680px;
+  max-width: calc(100vw - 32px);
+  height: 80vh;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.claude-md-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 36px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.claude-md-editor-path {
+  font-size: 13px;
+  font-weight: 400;
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.claude-md-editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.claude-md-editor-status {
+  font-size: 13px;
+  font-family: var(--font-mono);
+  color: var(--accent-text);
+  animation: tui-waiting-pulse 1.5s step-end infinite;
+}
+
+.claude-md-editor-save-btn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  font-weight: 400;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: color 0.1s;
+}
+
+.claude-md-editor-save-btn:hover:not(:disabled) {
+  color: var(--accent-text);
+}
+
+.claude-md-editor-save-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.claude-md-editor-close {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  font-weight: 400;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: color 0.1s;
+}
+
+.claude-md-editor-close:hover {
+  color: var(--text-primary);
+}
+
+.claude-md-editor-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.claude-md-editor-code {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.claude-md-editor-highlight {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 12px;
+  background: var(--bg-base);
+  border: none;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: var(--font-mono);
+  line-height: 1.6;
+  tab-size: 2;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow: auto;
+  pointer-events: none;
+}
+
+.claude-md-editor-highlight::-webkit-scrollbar {
+  width: 4px;
+}
+
+.claude-md-editor-highlight::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.claude-md-editor-highlight::-webkit-scrollbar-thumb {
+  background: transparent;
+}
+
+.claude-md-editor-textarea {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 12px;
+  background: transparent;
+  border: none;
+  color: transparent;
+  caret-color: var(--text-primary);
+  font-size: 13px;
+  font-family: var(--font-mono);
+  line-height: 1.6;
+  resize: none;
+  outline: none;
+  tab-size: 2;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow: auto;
+}
+
+.claude-md-editor-textarea::selection {
+  background: rgba(124, 58, 237, 0.35);
+  color: transparent;
+}
+
+.claude-md-editor-textarea::-webkit-scrollbar {
+  width: 4px;
+}
+
+.claude-md-editor-textarea::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.claude-md-editor-textarea::-webkit-scrollbar-thumb {
+  background: var(--border-visible);
+  border-radius: 2px;
+}
+
+/* --- Markdown syntax highlighting colors --- */
+
+.claude-md-editor-highlight .hljs-section {
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.claude-md-editor-highlight .hljs-bullet {
+  color: var(--hljs-keyword, #ff7b72);
+}
+
+.claude-md-editor-highlight .hljs-emphasis {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.claude-md-editor-highlight .hljs-strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.claude-md-editor-highlight .hljs-code {
+  color: var(--hljs-string, #a5d6ff);
+}
+
+.claude-md-editor-highlight .hljs-link {
+  color: var(--hljs-string, #a5d6ff);
+  text-decoration: underline;
+}
+
+.claude-md-editor-highlight .hljs-quote {
+  color: var(--hljs-comment, #8b949e);
+  font-style: italic;
+}
+
+.claude-md-editor-highlight .hljs-keyword {
+  color: var(--hljs-keyword, #ff7b72);
+}
+
+.claude-md-editor-highlight .hljs-string {
+  color: var(--hljs-string, #a5d6ff);
+}
+
+.claude-md-editor-highlight .hljs-comment {
+  color: var(--hljs-comment, #8b949e);
+  font-style: italic;
+}
+
+.claude-md-editor-loading,
+.claude-md-editor-error {
+  padding: 32px 12px;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+.claude-md-editor-error {
+  color: var(--git-deleted);
+}
+
+.claude-md-editor-footer {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 28px;
+  padding: 0 12px;
+  border-top: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.claude-md-editor-hint {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
 }

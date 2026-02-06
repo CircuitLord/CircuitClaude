@@ -4,6 +4,7 @@ import { useSessionStore } from "../stores/sessionStore";
 import { useAddProject } from "./AddProjectDialog";
 import { GitSection } from "./GitSection";
 import { SettingsDialog } from "./SettingsDialog";
+import { useClaudeMdStore } from "../stores/claudeMdStore";
 import { THEMES, THEME_OPTIONS } from "../lib/themes";
 import type { ThemeName } from "../types";
 
@@ -19,6 +20,7 @@ export function Sidebar() {
   const listRef = useRef<HTMLDivElement>(null);
   const dropIndexRef = useRef<number | null>(null);
   const handleAdd = useAddProject();
+  const openClaudeMdEditor = useClaudeMdStore((s) => s.open);
 
   useEffect(() => {
     if (!loaded) load();
@@ -308,6 +310,9 @@ export function Sidebar() {
         })}
       </div>
       <GitSection />
+      <button className="sidebar-settings-btn" onClick={() => openClaudeMdEditor()}>
+        <span className="sidebar-settings-prefix">:</span>global claude.md
+      </button>
       <button className="sidebar-settings-btn" onClick={() => setSettingsOpen(true)}>
         <span className="sidebar-settings-prefix">:</span>settings
       </button>

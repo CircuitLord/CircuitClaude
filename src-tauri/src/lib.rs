@@ -37,6 +37,8 @@ pub fn run() {
             commands::generate_commit_message,
             commands::read_conversation,
             commands::get_conversation_mtime,
+            commands::read_claude_md,
+            commands::save_claude_md,
             commands::exit_app,
         ])
         .build(tauri::generate_context!())
