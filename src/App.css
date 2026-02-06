@@ -769,6 +769,8 @@ body,
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--text-primary);
+  direction: rtl;
+  text-align: left;
 }
 
 .git-tree-file-item {
