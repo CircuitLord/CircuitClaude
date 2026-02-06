@@ -163,6 +163,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     const state = get();
     const byProject = new Map<string, TerminalSession[]>();
     for (const s of state.sessions) {
+      if (s.isShell) continue; // Shell sessions are ephemeral, don't persist
       if (!s.hasInteracted && !s.restored && !s.restorePending) continue;
       const list = byProject.get(s.projectPath) ?? [];
       list.push(s);

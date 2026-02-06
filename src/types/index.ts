@@ -14,6 +14,7 @@ export interface TerminalSession {
   restored?: boolean;
   hasInteracted?: boolean;
   restorePending?: boolean;
+  isShell?: boolean; // Plain terminal (no Claude)
 }
 
 export interface PersistedSession {
@@ -78,6 +79,7 @@ export interface Settings {
   terminalFontFamily: string;
   terminalCursorStyle: "bar" | "block" | "underline";
   terminalCursorBlink: boolean;
+  gitViewMode: "file" | "tree";
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -88,4 +90,5 @@ export const DEFAULT_SETTINGS: Settings = {
   terminalFontFamily: "'Cascadia Code', 'Consolas', 'Monaco', monospace",
   terminalCursorStyle: "bar",
   terminalCursorBlink: true,
+  gitViewMode: "file",
 };

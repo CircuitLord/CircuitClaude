@@ -14,6 +14,7 @@ pub fn run() {
         .manage(pty_manager::PtyManager::new())
         .invoke_handler(tauri::generate_handler![
             commands::spawn_session,
+            commands::spawn_shell,
             commands::write_session,
             commands::resize_session,
             commands::kill_session,

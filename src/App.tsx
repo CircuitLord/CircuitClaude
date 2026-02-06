@@ -10,6 +10,7 @@ import { DiffViewer } from "./components/DiffViewer";
 import { useSessionStore } from "./stores/sessionStore";
 import { useSettingsStore } from "./stores/settingsStore";
 import { useProjectStore } from "./stores/projectStore";
+import { useGitStore } from "./stores/gitStore";
 import { loadSessionsConfig, saveSessionsConfig, saveScrollback } from "./lib/config";
 import { killAllSessions, exitApp } from "./lib/pty";
 import { serializeAllTerminals } from "./lib/terminalRegistry";
@@ -49,7 +50,10 @@ function App() {
       useSettingsStore.getState().load(),
       useProjectStore.getState().load(),
     ])
-      .then(() => loadSessionsConfig())
+      .then(() => {
+        useGitStore.getState().initViewModeFromSettings();
+        return loadSessionsConfig();
+      })
       .then((config) => {
         if (config && config.layouts.length > 0) {
           useSessionStore.getState().restoreFromConfig(config);

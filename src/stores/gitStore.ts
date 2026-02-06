@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { DiffStat, GitFileEntry, GitStatus } from "../types";
 import { getGitDiff, getGitDiffStats, getGitStatus, gitCommit, gitPush, gitRevert, generateCommitMessage as generateCommitMessageIpc } from "../lib/git";
+import { useSettingsStore } from "./settingsStore";
 
 export function fileKey(file: GitFileEntry): string {
   return `${file.path}:${file.staged}`;
@@ -41,6 +42,7 @@ interface GitStore {
   openCommitDialog: (projectPath: string) => Promise<void>;
   closeCommitDialog: () => void;
   commitAndPush: (projectPath: string) => Promise<void>;
+  initViewModeFromSettings: () => void;
   generateCommitMessage: (projectPath: string) => Promise<void>;
 }
 
@@ -110,7 +112,10 @@ export const useGitStore = create<GitStore>((set, get) => ({
       },
     })),
 
-  setViewMode: (mode: "file" | "tree") => set({ viewMode: mode }),
+  setViewMode: (mode: "file" | "tree") => {
+    set({ viewMode: mode });
+    useSettingsStore.getState().update({ gitViewMode: mode });
+  },
 
   openDiff: async (projectPath: string, file: GitFileEntry) => {
     set({ diffFile: file, diffContent: null, diffLoading: true });
@@ -255,6 +260,13 @@ export const useGitStore = create<GitStore>((set, get) => ({
       await get().fetchStatus(projectPath);
     } catch (e) {
       set({ pushing: false, commitError: `Push failed: ${e instanceof Error ? e.message : String(e)}` });
+    }
+  },
+
+  initViewModeFromSettings: () => {
+    const { settings } = useSettingsStore.getState();
+    if (settings.gitViewMode) {
+      set({ viewMode: settings.gitViewMode });
     }
   },
 

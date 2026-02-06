@@ -5,7 +5,7 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { SerializeAddon } from "@xterm/addon-serialize";
 import { Channel } from "@tauri-apps/api/core";
-import { spawnSession, writeSession, resizeSession, killSession } from "../lib/pty";
+import { spawnSession, spawnShell, writeSession, resizeSession, killSession } from "../lib/pty";
 import { loadScrollback } from "../lib/config";
 import { registerTerminal, unregisterTerminal } from "../lib/terminalRegistry";
 import { useSessionStore } from "../stores/sessionStore";
@@ -47,11 +47,12 @@ interface TerminalViewProps {
   projectName: string;
   claudeSessionId?: string;
   isRestored?: boolean;
+  isShell?: boolean;
   hideTitleBar?: boolean;
   onClose: () => void;
 }
 
-export function TerminalView({ tabId, projectPath, projectName, claudeSessionId, isRestored, hideTitleBar, onClose }: TerminalViewProps) {
+export function TerminalView({ tabId, projectPath, projectName, claudeSessionId, isRestored, isShell, hideTitleBar, onClose }: TerminalViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const [title, setTitle] = useState(projectName);
@@ -127,36 +128,38 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
           if (event.type === "Data" && Array.isArray(event.data)) {
             terminal.write(new Uint8Array(event.data));
 
-            // Only show thinking after the user has interacted at least once,
-            // and not for output that's likely a keystroke echo (arrives <250ms after input)
-            const isEcho = (Date.now() - lastInputTimeRef.current) < 250;
-            if (hasInteractedRef.current && !isEcho) {
-              setThinking(tabId, true);
-              // Don't clear needsAttention here — Claude CLI status line updates
-              // arrive while prompts are displayed; clearing on data would immediately
-              // erase the "?" indicator. User input or the silence timer handles clearing.
-            }
-            // Periodic prompt check while data flows (every 500ms) — catches prompts
-            // even when Claude CLI status line updates prevent the 2s silence window
-            if (hasInteractedRef.current && !promptCheckPendingRef.current) {
-              promptCheckPendingRef.current = true;
-              setTimeout(() => {
-                promptCheckPendingRef.current = false;
+            if (!isShell) {
+              // Only show thinking after the user has interacted at least once,
+              // and not for output that's likely a keystroke echo (arrives <250ms after input)
+              const isEcho = (Date.now() - lastInputTimeRef.current) < 250;
+              if (hasInteractedRef.current && !isEcho) {
+                setThinking(tabId, true);
+                // Don't clear needsAttention here — Claude CLI status line updates
+                // arrive while prompts are displayed; clearing on data would immediately
+                // erase the "?" indicator. User input or the silence timer handles clearing.
+              }
+              // Periodic prompt check while data flows (every 500ms) — catches prompts
+              // even when Claude CLI status line updates prevent the 2s silence window
+              if (hasInteractedRef.current && !promptCheckPendingRef.current) {
+                promptCheckPendingRef.current = true;
+                setTimeout(() => {
+                  promptCheckPendingRef.current = false;
+                  if (detectInteractivePrompt(terminal)) {
+                    setNeedsAttention(tabId, true);
+                    setThinking(tabId, false);
+                  }
+                }, 500);
+              }
+              if (thinkingTimerRef.current) clearTimeout(thinkingTimerRef.current);
+              thinkingTimerRef.current = setTimeout(() => {
+                setThinking(tabId, false);
                 if (detectInteractivePrompt(terminal)) {
                   setNeedsAttention(tabId, true);
-                  setThinking(tabId, false);
+                } else {
+                  setNeedsAttention(tabId, false);
                 }
-              }, 500);
+              }, 2000);
             }
-            if (thinkingTimerRef.current) clearTimeout(thinkingTimerRef.current);
-            thinkingTimerRef.current = setTimeout(() => {
-              setThinking(tabId, false);
-              if (detectInteractivePrompt(terminal)) {
-                setNeedsAttention(tabId, true);
-              } else {
-                setNeedsAttention(tabId, false);
-              }
-            }, 2000);
           } else if (event.type === "Exit") {
             if (thinkingTimerRef.current) clearTimeout(thinkingTimerRef.current);
             setThinking(tabId, false);
@@ -172,13 +175,18 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
 
         const cols = terminal.cols;
         const rows = terminal.rows;
-        spawnSession(projectPath, cols, rows, channel,
-            isRestoredRef.current
-              ? claudeSessionId
-                ? { resumeSessionId: claudeSessionId }   // Restored with known ID → --resume <uuid>
-                : { continueSession: true }               // Legacy restored (no ID) → --continue
-              : { claudeSessionId }                       // New session → --session-id <uuid>
-          )
+
+        const spawnPromise = isShell
+          ? spawnShell(projectPath, cols, rows, channel)
+          : spawnSession(projectPath, cols, rows, channel,
+              isRestoredRef.current
+                ? claudeSessionId
+                  ? { resumeSessionId: claudeSessionId }   // Restored with known ID → --resume <uuid>
+                  : { continueSession: true }               // Legacy restored (no ID) → --continue
+                : { claudeSessionId }                       // New session → --session-id <uuid>
+            );
+
+        spawnPromise
           .then((sid) => {
             if (cleanedUp) {
               // Strict mode re-mount: this effect was cleaned up, kill the orphaned PTY
@@ -188,6 +196,10 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
             sessionIdRef.current = sid;
             updateSessionPtyId(tabId, sid);
             clearRestoredFlag(tabId);
+            if (isShell) {
+              markInteracted(tabId);
+              hasInteractedRef.current = true;
+            }
             if (isRestoredRef.current) {
               // Fallback: confirm after 15s if title change never fires
               restoreTimer = setTimeout(() => {
@@ -302,7 +314,7 @@ export function TerminalView({ tabId, projectPath, projectName, claudeSessionId,
       initializedRef.current = false;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectPath, tabId, claudeSessionId]);
+  }, [projectPath, tabId, claudeSessionId, isShell]);
 
   // Re-fit and focus terminal when this session becomes active (tab switch or new spawn)
   useEffect(() => {

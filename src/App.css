@@ -2327,6 +2327,46 @@ body,
   color: var(--accent-text);
 }
 
+.terminal-tab-shell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  min-width: 36px;
+  height: 100%;
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--border-subtle);
+  color: var(--text-tertiary);
+  font-size: 13px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: color 0.1s, background 0.1s;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.terminal-tab-shell:hover {
+  color: var(--accent-text);
+  background: var(--bg-elevated);
+}
+
+.terminal-tab-shell--active {
+  color: var(--accent-text);
+  background: var(--accent-muted);
+}
+
+.terminal-tab-shell--active::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 6px;
+  right: 6px;
+  height: 1px;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
+}
+
 .terminal-tab-add {
   display: flex;
   align-items: center;

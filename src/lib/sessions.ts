@@ -17,3 +17,24 @@ export function spawnNewSession() {
     restored: false,
   });
 }
+
+/** Get or create the single shell session for the active project, and activate it. */
+export function activateShellSession() {
+  const { sessions, activeProjectPath, addSession, setActiveSession } = useSessionStore.getState();
+  if (!activeProjectPath) return;
+
+  const existing = sessions.find((s) => s.projectPath === activeProjectPath && s.isShell);
+  if (existing) {
+    setActiveSession(existing.id);
+  } else {
+    addSession({
+      id: generateTabId(),
+      projectName: "terminal",
+      projectPath: activeProjectPath,
+      sessionId: null,
+      createdAt: Date.now(),
+      restored: false,
+      isShell: true,
+    });
+  }
+}

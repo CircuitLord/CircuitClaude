@@ -28,6 +28,17 @@ pub fn spawn_session(
 }
 
 #[tauri::command]
+pub fn spawn_shell(
+    pty_manager: State<'_, PtyManager>,
+    project_path: String,
+    cols: u16,
+    rows: u16,
+    on_output: Channel<PtyOutputEvent>,
+) -> Result<String, String> {
+    pty_manager.spawn_shell(&project_path, cols, rows, on_output)
+}
+
+#[tauri::command]
 pub fn write_session(
     pty_manager: State<'_, PtyManager>,
     session_id: String,

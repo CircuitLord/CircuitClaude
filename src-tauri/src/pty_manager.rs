@@ -41,17 +41,6 @@ impl PtyManager {
         continue_session: bool,
         on_output: Channel<PtyOutputEvent>,
     ) -> Result<SessionId, String> {
-        let pty_system = native_pty_system();
-
-        let pair = pty_system
-            .openpty(PtySize {
-                rows,
-                cols,
-                pixel_width: 0,
-                pixel_height: 0,
-            })
-            .map_err(|e| format!("Failed to open PTY: {}", e))?;
-
         let mut cmd = CommandBuilder::new("cmd.exe");
         if let Some(ref id) = resume_session_id {
             cmd.args(["/c", "claude", "--resume", id]);
@@ -64,10 +53,44 @@ impl PtyManager {
         }
         cmd.cwd(project_path);
 
+        self.spawn_pty(cmd, cols, rows, on_output)
+    }
+
+    pub fn spawn_shell(
+        &self,
+        project_path: &str,
+        cols: u16,
+        rows: u16,
+        on_output: Channel<PtyOutputEvent>,
+    ) -> Result<SessionId, String> {
+        let mut cmd = CommandBuilder::new("cmd.exe");
+        cmd.cwd(project_path);
+
+        self.spawn_pty(cmd, cols, rows, on_output)
+    }
+
+    fn spawn_pty(
+        &self,
+        cmd: CommandBuilder,
+        cols: u16,
+        rows: u16,
+        on_output: Channel<PtyOutputEvent>,
+    ) -> Result<SessionId, String> {
+        let pty_system = native_pty_system();
+
+        let pair = pty_system
+            .openpty(PtySize {
+                rows,
+                cols,
+                pixel_width: 0,
+                pixel_height: 0,
+            })
+            .map_err(|e| format!("Failed to open PTY: {}", e))?;
+
         let child = pair
             .slave
             .spawn_command(cmd)
-            .map_err(|e| format!("Failed to spawn claude: {}", e))?;
+            .map_err(|e| format!("Failed to spawn process: {}", e))?;
 
         // Drop slave after spawning - we don't need it anymore
         drop(pair.slave);

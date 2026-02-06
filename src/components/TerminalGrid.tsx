@@ -55,6 +55,7 @@ export function TerminalGrid({ projectPath }: TerminalGridProps) {
           projectName={s.projectName}
           claudeSessionId={s.claudeSessionId}
           isRestored={s.restored}
+          isShell={s.isShell}
           onClose={() => handleCloseSession(s.id)}
         />
       </div>
@@ -87,6 +88,7 @@ export function TerminalGrid({ projectPath }: TerminalGridProps) {
             projectName={s.projectName}
             claudeSessionId={s.claudeSessionId}
             isRestored={s.restored}
+            isShell={s.isShell}
             onClose={() => handleCloseSession(s.id)}
           />
         </div>

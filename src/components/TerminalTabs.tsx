@@ -4,7 +4,7 @@ import { TerminalView } from "./TerminalView";
 import { CompanionPanel } from "./CompanionPanel";
 import { killSession } from "../lib/pty";
 import { deleteScrollback } from "../lib/config";
-import { spawnNewSession } from "../lib/sessions";
+import { spawnNewSession, activateShellSession } from "../lib/sessions";
 
 interface TerminalTabsProps {
   projectPath: string;
@@ -15,11 +15,16 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
     useSessionStore();
 
   const projectSessions = sessions.filter((s) => s.projectPath === projectPath);
-  const confirmedSessions = projectSessions.filter((s) => !s.restorePending);
+  const shellSession = projectSessions.find((s) => s.isShell);
+  const claudeSessions = projectSessions.filter((s) => !s.isShell);
+  const confirmedSessions = claudeSessions.filter((s) => !s.restorePending);
+
+  // All renderable sessions (shell + confirmed Claude sessions)
+  const allVisible = [...(shellSession ? [shellSession] : []), ...claudeSessions];
 
   // If active session isn't in this project, fall back to first confirmed session
-  const activeInProject = confirmedSessions.find((s) => s.id === activeSessionId);
-  const visibleSessionId = activeInProject?.id ?? confirmedSessions[0]?.id ?? null;
+  const activeInProject = allVisible.find((s) => s.id === activeSessionId && !s.restorePending);
+  const visibleSessionId = activeInProject?.id ?? confirmedSessions[0]?.id ?? shellSession?.id ?? null;
 
   async function handleCloseSession(id: string) {
     const session = projectSessions.find((s) => s.id === id);
@@ -36,11 +41,12 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
 
   if (projectSessions.length === 0) return null;
 
-  const activeSession = confirmedSessions.find((s) => s.id === visibleSessionId);
+  const activeSession = allVisible.find((s) => s.id === visibleSessionId);
+  const shellIsActive = shellSession?.id === visibleSessionId;
 
   const terminalPanels = (
     <div className="terminal-tabs-panels">
-      {projectSessions.map((s) => (
+      {allVisible.map((s) => (
         <div
           key={s.id}
           className="terminal-tabs-panel"
@@ -52,6 +58,7 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
             projectName={s.projectName}
             claudeSessionId={s.claudeSessionId}
             isRestored={s.restored}
+            isShell={s.isShell}
             hideTitleBar
             onClose={() => handleCloseSession(s.id)}
           />
@@ -63,6 +70,13 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
   return (
     <div className="terminal-tabs-container">
       <div className="terminal-tabs-bar">
+        <button
+          className={`terminal-tab-shell ${shellIsActive ? "terminal-tab-shell--active" : ""}`}
+          onClick={() => activateShellSession()}
+          title="Terminal"
+        >
+          &gt;_
+        </button>
         {confirmedSessions.map((s) => {
           const isActive = s.id === visibleSessionId;
           const isThinking = thinkingSessions.has(s.id);

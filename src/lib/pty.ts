@@ -23,6 +23,20 @@ export function spawnSession(
   });
 }
 
+export function spawnShell(
+  projectPath: string,
+  cols: number,
+  rows: number,
+  onOutput: Channel<PtyOutputEvent>,
+): Promise<string> {
+  return invoke<string>("spawn_shell", {
+    projectPath,
+    cols,
+    rows,
+    onOutput,
+  });
+}
+
 export function writeSession(
   sessionId: string,
   data: Uint8Array

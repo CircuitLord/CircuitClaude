@@ -127,6 +127,10 @@ fn default_layout_mode() -> String {
     "grid".to_string()
 }
 
+fn default_git_view_mode() -> String {
+    "file".to_string()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SettingsConfig {
@@ -140,6 +144,8 @@ pub struct SettingsConfig {
     pub terminal_font_family: String,
     pub terminal_cursor_style: String,
     pub terminal_cursor_blink: bool,
+    #[serde(default = "default_git_view_mode")]
+    pub git_view_mode: String,
 }
 
 fn settings_path(app_handle: &tauri::AppHandle) -> PathBuf {
