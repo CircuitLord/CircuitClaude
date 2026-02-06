@@ -330,12 +330,19 @@ pub fn generate_commit_message(project_path: &str, files: &[GitFileEntry]) -> Re
         return Err("No diff content to generate a message from".to_string());
     }
 
+    let file_count = files.len();
+    let brevity_hint = if file_count <= 3 {
+        "This is a small change — use a SINGLE line only. No body, no bullets."
+    } else {
+        "Only add bullet points if the changes span many unrelated concerns. Prefer a single line."
+    };
+
     let prompt = format!(
-        "Generate a concise git commit message for the following diff. \
-         Output ONLY the commit message, nothing else. No quotes, no prefixes, no explanation. \
-         Use imperative mood (e.g. \"Add feature\" not \"Added feature\"). \
-         Keep the first line under 72 characters. If needed, add a blank line then bullet points for details.\n\n{}",
-        combined_diff
+        "Generate a brief git commit message for this diff. \
+         Rules: output ONLY the message, no quotes, no prefixes, no explanation. \
+         Imperative mood (\"Add\" not \"Added\"). First line under 72 chars. \
+         {}\n\n{}",
+        brevity_hint, combined_diff
     );
 
     let model = "claude-haiku-4-5-20251001";

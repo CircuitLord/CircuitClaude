@@ -1,13 +1,14 @@
 import { invoke } from "@tauri-apps/api/core";
 
-export interface AssistantMessage {
+export interface ConversationMessage {
   uuid: string;
+  role: "human" | "assistant";
   text: string;
   timestamp: string;
 }
 
 export interface ConversationResponse {
-  messages: AssistantMessage[];
+  messages: ConversationMessage[];
   lastModified: number;
 }
 

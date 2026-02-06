@@ -7,14 +7,15 @@ use std::time::UNIX_EPOCH;
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConversationResponse {
-    pub messages: Vec<AssistantMessage>,
+    pub messages: Vec<ConversationMessage>,
     pub last_modified: f64,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct AssistantMessage {
+pub struct ConversationMessage {
     pub uuid: String,
+    pub role: String,
     pub text: String,
     pub timestamp: String,
 }
@@ -73,9 +74,12 @@ pub fn get_mtime(project_path: &str, session_id: Option<&str>) -> Option<f64> {
     Some(duration.as_secs_f64() * 1000.0)
 }
 
-/// Read the conversation JSONL file and extract assistant messages.
-/// Filters for `type == "assistant"` entries where `isSidechain != true`,
-/// extracts `message.content[].text`, deduplicates by uuid (keeps last occurrence).
+/// Read the conversation JSONL file and extract user + assistant messages.
+/// Filters for `type == "assistant"` or `type == "user"` entries where
+/// `isSidechain != true` and `isMeta != true`,
+/// extracts message content (plain string for user, content[].text array for assistant),
+/// deduplicates by uuid (keeps last occurrence).
+/// User messages are normalized to role `"human"` for the frontend.
 pub fn read_conversation(
     project_path: &str,
     session_id: Option<&str>,
@@ -90,8 +94,8 @@ pub fn read_conversation(
         .as_secs_f64()
         * 1000.0;
 
-    // Parse each line, collect assistant messages, dedup by uuid (keep last)
-    let mut messages_map: HashMap<String, AssistantMessage> = HashMap::new();
+    // Parse each line, collect messages, dedup by uuid (keep last)
+    let mut messages_map: HashMap<String, ConversationMessage> = HashMap::new();
     let mut order: Vec<String> = Vec::new();
 
     for line in content.lines() {
@@ -105,21 +109,28 @@ pub fn read_conversation(
             Err(_) => continue,
         };
 
-        // Must be type "assistant"
-        if val.get("type").and_then(|t| t.as_str()) != Some("assistant") {
-            continue;
-        }
+        let role = match val.get("type").and_then(|t| t.as_str()) {
+            Some("assistant") => "assistant",
+            Some("user") => "human",
+            _ => continue,
+        };
 
         // Skip sidechain messages
         if val.get("isSidechain").and_then(|v| v.as_bool()) == Some(true) {
             continue;
         }
 
-        // Extract uuid
+        // Skip meta messages (tool_result, bash-output, etc.)
+        if val.get("isMeta").and_then(|v| v.as_bool()) == Some(true) {
+            continue;
+        }
+
+        // Extract uuid: assistant messages have message.id, user messages have top-level uuid
         let uuid = match val
             .get("message")
             .and_then(|m| m.get("id"))
             .and_then(|id| id.as_str())
+            .or_else(|| val.get("uuid").and_then(|u| u.as_str()))
         {
             Some(id) => id.to_string(),
             None => continue,
@@ -132,27 +143,28 @@ pub fn read_conversation(
             .unwrap_or("")
             .to_string();
 
-        // Join all content[].text blocks
-        let text = val
-            .get("message")
-            .and_then(|m| m.get("content"))
-            .and_then(|c| c.as_array())
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|item| {
-                        // Only text blocks (type == "text" or no type field with direct text)
-                        if item.get("type").and_then(|t| t.as_str()) == Some("text") {
-                            item.get("text").and_then(|t| t.as_str())
-                        } else if item.is_string() {
-                            item.as_str()
-                        } else {
-                            None
-                        }
-                    })
-                    .collect::<Vec<&str>>()
-                    .join("\n\n")
-            })
-            .unwrap_or_default();
+        // Extract content: plain string for user messages, content[].text array for assistant
+        let content_val = val.get("message").and_then(|m| m.get("content"));
+        let text = if let Some(s) = content_val.and_then(|c| c.as_str()) {
+            // User messages: content is a plain string
+            s.to_string()
+        } else if let Some(arr) = content_val.and_then(|c| c.as_array()) {
+            // Assistant messages: content is an array of {type, text} blocks
+            arr.iter()
+                .filter_map(|item| {
+                    if item.get("type").and_then(|t| t.as_str()) == Some("text") {
+                        item.get("text").and_then(|t| t.as_str())
+                    } else if item.is_string() {
+                        item.as_str()
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<&str>>()
+                .join("\n\n")
+        } else {
+            String::new()
+        };
 
         if text.is_empty() {
             continue;
@@ -164,15 +176,16 @@ pub fn read_conversation(
 
         messages_map.insert(
             uuid.clone(),
-            AssistantMessage {
+            ConversationMessage {
                 uuid,
+                role: role.to_string(),
                 text,
                 timestamp,
             },
         );
     }
 
-    let messages: Vec<AssistantMessage> = order
+    let messages: Vec<ConversationMessage> = order
         .into_iter()
         .filter_map(|uuid| messages_map.remove(&uuid))
         .collect();

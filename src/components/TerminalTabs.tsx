@@ -107,13 +107,13 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
         </button>
       </div>
       <Group orientation="horizontal" className="terminal-tabs-split">
-        <Panel minSize={30}>
+        <Panel defaultSize={companionVisible ? 60 : 100} minSize={30}>
           {terminalPanels}
         </Panel>
         {companionVisible && (
           <>
             <Separator className="resize-handle-vertical" />
-            <Panel defaultSize={35} minSize={15}>
+            <Panel defaultSize={40} minSize="25%" maxSize="70%">
               <CompanionPanel
                 projectPath={projectPath}
                 claudeSessionId={activeSession?.claudeSessionId}

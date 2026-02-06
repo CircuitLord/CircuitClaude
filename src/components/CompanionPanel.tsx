@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { readConversation, getConversationMtime } from "../lib/conversation";
 import { renderMarkdown } from "../lib/markdown";
-import type { AssistantMessage } from "../lib/conversation";
+import type { ConversationMessage } from "../lib/conversation";
 
 interface CompanionPanelProps {
   projectPath: string;
@@ -9,7 +9,7 @@ interface CompanionPanelProps {
 }
 
 export function CompanionPanel({ projectPath, claudeSessionId }: CompanionPanelProps) {
-  const [messages, setMessages] = useState<AssistantMessage[]>([]);
+  const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const lastMtimeRef = useRef<number | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const prevCountRef = useRef(0);
@@ -61,7 +61,8 @@ export function CompanionPanel({ projectPath, claudeSessionId }: CompanionPanelP
   const renderedMessages = useMemo(() => {
     return messages.map((msg) => ({
       uuid: msg.uuid,
-      html: renderMarkdown(msg.text),
+      role: msg.role,
+      html: msg.role === "human" ? escapeHtml(msg.text) : renderMarkdown(msg.text),
     }));
   }, [messages]);
 
@@ -75,12 +76,20 @@ export function CompanionPanel({ projectPath, claudeSessionId }: CompanionPanelP
           renderedMessages.map((msg) => (
             <div
               key={msg.uuid}
-              className="companion-message"
-              dangerouslySetInnerHTML={{ __html: msg.html }}
+              className={msg.role === "human" ? "companion-input" : "companion-message"}
+              dangerouslySetInnerHTML={{ __html: msg.role === "human" ? `<span class="companion-input-marker">&gt;</span> ${msg.html}` : msg.html }}
             />
           ))
         )}
       </div>
     </div>
   );
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }

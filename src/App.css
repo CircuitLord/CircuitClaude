@@ -2446,6 +2446,20 @@ body,
   border-bottom: 1px solid var(--border-subtle);
 }
 
+.companion-input {
+  padding: 8px 12px;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+  border-bottom: 1px solid var(--border-subtle);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.companion-input-marker {
+  color: var(--accent-text);
+}
+
 /* Markdown content typography */
 .companion-message p,
 .companion-message li,
