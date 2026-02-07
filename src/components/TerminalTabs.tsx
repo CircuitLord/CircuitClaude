@@ -45,7 +45,14 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
           {allVisible.map((s) => {
             const isActive = s.id === visibleSessionId;
             const isTabStreaming = streamingSessions.has(s.id);
-            const prefix = s.sessionType === "opencode" ? "o>" : s.sessionType === "shell" ? ">_" : ">";
+            const prefix =
+              s.sessionType === "opencode"
+                ? "o>"
+                : s.sessionType === "codex"
+                  ? "c>"
+                  : s.sessionType === "shell"
+                    ? ">_"
+                    : ">";
             const label = s.sessionType === "shell" ? "terminal" : (sessionTitles.get(s.id) ?? s.projectName);
 
             return (

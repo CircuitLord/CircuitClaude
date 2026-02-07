@@ -82,7 +82,7 @@ export function CommitDialog({ isOpen, onClose, projectPath }: CommitDialogProps
             {selectedEntries.map((f) => {
               const stat = statsMap.get(f.path);
               return (
-                <div className="commit-dialog-file" key={`${f.path}:${f.staged}`}>
+                <div className="commit-dialog-file" key={f.path}>
                   <span className="commit-dialog-file-status" style={{ color: statusColor(f.status) }}>
                     {displayStatus(f.status)}
                   </span>

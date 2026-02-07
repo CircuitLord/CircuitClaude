@@ -19,15 +19,49 @@ pub struct ModelUsage {
 #[serde(tag = "type", content = "data")]
 pub enum ClaudeEvent {
     MessageStart,
-    Text { text: String },
-    Thinking { text: String },
-    ToolUse { id: String, name: String, input: serde_json::Value },
-    ToolResult { tool_use_id: String, content: String, is_error: bool },
-    PermissionRequest { id: String, tool: String, input: serde_json::Value, description: String },
-    UserQuestion { id: String, questions: serde_json::Value },
-    Result { subtype: String, duration_ms: f64, is_error: bool, num_turns: u32, session_id: String, model_usage: Option<ModelUsage> },
-    Error { message: String },
-    System { session_id: String, model: String, permission_mode: String, tool_count: u32 },
+    Text {
+        text: String,
+    },
+    Thinking {
+        text: String,
+    },
+    ToolUse {
+        id: String,
+        name: String,
+        input: serde_json::Value,
+    },
+    ToolResult {
+        tool_use_id: String,
+        content: String,
+        is_error: bool,
+    },
+    PermissionRequest {
+        id: String,
+        tool: String,
+        input: serde_json::Value,
+        description: String,
+    },
+    UserQuestion {
+        id: String,
+        questions: serde_json::Value,
+    },
+    Result {
+        subtype: String,
+        duration_ms: f64,
+        is_error: bool,
+        num_turns: u32,
+        session_id: String,
+        model_usage: Option<ModelUsage>,
+    },
+    Error {
+        message: String,
+    },
+    System {
+        session_id: String,
+        model: String,
+        permission_mode: String,
+        tool_count: u32,
+    },
     Ready,
     MessageStop,
 }
@@ -37,11 +71,24 @@ pub enum ClaudeEvent {
 #[serde(tag = "type")]
 enum BridgeCommand {
     #[serde(rename = "init")]
-    Init { #[serde(rename = "projectPath")] project_path: String },
+    Init {
+        #[serde(rename = "projectPath")]
+        project_path: String,
+    },
     #[serde(rename = "message")]
-    Message { text: String, #[serde(rename = "permissionMode", skip_serializing_if = "Option::is_none")] permission_mode: Option<String> },
+    Message {
+        text: String,
+        #[serde(rename = "permissionMode", skip_serializing_if = "Option::is_none")]
+        permission_mode: Option<String>,
+    },
     #[serde(rename = "permission_response")]
-    PermissionResponse { id: String, allowed: bool, message: Option<String>, #[serde(rename = "updatedInput", skip_serializing_if = "Option::is_none")] updated_input: Option<serde_json::Value> },
+    PermissionResponse {
+        id: String,
+        allowed: bool,
+        message: Option<String>,
+        #[serde(rename = "updatedInput", skip_serializing_if = "Option::is_none")]
+        updated_input: Option<serde_json::Value>,
+    },
     #[serde(rename = "abort")]
     Abort,
 }
@@ -57,8 +104,12 @@ impl ClaudeSession {
     fn write_command(&mut self, cmd: &BridgeCommand) -> Result<(), String> {
         let stdin = self.stdin.as_mut().ok_or("Bridge stdin not available")?;
         let json = serde_json::to_string(cmd).map_err(|e| e.to_string())?;
-        stdin.write_all(json.as_bytes()).map_err(|e| format!("Write to bridge stdin failed: {}", e))?;
-        stdin.write_all(b"\n").map_err(|e| format!("Write newline failed: {}", e))?;
+        stdin
+            .write_all(json.as_bytes())
+            .map_err(|e| format!("Write to bridge stdin failed: {}", e))?;
+        stdin
+            .write_all(b"\n")
+            .map_err(|e| format!("Write newline failed: {}", e))?;
         stdin.flush().map_err(|e| format!("Flush failed: {}", e))?;
         Ok(())
     }
@@ -99,11 +150,19 @@ impl ClaudeManager {
             cmd.creation_flags(0x08000000);
         }
 
-        let mut child = cmd.spawn().map_err(|e| format!("Failed to spawn bridge: {}", e))?;
+        let mut child = cmd
+            .spawn()
+            .map_err(|e| format!("Failed to spawn bridge: {}", e))?;
 
         let stdin = child.stdin.take().ok_or("Failed to capture bridge stdin")?;
-        let stdout = child.stdout.take().ok_or("Failed to capture bridge stdout")?;
-        let stderr = child.stderr.take().ok_or("Failed to capture bridge stderr")?;
+        let stdout = child
+            .stdout
+            .take()
+            .ok_or("Failed to capture bridge stdout")?;
+        let stderr = child
+            .stderr
+            .take()
+            .ok_or("Failed to capture bridge stderr")?;
 
         let mut session = ClaudeSession {
             child: Some(child),
@@ -116,7 +175,10 @@ impl ClaudeManager {
             project_path: project_path.to_string(),
         })?;
 
-        self.sessions.lock().unwrap().insert(tab_id.clone(), session);
+        self.sessions
+            .lock()
+            .unwrap()
+            .insert(tab_id.clone(), session);
 
         // Spawn stdout reader thread (lives for session lifetime)
         let sessions_ref = self.sessions.clone();
@@ -281,73 +343,185 @@ fn parse_bridge_event(val: &serde_json::Value) -> Option<ClaudeEvent> {
         "ready" => Some(ClaudeEvent::Ready),
 
         "system" => {
-            let session_id = val.get("session_id").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            let model = val.get("model").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            let permission_mode = val.get("permission_mode").and_then(|v| v.as_str()).unwrap_or("default").to_string();
-            let tool_count = val.get("tools").and_then(|v| v.as_array()).map(|a| a.len() as u32).unwrap_or(0);
-            Some(ClaudeEvent::System { session_id, model, permission_mode, tool_count })
+            let session_id = val
+                .get("session_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let model = val
+                .get("model")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let permission_mode = val
+                .get("permission_mode")
+                .and_then(|v| v.as_str())
+                .unwrap_or("default")
+                .to_string();
+            let tool_count = val
+                .get("tools")
+                .and_then(|v| v.as_array())
+                .map(|a| a.len() as u32)
+                .unwrap_or(0);
+            Some(ClaudeEvent::System {
+                session_id,
+                model,
+                permission_mode,
+                tool_count,
+            })
         }
 
         "message_start" => Some(ClaudeEvent::MessageStart),
         "message_stop" => Some(ClaudeEvent::MessageStop),
 
         "text" => {
-            let text = val.get("text").and_then(|t| t.as_str()).unwrap_or("").to_string();
+            let text = val
+                .get("text")
+                .and_then(|t| t.as_str())
+                .unwrap_or("")
+                .to_string();
             Some(ClaudeEvent::Text { text })
         }
 
         "thinking" => {
-            let text = val.get("text").and_then(|t| t.as_str()).unwrap_or("").to_string();
+            let text = val
+                .get("text")
+                .and_then(|t| t.as_str())
+                .unwrap_or("")
+                .to_string();
             Some(ClaudeEvent::Thinking { text })
         }
 
         "tool_use" => {
-            let id = val.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            let name = val.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let id = val
+                .get("id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let name = val
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
             let input = val.get("input").cloned().unwrap_or(serde_json::Value::Null);
             Some(ClaudeEvent::ToolUse { id, name, input })
         }
 
         "tool_result" => {
-            let tool_use_id = val.get("tool_use_id").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            let content = val.get("content").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            let is_error = val.get("is_error").and_then(|v| v.as_bool()).unwrap_or(false);
-            Some(ClaudeEvent::ToolResult { tool_use_id, content, is_error })
+            let tool_use_id = val
+                .get("tool_use_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let content = val
+                .get("content")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let is_error = val
+                .get("is_error")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            Some(ClaudeEvent::ToolResult {
+                tool_use_id,
+                content,
+                is_error,
+            })
         }
 
         "permission_request" => {
-            let id = val.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            let tool = val.get("tool").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let id = val
+                .get("id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let tool = val
+                .get("tool")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
             let input = val.get("input").cloned().unwrap_or(serde_json::Value::Null);
-            let description = val.get("description").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            Some(ClaudeEvent::PermissionRequest { id, tool, input, description })
+            let description = val
+                .get("description")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            Some(ClaudeEvent::PermissionRequest {
+                id,
+                tool,
+                input,
+                description,
+            })
         }
 
         "user_question" => {
-            let id = val.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            let questions = val.get("questions").cloned().unwrap_or(serde_json::Value::Array(vec![]));
+            let id = val
+                .get("id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let questions = val
+                .get("questions")
+                .cloned()
+                .unwrap_or(serde_json::Value::Array(vec![]));
             Some(ClaudeEvent::UserQuestion { id, questions })
         }
 
         "result" => {
-            let subtype = val.get("subtype").and_then(|v| v.as_str()).unwrap_or("success").to_string();
-            let duration_ms = val.get("duration_ms").and_then(|v| v.as_f64()).unwrap_or(0.0);
-            let is_error = val.get("is_error").and_then(|v| v.as_bool()).unwrap_or(false);
+            let subtype = val
+                .get("subtype")
+                .and_then(|v| v.as_str())
+                .unwrap_or("success")
+                .to_string();
+            let duration_ms = val
+                .get("duration_ms")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0);
+            let is_error = val
+                .get("is_error")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
             let num_turns = val.get("num_turns").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
-            let session_id = val.get("session_id").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let session_id = val
+                .get("session_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
 
             // Extract first entry from model_usage map
             let mu_obj = val.get("model_usage").and_then(|mu| mu.as_object());
-            let model_usage = mu_obj
-                .and_then(|map| map.iter().next())
-                .map(|(model_name, usage)| ModelUsage {
-                    model: model_name.clone(),
-                    input_tokens: usage.get("inputTokens").or_else(|| usage.get("input_tokens")).and_then(|v| v.as_u64()).unwrap_or(0) as u32,
-                    output_tokens: usage.get("outputTokens").or_else(|| usage.get("output_tokens")).and_then(|v| v.as_u64()).unwrap_or(0) as u32,
-                    cache_read_input_tokens: usage.get("cacheReadInputTokens").or_else(|| usage.get("cache_read_input_tokens")).and_then(|v| v.as_u64()).unwrap_or(0) as u32,
-                    cache_creation_input_tokens: usage.get("cacheCreationInputTokens").or_else(|| usage.get("cache_creation_input_tokens")).and_then(|v| v.as_u64()).unwrap_or(0) as u32,
-                    context_window: usage.get("contextWindow").or_else(|| usage.get("context_window")).and_then(|v| v.as_u64()).unwrap_or(0) as u32,
-                });
+            let model_usage =
+                mu_obj
+                    .and_then(|map| map.iter().next())
+                    .map(|(model_name, usage)| ModelUsage {
+                        model: model_name.clone(),
+                        input_tokens: usage
+                            .get("inputTokens")
+                            .or_else(|| usage.get("input_tokens"))
+                            .and_then(|v| v.as_u64())
+                            .unwrap_or(0) as u32,
+                        output_tokens: usage
+                            .get("outputTokens")
+                            .or_else(|| usage.get("output_tokens"))
+                            .and_then(|v| v.as_u64())
+                            .unwrap_or(0) as u32,
+                        cache_read_input_tokens: usage
+                            .get("cacheReadInputTokens")
+                            .or_else(|| usage.get("cache_read_input_tokens"))
+                            .and_then(|v| v.as_u64())
+                            .unwrap_or(0) as u32,
+                        cache_creation_input_tokens: usage
+                            .get("cacheCreationInputTokens")
+                            .or_else(|| usage.get("cache_creation_input_tokens"))
+                            .and_then(|v| v.as_u64())
+                            .unwrap_or(0)
+                            as u32,
+                        context_window: usage
+                            .get("contextWindow")
+                            .or_else(|| usage.get("context_window"))
+                            .and_then(|v| v.as_u64())
+                            .unwrap_or(0) as u32,
+                    });
 
             Some(ClaudeEvent::Result {
                 subtype,
@@ -360,7 +534,11 @@ fn parse_bridge_event(val: &serde_json::Value) -> Option<ClaudeEvent> {
         }
 
         "error" => {
-            let message = val.get("message").and_then(|v| v.as_str()).unwrap_or("Unknown error").to_string();
+            let message = val
+                .get("message")
+                .and_then(|v| v.as_str())
+                .unwrap_or("Unknown error")
+                .to_string();
             Some(ClaudeEvent::Error { message })
         }
 

@@ -1,9 +1,9 @@
 use portable_pty::{native_pty_system, CommandBuilder, MasterPty, PtySize};
+use serde::Serialize;
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
 use tauri::ipc::Channel;
-use serde::Serialize;
 
 pub type SessionId = String;
 
@@ -69,6 +69,25 @@ impl PtyManager {
             cmd.args(["/c", "opencode", "--continue"]);
         } else {
             cmd.args(["/c", "opencode"]);
+        }
+        cmd.cwd(project_path);
+
+        self.spawn_pty(cmd, cols, rows, on_output)
+    }
+
+    pub fn spawn_codex(
+        &self,
+        project_path: &str,
+        cols: u16,
+        rows: u16,
+        continue_session: bool,
+        on_output: Channel<PtyOutputEvent>,
+    ) -> Result<SessionId, String> {
+        let mut cmd = CommandBuilder::new("cmd.exe");
+        if continue_session {
+            cmd.args(["/c", "codex", "resume", "--last"]);
+        } else {
+            cmd.args(["/c", "codex"]);
         }
         cmd.cwd(project_path);
 
@@ -157,14 +176,12 @@ impl PtyManager {
 
             // Process exited - get exit code
             // Use try_lock to avoid deadlock when kill_all() holds the mutex
-            let exit_code = sessions_ref
-                .try_lock()
-                .ok()
-                .and_then(|mut guard| {
-                    guard.get_mut(&sid)
-                        .and_then(|s| s.child.try_wait().ok().flatten())
-                        .map(|status| status.exit_code())
-                });
+            let exit_code = sessions_ref.try_lock().ok().and_then(|mut guard| {
+                guard
+                    .get_mut(&sid)
+                    .and_then(|s| s.child.try_wait().ok().flatten())
+                    .map(|status| status.exit_code())
+            });
 
             let _ = on_output.send(PtyOutputEvent::Exit(exit_code));
         });
@@ -206,7 +223,10 @@ impl PtyManager {
     pub fn kill(&self, session_id: &str) -> Result<(), String> {
         let mut sessions = self.sessions.lock().unwrap();
         if let Some(mut session) = sessions.remove(session_id) {
-            session.child.kill().map_err(|e| format!("Kill failed: {}", e))
+            session
+                .child
+                .kill()
+                .map_err(|e| format!("Kill failed: {}", e))
         } else {
             Ok(()) // Already removed
         }

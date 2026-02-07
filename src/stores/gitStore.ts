@@ -4,7 +4,7 @@ import { getGitDiff, getGitDiffStats, getGitStatus, gitCommit, gitPush, gitRever
 import { useSettingsStore } from "./settingsStore";
 
 export function fileKey(file: GitFileEntry): string {
-  return `${file.path}:${file.staged}`;
+  return file.path;
 }
 
 interface GitStore {
@@ -120,7 +120,7 @@ export const useGitStore = create<GitStore>((set, get) => ({
   openDiff: async (projectPath: string, file: GitFileEntry) => {
     set({ diffFile: file, diffContent: null, diffLoading: true });
     try {
-      const content = await getGitDiff(projectPath, file.path, file.staged, file.status);
+      const content = await getGitDiff(projectPath, file.path, file.status);
       set({ diffContent: content, diffLoading: false });
     } catch {
       set({ diffContent: null, diffLoading: false });
@@ -175,7 +175,6 @@ export const useGitStore = create<GitStore>((set, get) => ({
     }
     if (filePaths.length === 0) return;
 
-    // Deduplicate paths (a file might appear in both staged + unstaged)
     const uniquePaths = [...new Set(filePaths)];
 
     set({ committing: true, commitError: null });

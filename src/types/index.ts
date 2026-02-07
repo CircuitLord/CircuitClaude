@@ -1,4 +1,4 @@
-export type SessionType = "claude" | "opencode" | "shell";
+export type SessionType = "claude" | "codex" | "opencode" | "shell";
 
 export interface Project {
   name: string;
@@ -47,7 +47,6 @@ export interface PtyOutputEvent {
 export interface GitFileEntry {
   path: string;
   status: string; // "M", "A", "D", "R", "?", "S" (subrepo)
-  staged: boolean;
 }
 
 export interface GitStatus {

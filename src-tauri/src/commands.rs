@@ -47,6 +47,24 @@ pub fn spawn_opencode(
 }
 
 #[tauri::command]
+pub fn spawn_codex(
+    pty_manager: State<'_, PtyManager>,
+    project_path: String,
+    cols: u16,
+    rows: u16,
+    continue_session: Option<bool>,
+    on_output: Channel<PtyOutputEvent>,
+) -> Result<String, String> {
+    pty_manager.spawn_codex(
+        &project_path,
+        cols,
+        rows,
+        continue_session.unwrap_or(false),
+        on_output,
+    )
+}
+
+#[tauri::command]
 pub fn spawn_shell(
     pty_manager: State<'_, PtyManager>,
     project_path: String,
@@ -77,10 +95,7 @@ pub fn resize_session(
 }
 
 #[tauri::command]
-pub fn kill_session(
-    pty_manager: State<'_, PtyManager>,
-    session_id: String,
-) -> Result<(), String> {
+pub fn kill_session(pty_manager: State<'_, PtyManager>, session_id: String) -> Result<(), String> {
     pty_manager.kill(&session_id)
 }
 
@@ -126,18 +141,12 @@ pub fn save_scrollback(
 }
 
 #[tauri::command]
-pub fn load_scrollback(
-    app_handle: tauri::AppHandle,
-    tab_id: String,
-) -> Result<String, String> {
+pub fn load_scrollback(app_handle: tauri::AppHandle, tab_id: String) -> Result<String, String> {
     config::load_scrollback(&app_handle, &tab_id)
 }
 
 #[tauri::command]
-pub fn delete_scrollback(
-    app_handle: tauri::AppHandle,
-    tab_id: String,
-) -> Result<(), String> {
+pub fn delete_scrollback(app_handle: tauri::AppHandle, tab_id: String) -> Result<(), String> {
     config::delete_scrollback(&app_handle, &tab_id)
 }
 
@@ -147,10 +156,7 @@ pub fn load_settings(app_handle: tauri::AppHandle) -> Option<SettingsConfig> {
 }
 
 #[tauri::command]
-pub fn save_settings(
-    app_handle: tauri::AppHandle,
-    settings: SettingsConfig,
-) -> Result<(), String> {
+pub fn save_settings(app_handle: tauri::AppHandle, settings: SettingsConfig) -> Result<(), String> {
     config::save_settings(&app_handle, &settings)
 }
 
@@ -160,12 +166,20 @@ pub fn get_git_status(project_path: String) -> git::GitStatus {
 }
 
 #[tauri::command]
-pub fn get_git_diff(project_path: String, file_path: String, staged: bool, status: String) -> Result<String, String> {
-    git::get_diff(&project_path, &file_path, staged, &status)
+pub fn get_git_diff(
+    project_path: String,
+    file_path: String,
+    status: String,
+) -> Result<String, String> {
+    git::get_diff(&project_path, &file_path, &status)
 }
 
 #[tauri::command]
-pub fn git_commit(project_path: String, files: Vec<String>, message: String) -> Result<String, String> {
+pub fn git_commit(
+    project_path: String,
+    files: Vec<String>,
+    message: String,
+) -> Result<String, String> {
     git::commit(&project_path, &files, &message)
 }
 
@@ -175,7 +189,10 @@ pub fn git_revert(project_path: String, files: Vec<git::GitFileEntry>) -> Result
 }
 
 #[tauri::command]
-pub fn get_git_diff_stats(project_path: String, files: Vec<git::GitFileEntry>) -> Result<Vec<git::DiffStat>, String> {
+pub fn get_git_diff_stats(
+    project_path: String,
+    files: Vec<git::GitFileEntry>,
+) -> Result<Vec<git::DiffStat>, String> {
     git::get_diff_stats(&project_path, &files)
 }
 
@@ -185,7 +202,10 @@ pub fn git_push(project_path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn generate_commit_message(project_path: String, files: Vec<git::GitFileEntry>) -> Result<git::GenerateResult, String> {
+pub fn generate_commit_message(
+    project_path: String,
+    files: Vec<git::GitFileEntry>,
+) -> Result<git::GenerateResult, String> {
     git::generate_commit_message(&project_path, &files)
 }
 
@@ -199,10 +219,7 @@ pub fn read_conversation(
 }
 
 #[tauri::command]
-pub fn get_conversation_mtime(
-    project_path: String,
-    session_id: Option<String>,
-) -> Option<f64> {
+pub fn get_conversation_mtime(project_path: String, session_id: Option<String>) -> Option<f64> {
     conversation::get_mtime(&project_path, session_id.as_deref())
 }
 

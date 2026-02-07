@@ -18,7 +18,6 @@ fn git_cmd() -> Command {
 pub struct GitFileEntry {
     pub path: String,
     pub status: String,
-    pub staged: bool,
 }
 
 #[derive(Serialize, Clone)]
@@ -73,15 +72,22 @@ pub fn get_status(project_path: &str) -> GitStatus {
     }
 }
 
-pub fn get_diff(project_path: &str, file_path: &str, staged: bool, status: &str) -> Result<String, String> {
+pub fn get_diff(
+    project_path: &str,
+    file_path: &str,
+    status: &str,
+) -> Result<String, String> {
     if status == "?" {
         // Untracked file: read contents and format as synthetic diff
         let full_path = std::path::Path::new(project_path).join(file_path);
-        let contents = fs::read_to_string(&full_path)
-            .map_err(|e| format!("Failed to read file: {}", e))?;
+        let contents =
+            fs::read_to_string(&full_path).map_err(|e| format!("Failed to read file: {}", e))?;
         let lines: Vec<&str> = contents.lines().collect();
         let line_count = lines.len();
-        let mut diff = format!("--- /dev/null\n+++ b/{}\n@@ -0,0 +1,{} @@\n", file_path, line_count);
+        let mut diff = format!(
+            "--- /dev/null\n+++ b/{}\n@@ -0,0 +1,{} @@\n",
+            file_path, line_count
+        );
         for line in lines {
             diff.push('+');
             diff.push_str(line);
@@ -90,15 +96,8 @@ pub fn get_diff(project_path: &str, file_path: &str, staged: bool, status: &str)
         return Ok(diff);
     }
 
-    let mut args = vec!["diff"];
-    if staged {
-        args.push("--cached");
-    }
-    args.push("--");
-    args.push(file_path);
-
     let output = git_cmd()
-        .args(&args)
+        .args(["diff", "HEAD", "--", file_path])
         .current_dir(project_path)
         .output()
         .map_err(|e| format!("Failed to run git diff: {}", e))?;
@@ -140,21 +139,21 @@ pub fn commit(project_path: &str, files: &[String], message: &str) -> Result<Str
         return Err(format!("git commit failed: {}", stderr));
     }
 
-    Ok(String::from_utf8_lossy(&commit_output.stdout).trim().to_string())
+    Ok(String::from_utf8_lossy(&commit_output.stdout)
+        .trim()
+        .to_string())
 }
 
 pub fn revert(project_path: &str, files: &[GitFileEntry]) -> Result<(), String> {
     let mut untracked: Vec<&str> = Vec::new();
-    let mut staged: Vec<&str> = Vec::new();
-    let mut unstaged: Vec<&str> = Vec::new();
+    let mut added: Vec<&str> = Vec::new();
+    let mut tracked: Vec<&str> = Vec::new();
 
     for f in files {
-        if f.status == "?" {
-            untracked.push(&f.path);
-        } else if f.staged {
-            staged.push(&f.path);
-        } else {
-            unstaged.push(&f.path);
+        match f.status.as_str() {
+            "?" => untracked.push(&f.path),
+            "A" => added.push(&f.path),
+            _ => tracked.push(&f.path),
         }
     }
 
@@ -173,45 +172,33 @@ pub fn revert(project_path: &str, files: &[GitFileEntry]) -> Result<(), String> 
         }
     }
 
-    // Revert staged: unstage first, then restore
-    if !staged.is_empty() {
-        let mut unstage_args: Vec<&str> = vec!["restore", "--staged", "--"];
-        unstage_args.extend(&staged);
-        let output = git_cmd()
-            .args(&unstage_args)
-            .current_dir(project_path)
-            .output()
-            .map_err(|e| format!("Failed to run git restore --staged: {}", e))?;
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(format!("git restore --staged failed: {}", stderr));
-        }
-
-        let mut restore_args: Vec<&str> = vec!["restore", "--"];
-        restore_args.extend(&staged);
-        let output = git_cmd()
-            .args(&restore_args)
-            .current_dir(project_path)
-            .output()
-            .map_err(|e| format!("Failed to run git restore: {}", e))?;
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(format!("git restore failed: {}", stderr));
-        }
-    }
-
-    // Revert unstaged: git restore -- <paths>
-    if !unstaged.is_empty() {
-        let mut args: Vec<&str> = vec!["restore", "--"];
-        args.extend(&unstaged);
+    // Revert added: git rm -f -- <paths>
+    if !added.is_empty() {
+        let mut args: Vec<&str> = vec!["rm", "-f", "--"];
+        args.extend(&added);
         let output = git_cmd()
             .args(&args)
             .current_dir(project_path)
             .output()
-            .map_err(|e| format!("Failed to run git restore: {}", e))?;
+            .map_err(|e| format!("Failed to run git rm: {}", e))?;
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(format!("git restore failed: {}", stderr));
+            return Err(format!("git rm failed: {}", stderr));
+        }
+    }
+
+    // Revert tracked (M, D, R, etc.): git checkout HEAD -- <paths>
+    if !tracked.is_empty() {
+        let mut args: Vec<&str> = vec!["checkout", "HEAD", "--"];
+        args.extend(&tracked);
+        let output = git_cmd()
+            .args(&args)
+            .current_dir(project_path)
+            .output()
+            .map_err(|e| format!("Failed to run git checkout: {}", e))?;
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(format!("git checkout failed: {}", stderr));
         }
     }
 
@@ -227,45 +214,28 @@ pub struct DiffStat {
 }
 
 pub fn get_diff_stats(project_path: &str, files: &[GitFileEntry]) -> Result<Vec<DiffStat>, String> {
-    let mut staged_paths: Vec<&str> = Vec::new();
-    let mut unstaged_paths: Vec<&str> = Vec::new();
+    let mut tracked_paths: Vec<&str> = Vec::new();
     let mut untracked: Vec<&GitFileEntry> = Vec::new();
 
     for f in files {
         if f.status == "?" {
             untracked.push(f);
-        } else if f.staged {
-            staged_paths.push(&f.path);
         } else {
-            unstaged_paths.push(&f.path);
+            tracked_paths.push(&f.path);
         }
     }
 
     let mut stats: Vec<DiffStat> = Vec::new();
 
-    // Staged files: git diff --cached --numstat -- <paths>
-    if !staged_paths.is_empty() {
-        let mut args: Vec<&str> = vec!["diff", "--cached", "--numstat", "--"];
-        args.extend(&staged_paths);
+    // Tracked files: git diff HEAD --numstat -- <paths>
+    if !tracked_paths.is_empty() {
+        let mut args: Vec<&str> = vec!["diff", "HEAD", "--numstat", "--"];
+        args.extend(&tracked_paths);
         let output = git_cmd()
             .args(&args)
             .current_dir(project_path)
             .output()
-            .map_err(|e| format!("Failed to run git diff --cached --numstat: {}", e))?;
-        if output.status.success() {
-            stats.extend(parse_numstat(&String::from_utf8_lossy(&output.stdout)));
-        }
-    }
-
-    // Unstaged files: git diff --numstat -- <paths>
-    if !unstaged_paths.is_empty() {
-        let mut args: Vec<&str> = vec!["diff", "--numstat", "--"];
-        args.extend(&unstaged_paths);
-        let output = git_cmd()
-            .args(&args)
-            .current_dir(project_path)
-            .output()
-            .map_err(|e| format!("Failed to run git diff --numstat: {}", e))?;
+            .map_err(|e| format!("Failed to run git diff HEAD --numstat: {}", e))?;
         if output.status.success() {
             stats.extend(parse_numstat(&String::from_utf8_lossy(&output.stdout)));
         }
@@ -316,11 +286,14 @@ pub struct GenerateResult {
     pub model: String,
 }
 
-pub fn generate_commit_message(project_path: &str, files: &[GitFileEntry]) -> Result<GenerateResult, String> {
+pub fn generate_commit_message(
+    project_path: &str,
+    files: &[GitFileEntry],
+) -> Result<GenerateResult, String> {
     // Collect combined diffs from all selected files
     let mut combined_diff = String::new();
     for f in files {
-        match get_diff(project_path, &f.path, f.staged, &f.status) {
+        match get_diff(project_path, &f.path, &f.status) {
             Ok(diff) => {
                 combined_diff.push_str(&diff);
                 combined_diff.push('\n');
@@ -356,7 +329,14 @@ pub fn generate_commit_message(project_path: &str, files: &[GitFileEntry]) -> Re
     let model = "claude-haiku-4-5-20251001";
 
     let mut child = Command::new("cmd.exe")
-        .args(["/c", "claude", "-p", "--no-session-persistence", "--model", model])
+        .args([
+            "/c",
+            "claude",
+            "-p",
+            "--no-session-persistence",
+            "--model",
+            model,
+        ])
         .current_dir(project_path)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -366,9 +346,12 @@ pub fn generate_commit_message(project_path: &str, files: &[GitFileEntry]) -> Re
         .map_err(|e| format!("Failed to launch Claude CLI: {}", e))?;
 
     {
-        let mut stdin: std::process::ChildStdin = child.stdin.take()
+        let mut stdin: std::process::ChildStdin = child
+            .stdin
+            .take()
             .ok_or_else(|| "Failed to open Claude CLI stdin".to_string())?;
-        stdin.write_all(prompt.as_bytes())
+        stdin
+            .write_all(prompt.as_bytes())
             .map_err(|e| format!("Failed to write to Claude CLI stdin: {}", e))?;
     }
 
@@ -380,7 +363,10 @@ pub fn generate_commit_message(project_path: &str, files: &[GitFileEntry]) -> Re
         let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
         let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
         let detail = if !stderr.is_empty() { stderr } else { stdout };
-        return Err(format!("Claude CLI failed (exit {}): {}", output.status, detail));
+        return Err(format!(
+            "Claude CLI failed (exit {}): {}",
+            output.status, detail
+        ));
     }
 
     let message = String::from_utf8_lossy(&output.stdout).trim().to_string();
@@ -388,7 +374,11 @@ pub fn generate_commit_message(project_path: &str, files: &[GitFileEntry]) -> Re
         return Err("Claude CLI returned an empty response".to_string());
     }
 
-    Ok(GenerateResult { prompt, message, model: model.to_string() })
+    Ok(GenerateResult {
+        prompt,
+        message,
+        model: model.to_string(),
+    })
 }
 
 fn parse_numstat(output: &str) -> Vec<DiffStat> {
@@ -442,28 +432,20 @@ fn parse_porcelain(output: &str) -> Vec<GitFileEntry> {
             path
         };
 
-        // Staged entry (index has a real status)
-        if index_status != ' ' && index_status != '?' {
-            files.push(GitFileEntry {
-                path: path.clone(),
-                status: index_status.to_string(),
-                staged: true,
-            });
-        }
-
-        // Worktree entry (unstaged changes or untracked)
-        if worktree_status != ' ' {
-            let status = if index_status == '?' {
+        // One entry per file — prefer index status if present, else worktree status
+        let status = if index_status != ' ' && index_status != '?' {
+            index_status.to_string()
+        } else if worktree_status != ' ' {
+            if index_status == '?' {
                 "?".to_string()
             } else {
                 worktree_status.to_string()
-            };
-            files.push(GitFileEntry {
-                path: path.clone(),
-                status,
-                staged: false,
-            });
-        }
+            }
+        } else {
+            continue;
+        };
+
+        files.push(GitFileEntry { path, status });
     }
 
     files

@@ -7,6 +7,7 @@ interface NewSessionMenuProps {
 
 const OPTIONS = [
   { type: "claude" as const, label: "claude" },
+  { type: "codex" as const, label: "codex" },
   { type: "opencode" as const, label: "opencode" },
   { type: "terminal" as const, label: "terminal" },
 ] as const;
@@ -26,7 +27,7 @@ export function NewSessionMenu({ variant }: NewSessionMenuProps) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [open]);
 
-  function handleSelect(type: "claude" | "opencode" | "terminal") {
+  function handleSelect(type: "claude" | "codex" | "opencode" | "terminal") {
     setOpen(false);
     spawnNewSession(type === "terminal" ? "shell" : type);
   }

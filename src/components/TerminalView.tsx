@@ -5,7 +5,7 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { SerializeAddon } from "@xterm/addon-serialize";
 import { Channel } from "@tauri-apps/api/core";
-import { spawnSession, spawnShell, spawnOpencode, writeSession, resizeSession, killSession } from "../lib/pty";
+import { spawnSession, spawnShell, spawnOpencode, spawnCodex, writeSession, resizeSession, killSession } from "../lib/pty";
 import { registerTerminal, unregisterTerminal } from "../lib/terminalRegistry";
 import { useSessionStore } from "../stores/sessionStore";
 import { useSettingsStore } from "../stores/settingsStore";
@@ -97,6 +97,8 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, cla
       let spawnPromise: Promise<string>;
       if (sessionType === "shell") {
         spawnPromise = spawnShell(projectPath, cols, rows, channel);
+      } else if (sessionType === "codex") {
+        spawnPromise = spawnCodex(projectPath, cols, rows, channel);
       } else if (sessionType === "opencode") {
         spawnPromise = spawnOpencode(projectPath, cols, rows, channel, {
           continueSession: isRestored,
@@ -120,7 +122,14 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, cla
         })
         .catch((err) => {
           if (!cleanedUp) {
-            const label = sessionType === "shell" ? "shell" : sessionType === "opencode" ? "opencode session" : "Claude session";
+            const label =
+              sessionType === "shell"
+                ? "shell"
+                : sessionType === "opencode"
+                  ? "opencode session"
+                  : sessionType === "codex"
+                    ? "codex session"
+                    : "Claude session";
             terminal.write(`\r\n\x1b[31mFailed to spawn ${label}: ${err}\x1b[0m\r\n`);
           }
         });

@@ -53,6 +53,22 @@ export function spawnOpencode(
   });
 }
 
+export function spawnCodex(
+  projectPath: string,
+  cols: number,
+  rows: number,
+  onOutput: Channel<PtyOutputEvent>,
+  options?: { continueSession?: boolean },
+): Promise<string> {
+  return invoke<string>("spawn_codex", {
+    projectPath,
+    cols,
+    rows,
+    continueSession: options?.continueSession ?? false,
+    onOutput,
+  });
+}
+
 export function writeSession(
   sessionId: string,
   data: Uint8Array

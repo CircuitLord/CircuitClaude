@@ -88,11 +88,7 @@ pub fn read_conversation(
     let content = fs::read_to_string(&path).ok()?;
     let meta = fs::metadata(&path).ok()?;
     let mtime = meta.modified().ok()?;
-    let last_modified = mtime
-        .duration_since(UNIX_EPOCH)
-        .ok()?
-        .as_secs_f64()
-        * 1000.0;
+    let last_modified = mtime.duration_since(UNIX_EPOCH).ok()?.as_secs_f64() * 1000.0;
 
     // Parse each line, collect messages, dedup by uuid (keep last)
     let mut messages_map: HashMap<String, ConversationMessage> = HashMap::new();

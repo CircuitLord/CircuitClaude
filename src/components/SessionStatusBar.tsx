@@ -25,7 +25,7 @@ export function SessionStatusBar({ tabId, sessionType }: SessionStatusBarProps) 
     (s) => s.sessionStats.get(tabId)
   );
 
-  if (sessionType === "shell" || sessionType === "opencode") return null;
+  if (sessionType === "shell" || sessionType === "opencode" || sessionType === "codex") return null;
 
   if (!stats || !stats.model) {
     return (

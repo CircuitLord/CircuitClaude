@@ -79,7 +79,6 @@ export function DiffViewer() {
             {diffFile.status}
           </span>
           <span className="diff-header-path">{diffFile.path}</span>
-          {diffFile.staged && <span className="diff-header-badge">Staged</span>}
           <button className="diff-close-btn" onClick={closeDiff}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
               <path d="M3 3l8 8M11 3l-8 8" />

@@ -43,6 +43,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::spawn_session,
             commands::spawn_opencode,
+            commands::spawn_codex,
             commands::spawn_shell,
             commands::write_session,
             commands::resize_session,

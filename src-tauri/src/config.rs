@@ -48,14 +48,11 @@ pub struct SessionsConfig {
 }
 
 fn config_dir(app_handle: &tauri::AppHandle) -> PathBuf {
-    let dir = app_handle
-        .path()
-        .app_config_dir()
-        .unwrap_or_else(|_| {
-            dirs::config_dir()
-                .unwrap_or_else(|| PathBuf::from("."))
-                .join("CircuitClaude")
-        });
+    let dir = app_handle.path().app_config_dir().unwrap_or_else(|_| {
+        dirs::config_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join("CircuitClaude")
+    });
     fs::create_dir_all(&dir).ok();
     dir
 }
@@ -102,7 +99,11 @@ pub fn save_sessions(app_handle: &tauri::AppHandle, config: &SessionsConfig) -> 
     fs::write(&path, json).map_err(|e| e.to_string())
 }
 
-pub fn save_scrollback(app_handle: &tauri::AppHandle, tab_id: &str, data: &str) -> Result<(), String> {
+pub fn save_scrollback(
+    app_handle: &tauri::AppHandle,
+    tab_id: &str,
+    data: &str,
+) -> Result<(), String> {
     let path = scrollback_dir(app_handle).join(format!("{}.dat", tab_id));
     fs::write(&path, data).map_err(|e| e.to_string())
 }
@@ -168,7 +169,10 @@ pub fn load_settings(app_handle: &tauri::AppHandle) -> Option<SettingsConfig> {
     }
 }
 
-pub fn save_settings(app_handle: &tauri::AppHandle, settings: &SettingsConfig) -> Result<(), String> {
+pub fn save_settings(
+    app_handle: &tauri::AppHandle,
+    settings: &SettingsConfig,
+) -> Result<(), String> {
     let path = settings_path(app_handle);
     let json = serde_json::to_string_pretty(settings).map_err(|e| e.to_string())?;
     fs::write(&path, json).map_err(|e| e.to_string())

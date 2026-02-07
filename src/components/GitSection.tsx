@@ -262,7 +262,6 @@ function TreeFileItem({
         {displayStatus(f.status)}
       </span>
       <span className="git-file-name">{node.name}</span>
-      {f.staged && <span className="git-tree-staged">S</span>}
       <RevertButton onConfirm={() => revertFiles(projectPath, [f])} />
     </div>
   );
@@ -335,65 +334,44 @@ const VIEW_MODE_OPTIONS: Array<{ label: string; value: "file" | "tree" }> = [
 
 /* ---- Flat view components ---- */
 
-function FileGroup({
-  label,
-  groupKey,
-  files,
+function FileItem({
+  file,
+  dir,
+  name,
   onFileClick,
   projectPath,
 }: {
-  label: string;
-  groupKey: string;
-  files: GitFileEntry[];
-  onFileClick: (file: GitFileEntry) => void;
+  file: GitFileEntry;
+  dir: string;
+  name: string;
+  onFileClick: () => void;
   projectPath: string;
 }) {
-  const { collapsedGroups, toggleGroup, selectedFiles, toggleFileSelection, revertFiles } = useGitStore();
-  const collapsed = collapsedGroups[groupKey] ?? false;
-
-  if (files.length === 0) return null;
+  const { selectedFiles, toggleFileSelection, revertFiles } = useGitStore();
+  const isSelected = selectedFiles[fileKey(file)];
 
   return (
-    <div className="git-group">
-      <div className="git-group-header" onClick={() => toggleGroup(groupKey)}>
-        <span className="git-group-chevron">{collapsed ? ">" : "v"}</span>
-        <GroupCheckbox files={files} />
-        <span className="git-group-label">{label}</span>
-        <span className="git-group-count">[{files.length}]</span>
-      </div>
-      {!collapsed && (
-        <div className="git-group-items">
-          {files.map((f, i) => {
-            const { dir, name } = splitPath(f.path);
-            const isSelected = selectedFiles[fileKey(f)];
-            return (
-              <div
-                className="git-file-item"
-                key={`${f.path}-${i}`}
-                title={f.path}
-                onClick={() => onFileClick(f)}
-              >
-                <FileCheckbox
-                  checked={isSelected}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleFileSelection(f);
-                  }}
-                />
-                <span
-                  className="git-file-status"
-                  style={{ color: statusColor(f.status) }}
-                >
-                  {displayStatus(f.status)}
-                </span>
-                <span className="git-file-name">{name}</span>
-                {dir && <span className="git-file-dir">{dir}</span>}
-                <RevertButton onConfirm={() => revertFiles(projectPath, [f])} />
-              </div>
-            );
-          })}
-        </div>
-      )}
+    <div
+      className="git-file-item"
+      title={file.path}
+      onClick={onFileClick}
+    >
+      <FileCheckbox
+        checked={isSelected}
+        onClick={(e) => {
+          e.stopPropagation();
+          toggleFileSelection(file);
+        }}
+      />
+      <span
+        className="git-file-status"
+        style={{ color: statusColor(file.status) }}
+      >
+        {displayStatus(file.status)}
+      </span>
+      <span className="git-file-name">{name}</span>
+      {dir && <span className="git-file-dir">{dir}</span>}
+      <RevertButton onConfirm={() => revertFiles(projectPath, [file])} />
     </div>
   );
 }
@@ -477,7 +455,7 @@ function ActionBar({ projectPath }: { projectPath: string }) {
 
 export function GitSection() {
   const activeProjectPath = useSessionStore((s) => s.activeProjectPath);
-  const { statuses, sectionOpen, fetchStatus, toggleSection, openDiff, viewMode, setViewMode, selectedFiles, toggleFileSelection, revertFiles, commitDialogOpen, closeCommitDialog } = useGitStore();
+  const { statuses, sectionOpen, fetchStatus, toggleSection, openDiff, viewMode, setViewMode, commitDialogOpen, closeCommitDialog } = useGitStore();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
   const [heightRatio, setHeightRatio] = useState(DEFAULT_RATIO);
@@ -566,9 +544,7 @@ export function GitSection() {
 
   if (!activeProjectPath) return null;
 
-  const staged = allFiles.filter((f) => f.staged);
-  const changes = allFiles.filter((f) => !f.staged);
-  const totalCount = staged.length + changes.length;
+  const totalCount = allFiles.length;
 
   return (
     <div
@@ -623,55 +599,28 @@ export function GitSection() {
                       />
                     ))
                   ) : (
-                    <>
-                      <FileGroup
-                        label="Staged Changes"
-                        groupKey="staged"
-                        files={staged}
-                        onFileClick={(f) => openDiff(activeProjectPath, f)}
-                        projectPath={activeProjectPath}
-                      />
-                      {changes.length > 0 && (
-                        <div className="git-group">
-                          <div className="git-group-header git-group-header--static">
-                            <GroupCheckbox files={changes} />
-                            <span className="git-group-label">Changes</span>
-                            <span className="git-group-count">[{changes.length}]</span>
-                          </div>
-                          <div className="git-group-items">
-                            {changes.map((f, i) => {
-                              const { dir, name } = splitPath(f.path);
-                              const isSelected = selectedFiles[fileKey(f)];
-                              return (
-                                <div
-                                  className="git-file-item"
-                                  key={`${f.path}-${i}`}
-                                  title={f.path}
-                                  onClick={() => openDiff(activeProjectPath, f)}
-                                >
-                                  <FileCheckbox
-                                    checked={isSelected}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      toggleFileSelection(f);
-                                    }}
-                                  />
-                                  <span
-                                    className="git-file-status"
-                                    style={{ color: statusColor(f.status) }}
-                                  >
-                                    {displayStatus(f.status)}
-                                  </span>
-                                  <span className="git-file-name">{name}</span>
-                                  {dir && <span className="git-file-dir">{dir}</span>}
-                                  <RevertButton onConfirm={() => revertFiles(activeProjectPath, [f])} />
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </>
+                    <div className="git-group">
+                      <div className="git-group-header git-group-header--static">
+                        <GroupCheckbox files={allFiles} />
+                        <span className="git-group-label">Changes</span>
+                        <span className="git-group-count">[{allFiles.length}]</span>
+                      </div>
+                      <div className="git-group-items">
+                        {allFiles.map((f) => {
+                          const { dir, name } = splitPath(f.path);
+                          return (
+                            <FileItem
+                              key={f.path}
+                              file={f}
+                              dir={dir}
+                              name={name}
+                              onFileClick={() => openDiff(activeProjectPath, f)}
+                              projectPath={activeProjectPath}
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
                   )}
                 </div>
               </>
