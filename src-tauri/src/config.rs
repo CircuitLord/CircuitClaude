@@ -7,6 +7,10 @@ fn default_project_theme() -> String {
     "midnight".to_string()
 }
 
+fn default_session_type() -> String {
+    "claude".to_string()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectConfig {
     pub name: String,
@@ -24,6 +28,8 @@ pub struct PersistedSession {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub claude_session_id: Option<String>,
     pub created_at: f64,
+    #[serde(default = "default_session_type")]
+    pub session_type: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

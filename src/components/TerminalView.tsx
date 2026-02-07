@@ -5,27 +5,27 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { SerializeAddon } from "@xterm/addon-serialize";
 import { Channel } from "@tauri-apps/api/core";
-import { spawnSession, spawnShell, writeSession, resizeSession, killSession } from "../lib/pty";
+import { spawnSession, spawnShell, spawnOpencode, writeSession, resizeSession, killSession } from "../lib/pty";
 import { registerTerminal, unregisterTerminal } from "../lib/terminalRegistry";
 import { useSessionStore } from "../stores/sessionStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useProjectStore } from "../stores/projectStore";
 import { THEMES } from "../lib/themes";
-import { PtyOutputEvent } from "../types";
+import { PtyOutputEvent, SessionType } from "../types";
 import "@xterm/xterm/css/xterm.css";
 
 interface TerminalViewProps {
   tabId: string;
   projectPath: string;
   projectName: string;
-  isShell?: boolean;
+  sessionType: SessionType;
   claudeSessionId?: string;
   isRestored?: boolean;
   hideTitleBar?: boolean;
   onClose: () => void;
 }
 
-export function TerminalView({ tabId, projectPath, projectName, isShell, claudeSessionId, isRestored, hideTitleBar, onClose }: TerminalViewProps) {
+export function TerminalView({ tabId, projectPath, projectName, sessionType, claudeSessionId, isRestored, hideTitleBar, onClose }: TerminalViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const [title, setTitle] = useState(projectName);
@@ -94,12 +94,19 @@ export function TerminalView({ tabId, projectPath, projectName, isShell, claudeS
       const cols = terminal.cols;
       const rows = terminal.rows;
 
-      const spawnPromise = isShell
-        ? spawnShell(projectPath, cols, rows, channel)
-        : spawnSession(projectPath, cols, rows, channel, {
-            claudeSessionId: claudeSessionId,
-            resumeSessionId: isRestored ? claudeSessionId : undefined,
-          });
+      let spawnPromise: Promise<string>;
+      if (sessionType === "shell") {
+        spawnPromise = spawnShell(projectPath, cols, rows, channel);
+      } else if (sessionType === "opencode") {
+        spawnPromise = spawnOpencode(projectPath, cols, rows, channel, {
+          continueSession: isRestored,
+        });
+      } else {
+        spawnPromise = spawnSession(projectPath, cols, rows, channel, {
+          claudeSessionId: claudeSessionId,
+          resumeSessionId: isRestored ? claudeSessionId : undefined,
+        });
+      }
 
       spawnPromise
         .then((sid) => {
@@ -113,7 +120,7 @@ export function TerminalView({ tabId, projectPath, projectName, isShell, claudeS
         })
         .catch((err) => {
           if (!cleanedUp) {
-            const label = isShell ? "shell" : "Claude session";
+            const label = sessionType === "shell" ? "shell" : sessionType === "opencode" ? "opencode session" : "Claude session";
             terminal.write(`\r\n\x1b[31mFailed to spawn ${label}: ${err}\x1b[0m\r\n`);
           }
         });
@@ -180,7 +187,7 @@ export function TerminalView({ tabId, projectPath, projectName, isShell, claudeS
       initializedRef.current = false;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectPath, tabId, isShell, claudeSessionId, isRestored]);
+  }, [projectPath, tabId, sessionType, claudeSessionId, isRestored]);
 
   // Re-fit and focus when this session becomes active
   useEffect(() => {

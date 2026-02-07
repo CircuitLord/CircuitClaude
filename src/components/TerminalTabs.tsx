@@ -1,8 +1,8 @@
 import { useSessionStore } from "../stores/sessionStore";
 import { TerminalView } from "./TerminalView";
+import { NewSessionMenu } from "./NewSessionMenu";
 import { killSession } from "../lib/pty";
 import { deleteScrollback } from "../lib/config";
-import { spawnNewSession, activateShellSession } from "../lib/sessions";
 
 interface TerminalTabsProps {
   projectPath: string;
@@ -13,15 +13,15 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
     useSessionStore();
 
   const projectSessions = sessions.filter((s) => s.projectPath === projectPath);
-  const shellSession = projectSessions.find((s) => s.isShell);
-  const claudeSessions = projectSessions.filter((s) => !s.isShell);
+  const shellSessions = projectSessions.filter((s) => s.sessionType === "shell");
+  const agentSessions = projectSessions.filter((s) => s.sessionType !== "shell");
 
-  // All renderable sessions (shell + Claude sessions)
-  const allVisible = [...(shellSession ? [shellSession] : []), ...claudeSessions];
+  // All renderable sessions (shells + agent sessions)
+  const allVisible = [...shellSessions, ...agentSessions];
 
   // If active session isn't in this project, fall back to first session
   const activeInProject = allVisible.find((s) => s.id === activeSessionId);
-  const visibleSessionId = activeInProject?.id ?? claudeSessions[0]?.id ?? shellSession?.id ?? null;
+  const visibleSessionId = activeInProject?.id ?? agentSessions[0]?.id ?? shellSessions[0]?.id ?? null;
 
   async function handleCloseSession(id: string) {
     const session = projectSessions.find((s) => s.id === id);
@@ -38,56 +38,45 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
 
   if (projectSessions.length === 0) return null;
 
-  const shellIsActive = shellSession?.id === visibleSessionId;
-
   return (
     <div className="terminal-tabs-container">
-      <div className="terminal-tabs-bar">
-        <button
-          className={`terminal-tab-shell ${shellIsActive ? "terminal-tab-shell--active" : ""}`}
-          onClick={() => activateShellSession()}
-          title="Terminal"
-        >
-          &gt;_
-        </button>
-        {claudeSessions.map((s) => {
-          const isActive = s.id === visibleSessionId;
-          const isTabStreaming = streamingSessions.has(s.id);
+      <div className="terminal-tabs-bar-wrapper">
+        <div className="terminal-tabs-bar">
+          {allVisible.map((s) => {
+            const isActive = s.id === visibleSessionId;
+            const isTabStreaming = streamingSessions.has(s.id);
+            const prefix = s.sessionType === "opencode" ? "o>" : s.sessionType === "shell" ? ">_" : ">";
+            const label = s.sessionType === "shell" ? "terminal" : (sessionTitles.get(s.id) ?? s.projectName);
 
-          return (
-            <button
-              key={s.id}
-              className={`terminal-tab ${isActive ? "terminal-tab--active" : ""}`}
-              onClick={() => setActiveSession(s.id)}
-            >
-              <span className={`terminal-tab-prefix ${isActive ? "terminal-tab-prefix--active" : ""}`}>
-                {">"}
-              </span>
-              <span className="terminal-tab-name">{sessionTitles.get(s.id) ?? s.projectName}</span>
-              <span className="terminal-tab-trailing">
-                {isTabStreaming ? (
-                  <span className="terminal-tab-status terminal-tab-thinking">*</span>
-                ) : null}
-                <span
-                  className="terminal-tab-close"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleCloseSession(s.id);
-                  }}
-                >
-                  x
+            return (
+              <button
+                key={s.id}
+                className={`terminal-tab ${isActive ? "terminal-tab--active" : ""}`}
+                onClick={() => setActiveSession(s.id)}
+              >
+                <span className="terminal-tab-prefix">
+                  {prefix}
                 </span>
-              </span>
-            </button>
-          );
-        })}
-        <button
-          className="terminal-tab-add"
-          onClick={() => spawnNewSession()}
-          title="New session"
-        >
-          +
-        </button>
+                <span className="terminal-tab-name">{label}</span>
+                <span className="terminal-tab-trailing">
+                  {isTabStreaming ? (
+                    <span className="terminal-tab-status terminal-tab-thinking">*</span>
+                  ) : null}
+                  <span
+                    className="terminal-tab-close"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCloseSession(s.id);
+                    }}
+                  >
+                    x
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <NewSessionMenu variant="button" />
       </div>
       <div className="terminal-tabs-panels">
         {allVisible.map((s) => (
@@ -100,7 +89,7 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
               tabId={s.id}
               projectPath={s.projectPath}
               projectName={s.projectName}
-              isShell={s.isShell}
+              sessionType={s.sessionType}
               claudeSessionId={s.claudeSessionId}
               isRestored={s.restored}
               hideTitleBar

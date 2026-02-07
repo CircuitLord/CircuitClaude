@@ -56,6 +56,25 @@ impl PtyManager {
         self.spawn_pty(cmd, cols, rows, on_output)
     }
 
+    pub fn spawn_opencode(
+        &self,
+        project_path: &str,
+        cols: u16,
+        rows: u16,
+        continue_session: bool,
+        on_output: Channel<PtyOutputEvent>,
+    ) -> Result<SessionId, String> {
+        let mut cmd = CommandBuilder::new("cmd.exe");
+        if continue_session {
+            cmd.args(["/c", "opencode", "--continue"]);
+        } else {
+            cmd.args(["/c", "opencode"]);
+        }
+        cmd.cwd(project_path);
+
+        self.spawn_pty(cmd, cols, rows, on_output)
+    }
+
     pub fn spawn_shell(
         &self,
         project_path: &str,

@@ -13,7 +13,6 @@ import { useProjectStore } from "./stores/projectStore";
 import { useGitStore } from "./stores/gitStore";
 import { loadSessionsConfig, saveSessionsConfig } from "./lib/config";
 import { killAllSessions, exitApp } from "./lib/pty";
-import { spawnNewSession } from "./lib/sessions";
 import { applyThemeToDOM, applySyntaxThemeToDOM } from "./lib/themes";
 import { useHotkeys } from "./hooks/useHotkeys";
 import "./App.css";
@@ -104,10 +103,6 @@ function App() {
     ? sessions.filter((s) => s.projectPath === activeProjectPath)
     : [];
 
-  function handleSpawnForProject() {
-    spawnNewSession();
-  }
-
   return (
     <>
       <div className="app">
@@ -118,10 +113,7 @@ function App() {
               <ProjectHeader />
               {activeProjectSessions.length === 0 ? (
                 <div className="terminal-area">
-                  <EmptyState
-                    variant="no-sessions"
-                    onSpawn={handleSpawnForProject}
-                  />
+                  <EmptyState variant="no-sessions" />
                 </div>
               ) : null}
             </>

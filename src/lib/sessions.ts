@@ -1,7 +1,8 @@
 import { useSessionStore, generateTabId } from "../stores/sessionStore";
 import { useProjectStore } from "../stores/projectStore";
+import type { SessionType } from "../types";
 
-export function spawnNewSession() {
+export function spawnNewSession(type: SessionType = "claude") {
   const { activeProjectPath, addSession } = useSessionStore.getState();
   const { projects } = useProjectStore.getState();
   if (!activeProjectPath) return;
@@ -12,29 +13,10 @@ export function spawnNewSession() {
     projectName: name,
     projectPath: activeProjectPath,
     sessionId: null,
-    claudeSessionId: crypto.randomUUID(),
+    claudeSessionId: type === "claude" ? crypto.randomUUID() : undefined,
     createdAt: Date.now(),
     restored: false,
+    sessionType: type,
   });
 }
 
-/** Get or create the single shell session for the active project, and activate it. */
-export function activateShellSession() {
-  const { sessions, activeProjectPath, addSession, setActiveSession } = useSessionStore.getState();
-  if (!activeProjectPath) return;
-
-  const existing = sessions.find((s) => s.projectPath === activeProjectPath && s.isShell);
-  if (existing) {
-    setActiveSession(existing.id);
-  } else {
-    addSession({
-      id: generateTabId(),
-      projectName: "terminal",
-      projectPath: activeProjectPath,
-      sessionId: null,
-      createdAt: Date.now(),
-      restored: false,
-      isShell: true,
-    });
-  }
-}

@@ -1,8 +1,8 @@
 import { useSessionStore } from "../stores/sessionStore";
 import { useProjectStore } from "../stores/projectStore";
-import { spawnNewSession } from "../lib/sessions";
 import { useClaudeMdStore } from "../stores/claudeMdStore";
 import { WindowControls } from "./WindowControls";
+import { NewSessionMenu } from "./NewSessionMenu";
 
 export function ProjectHeader() {
   const { activeProjectPath, sessions } = useSessionStore();
@@ -32,13 +32,7 @@ export function ProjectHeader() {
       </div>
       <div className="project-header-actions">
         <span className="project-header-count">[{sessionCount}]</span>
-        <button
-          className="project-header-spawn"
-          onClick={spawnNewSession}
-          title="New session"
-        >
-+ new session
-        </button>
+        <NewSessionMenu variant="pill" />
       </div>
       <WindowControls />
     </div>

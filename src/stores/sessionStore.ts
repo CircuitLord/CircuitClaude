@@ -131,6 +131,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             restored: true,
             restorePending: false, // No longer pending — conversation view loads history directly
             hasInteracted: true, // Restored sessions are considered interacted
+            sessionType: ps.sessionType ?? "claude",
           });
         }
       }
@@ -145,7 +146,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     const state = get();
     const byProject = new Map<string, TerminalSession[]>();
     for (const s of state.sessions) {
-      if (s.isShell) continue;
+      if (s.sessionType === "shell") continue;
       if (!s.hasInteracted && !s.restored) continue;
       const list = byProject.get(s.projectPath) ?? [];
       list.push(s);
@@ -160,6 +161,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           projectPath: s.projectPath,
           claudeSessionId: s.claudeSessionId,
           createdAt: s.createdAt,
+          sessionType: s.sessionType,
         })),
       })
     );

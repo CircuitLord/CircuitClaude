@@ -1,9 +1,10 @@
+import { NewSessionMenu } from "./NewSessionMenu";
+
 interface EmptyStateProps {
   variant?: "no-project" | "no-sessions";
-  onSpawn?: () => void;
 }
 
-export function EmptyState({ variant = "no-project", onSpawn }: EmptyStateProps) {
+export function EmptyState({ variant = "no-project" }: EmptyStateProps) {
   if (variant === "no-sessions") {
     return (
       <div className="empty-state">
@@ -11,11 +12,9 @@ export function EmptyState({ variant = "no-project", onSpawn }: EmptyStateProps)
           <div className="empty-state-ascii">{">"} <span className="empty-state-cursor">_</span></div>
           <div className="empty-state-label">no sessions</div>
           <div className="empty-state-desc">spawn a session to get started.</div>
-          {onSpawn && (
-            <button className="empty-state-action project-header-spawn" onClick={onSpawn}>
-              + new session
-            </button>
-          )}
+          <div className="empty-state-action">
+            <NewSessionMenu variant="pill" />
+          </div>
         </div>
       </div>
     );

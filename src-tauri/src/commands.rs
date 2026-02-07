@@ -29,6 +29,24 @@ pub fn spawn_session(
 }
 
 #[tauri::command]
+pub fn spawn_opencode(
+    pty_manager: State<'_, PtyManager>,
+    project_path: String,
+    cols: u16,
+    rows: u16,
+    continue_session: Option<bool>,
+    on_output: Channel<PtyOutputEvent>,
+) -> Result<String, String> {
+    pty_manager.spawn_opencode(
+        &project_path,
+        cols,
+        rows,
+        continue_session.unwrap_or(false),
+        on_output,
+    )
+}
+
+#[tauri::command]
 pub fn spawn_shell(
     pty_manager: State<'_, PtyManager>,
     project_path: String,

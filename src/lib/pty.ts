@@ -37,6 +37,22 @@ export function spawnShell(
   });
 }
 
+export function spawnOpencode(
+  projectPath: string,
+  cols: number,
+  rows: number,
+  onOutput: Channel<PtyOutputEvent>,
+  options?: { continueSession?: boolean },
+): Promise<string> {
+  return invoke<string>("spawn_opencode", {
+    projectPath,
+    cols,
+    rows,
+    continueSession: options?.continueSession ?? false,
+    onOutput,
+  });
+}
+
 export function writeSession(
   sessionId: string,
   data: Uint8Array

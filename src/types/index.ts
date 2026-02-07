@@ -1,3 +1,5 @@
+export type SessionType = "claude" | "opencode" | "shell";
+
 export interface Project {
   name: string;
   path: string;
@@ -8,13 +10,13 @@ export interface TerminalSession {
   id: string;
   projectName: string;
   projectPath: string;
-  sessionId: string | null; // PTY session ID from Rust (shell sessions only)
+  sessionId: string | null; // PTY session ID from Rust
   claudeSessionId?: string; // UUID passed to Claude CLI via --session-id / --resume
   createdAt: number;
   restored?: boolean;
   hasInteracted?: boolean;
   restorePending?: boolean;
-  isShell?: boolean; // Plain terminal (no Claude)
+  sessionType: SessionType;
 }
 
 export interface PersistedSession {
@@ -23,6 +25,7 @@ export interface PersistedSession {
   projectPath: string;
   claudeSessionId?: string;
   createdAt: number;
+  sessionType?: SessionType; // Defaults to "claude" for backward compat
 }
 
 export interface ProjectSessionLayout {

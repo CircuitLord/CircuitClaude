@@ -2222,18 +2222,24 @@ body,
   height: 100%;
 }
 
-.terminal-tabs-bar {
+.terminal-tabs-bar-wrapper {
   display: flex;
   align-items: stretch;
   height: 36px;
   min-height: 36px;
-  padding: 0 10px;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border-subtle);
-  overflow-x: auto;
-  overflow-y: hidden;
   user-select: none;
   font-family: var(--font-mono);
+}
+
+.terminal-tabs-bar {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  padding: 0 0 0 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .terminal-tabs-bar::-webkit-scrollbar {
@@ -2281,15 +2287,14 @@ body,
 }
 
 .terminal-tab-prefix {
-  width: 0;
-  overflow: hidden;
+  width: 20px;
   flex-shrink: 0;
-  color: var(--accent-text);
+  color: var(--text-tertiary);
   font-size: 13px;
 }
 
-.terminal-tab-prefix--active {
-  width: 14px;
+.terminal-tab--active .terminal-tab-prefix {
+  color: var(--accent-text);
 }
 
 .terminal-tab-name {
@@ -2340,46 +2345,6 @@ body,
 
 .terminal-tab-close:hover {
   color: var(--accent-text);
-}
-
-.terminal-tab-shell {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  min-width: 36px;
-  height: 100%;
-  background: transparent;
-  border: none;
-  border-right: 1px solid var(--border-subtle);
-  color: var(--text-tertiary);
-  font-size: 13px;
-  font-family: var(--font-mono);
-  cursor: pointer;
-  transition: color 0.1s, background 0.1s;
-  flex-shrink: 0;
-  position: relative;
-}
-
-.terminal-tab-shell:hover {
-  color: var(--accent-text);
-  background: var(--bg-elevated);
-}
-
-.terminal-tab-shell--active {
-  color: var(--accent-text);
-  background: var(--accent-muted);
-}
-
-.terminal-tab-shell--active::after {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  left: 6px;
-  right: 6px;
-  height: 1px;
-  background: var(--accent);
-  box-shadow: 0 0 6px var(--accent);
 }
 
 .terminal-tab-add {
@@ -3688,4 +3653,60 @@ body,
 
 .conversation-auto-exit-btn:hover {
   color: var(--text-primary);
+}
+
+/* --- New Session Menu --- */
+
+.new-session-menu {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.new-session-dropdown {
+  position: absolute;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-visible);
+  border-radius: 2px;
+  padding: 2px 0;
+  z-index: 10;
+  min-width: 120px;
+}
+
+.new-session-dropdown--tab {
+  top: calc(100% + 4px);
+  left: 0;
+}
+
+.new-session-dropdown--pill {
+  top: calc(100% + 4px);
+  right: 0;
+}
+
+.new-session-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 10px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  text-align: left;
+  transition: color 0.1s, background 0.1s;
+  white-space: nowrap;
+}
+
+.new-session-option:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.new-session-option-marker {
+  width: 1ch;
+  flex-shrink: 0;
+  color: var(--accent-text);
 }

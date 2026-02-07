@@ -1,9 +1,9 @@
 import { useConversationStore } from "../stores/conversationStore";
-import type { SessionStats } from "../types";
+import type { SessionStats, SessionType } from "../types";
 
 interface SessionStatusBarProps {
   tabId: string;
-  isShell?: boolean;
+  sessionType: SessionType;
 }
 
 function formatTokenCount(n: number): string {
@@ -20,12 +20,12 @@ function formatDuration(ms: number): string {
   return mins + "m" + (rem > 0 ? rem + "s" : "");
 }
 
-export function SessionStatusBar({ tabId, isShell }: SessionStatusBarProps) {
+export function SessionStatusBar({ tabId, sessionType }: SessionStatusBarProps) {
   const stats: SessionStats | undefined = useConversationStore(
     (s) => s.sessionStats.get(tabId)
   );
 
-  if (isShell) return null;
+  if (sessionType === "shell" || sessionType === "opencode") return null;
 
   if (!stats || !stats.model) {
     return (
