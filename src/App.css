@@ -2419,15 +2419,17 @@ body,
   flex-direction: column;
 }
 
-.terminal-tabs-panel .terminal-view,
-.terminal-tabs-panel .conversation-view {
+.terminal-tabs-panel .terminal-view {
   border: 1px solid var(--border-visible);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
   position: relative;
 }
 
-.terminal-tabs-panel .terminal-view::before,
-.terminal-tabs-panel .conversation-view::before {
+.terminal-tabs-panel .conversation-view {
+  position: relative;
+}
+
+.terminal-tabs-panel .terminal-view::before {
   content: "";
   position: absolute;
   top: 0;
@@ -2661,6 +2663,7 @@ body,
   background: var(--bg-base);
   font-family: var(--font-mono);
   overflow: hidden;
+  position: relative;
 }
 
 .conversation-messages {
@@ -2670,6 +2673,7 @@ body,
   scrollbar-width: thin;
   scrollbar-color: var(--border-visible) transparent;
   padding: 8px 0;
+  padding-bottom: 8px;
 }
 
 .conversation-messages::-webkit-scrollbar {
@@ -2702,6 +2706,7 @@ body,
   word-break: break-word;
   display: flex;
   gap: 8px;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .conversation-user-marker {
@@ -2717,6 +2722,11 @@ body,
 
 .conversation-assistant-message {
   padding: 4px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.conversation-assistant-message:last-child {
+  border-bottom: none;
 }
 
 .conversation-text-block {
@@ -2849,15 +2859,19 @@ body,
 
 /* --- Input area --- */
 
-/* --- Input wrapper (input + stats) --- */
+/* --- Input wrapper (floating at bottom) --- */
 
 .conversation-input-wrapper {
   flex-shrink: 0;
+  margin: 0 10px 10px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
 }
 
 .conversation-input-area {
-  background: var(--bg-surface);
-  border-top: 1px solid var(--border-subtle);
   padding: 10px 16px;
 }
 
@@ -2874,6 +2888,7 @@ body,
   font-family: var(--font-mono);
   gap: 8px;
   user-select: none;
+  border-radius: 0 0 6px 6px;
 }
 
 .conversation-input-stats-model {
