@@ -2,7 +2,6 @@ import { useEffect, useRef } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Sidebar } from "./components/Sidebar";
 import { ProjectHeader } from "./components/ProjectHeader";
-import { TerminalGrid } from "./components/TerminalGrid";
 import { TerminalTabs } from "./components/TerminalTabs";
 import { EmptyState } from "./components/EmptyState";
 import { WindowControls } from "./components/WindowControls";
@@ -12,9 +11,8 @@ import { useSessionStore } from "./stores/sessionStore";
 import { useSettingsStore } from "./stores/settingsStore";
 import { useProjectStore } from "./stores/projectStore";
 import { useGitStore } from "./stores/gitStore";
-import { loadSessionsConfig, saveSessionsConfig, saveScrollback } from "./lib/config";
+import { loadSessionsConfig, saveSessionsConfig } from "./lib/config";
 import { killAllSessions, exitApp } from "./lib/pty";
-import { serializeAllTerminals } from "./lib/terminalRegistry";
 import { spawnNewSession } from "./lib/sessions";
 import { applyThemeToDOM, applySyntaxThemeToDOM } from "./lib/themes";
 import { useHotkeys } from "./hooks/useHotkeys";
@@ -22,29 +20,20 @@ import "./App.css";
 
 async function saveAllSessionData() {
   const config = useSessionStore.getState().toSessionsConfig();
-  const buffers = serializeAllTerminals();
-
-  // Save scrollback files in parallel, then save config
-  const scrollbackPromises = Array.from(buffers.entries()).map(
-    ([tabId, data]) => saveScrollback(tabId, data).catch(() => {})
-  );
-  await Promise.all(scrollbackPromises);
   await saveSessionsConfig(config).catch(() => {});
 }
 
 function App() {
   const { sessions, activeProjectPath } = useSessionStore();
   const projects = useProjectStore((s) => s.projects);
-  const layoutMode = useSettingsStore((s) => s.settings.layoutMode);
   const restoredRef = useRef(false);
   useHotkeys();
 
-  // Restore sessions on startup (once, after projects are loaded)
+  // Restore sessions on startup
   useEffect(() => {
     if (restoredRef.current) return;
     restoredRef.current = true;
 
-    // Prevent animation flash on first paint
     document.documentElement.classList.add("no-transition");
 
     Promise.all([
@@ -62,7 +51,6 @@ function App() {
       })
       .catch(() => {})
       .finally(() => {
-        // Remove no-transition guard after first theme is applied
         requestAnimationFrame(() => {
           document.documentElement.classList.remove("no-transition");
         });
@@ -72,7 +60,6 @@ function App() {
   // Apply project theme when active project changes
   useEffect(() => {
     if (!activeProjectPath) {
-      // No project selected — apply default theme from settings
       const defaultTheme = useSettingsStore.getState().settings.theme;
       applyThemeToDOM(defaultTheme);
       return;
@@ -91,7 +78,6 @@ function App() {
 
   // Save on close + auto-save every 30s
   useEffect(() => {
-    // Intercept window close
     const unlisten = getCurrentWindow().onCloseRequested(async (event) => {
       event.preventDefault();
       await saveAllSessionData();
@@ -99,7 +85,6 @@ function App() {
       await exitApp().catch(() => {});
     });
 
-    // Auto-save interval
     const interval = setInterval(() => {
       saveAllSessionData();
     }, 30_000);
@@ -157,11 +142,7 @@ function App() {
               className="terminal-grid-wrapper"
               style={{ display: path === activeProjectPath ? "flex" : "none" }}
             >
-              {layoutMode === "tabs" ? (
-                <TerminalTabs projectPath={path} />
-              ) : (
-                <TerminalGrid projectPath={path} />
-              )}
+              <TerminalTabs projectPath={path} />
             </div>
           ))}
         </div>

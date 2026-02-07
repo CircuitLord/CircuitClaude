@@ -8,7 +8,7 @@ export interface TerminalSession {
   id: string;
   projectName: string;
   projectPath: string;
-  sessionId: string | null; // PTY session ID from Rust
+  sessionId: string | null; // PTY session ID from Rust (shell sessions only)
   claudeSessionId?: string; // UUID passed to Claude CLI via --session-id / --resume
   createdAt: number;
   restored?: boolean;
@@ -69,26 +69,115 @@ export type ThemeName = "midnight" | "ember" | "arctic" | "forest" | "crimson" |
 
 export type SyntaxThemeName = "github-dark" | "monokai" | "tokyo-night";
 
-export type LayoutMode = "grid" | "tabs";
+// --- Claude Event types (from Rust claude_manager) ---
+
+export interface ModelUsage {
+  model: string;
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_input_tokens: number;
+  cache_creation_input_tokens: number;
+  context_window: number;
+}
+
+export interface SessionStats {
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+  contextWindow: number;
+  turns: number;
+  durationMs: number;
+}
+
+export interface ClaudeTextEvent { type: "Text"; data: { text: string } }
+export interface ClaudeThinkingEvent { type: "Thinking"; data: { text: string } }
+export interface ClaudeToolUseEvent { type: "ToolUse"; data: { id: string; name: string; input: unknown } }
+export interface ClaudeToolResultEvent { type: "ToolResult"; data: { tool_use_id: string; content: string; is_error: boolean } }
+export interface ClaudeResultEvent { type: "Result"; data: { subtype: string; duration_ms: number; is_error: boolean; num_turns: number; session_id: string; model_usage: ModelUsage | null } }
+export interface ClaudeErrorEvent { type: "Error"; data: { message: string } }
+export interface ClaudeMessageStartEvent { type: "MessageStart"; data: null }
+export interface ClaudeMessageStopEvent { type: "MessageStop"; data: null }
+export interface ClaudePermissionRequestEvent { type: "PermissionRequest"; data: { id: string; tool: string; input: unknown; description: string } }
+export interface ClaudeUserQuestionEvent { type: "UserQuestion"; data: { id: string; questions: UserQuestionItem[] } }
+export interface ClaudeReadyEvent { type: "Ready"; data: null }
+export interface ClaudeSystemEvent { type: "System"; data: { session_id: string; model: string } }
+
+export type ClaudeEvent =
+  | ClaudeTextEvent
+  | ClaudeThinkingEvent
+  | ClaudeToolUseEvent
+  | ClaudeToolResultEvent
+  | ClaudeResultEvent
+  | ClaudeErrorEvent
+  | ClaudeMessageStartEvent
+  | ClaudeMessageStopEvent
+  | ClaudePermissionRequestEvent
+  | ClaudeUserQuestionEvent
+  | ClaudeReadyEvent
+  | ClaudeSystemEvent;
+
+// --- User question types ---
+
+export interface UserQuestionOption {
+  label: string;
+  description: string;
+}
+
+export interface UserQuestionItem {
+  question: string;
+  header?: string;
+  options?: UserQuestionOption[];
+  multiSelect?: boolean;
+}
+
+// --- Conversation model for display ---
+
+export type PermissionStatus = "pending" | "allowed" | "denied";
+export type QuestionStatus = "pending" | "answered";
+
+export interface ConversationBlock {
+  type: "text" | "thinking" | "tool_use" | "tool_result" | "error" | "permission_request" | "user_question";
+  content: string;
+  toolName?: string;
+  toolInput?: unknown;
+  toolUseId?: string;
+  isError?: boolean;
+  // Permission request fields
+  permissionId?: string;
+  permissionTool?: string;
+  permissionDescription?: string;
+  permissionStatus?: PermissionStatus;
+  // User question fields
+  questionId?: string;
+  questions?: UserQuestionItem[];
+  questionStatus?: QuestionStatus;
+  answers?: Record<string, string>;
+}
+
+export interface ConversationMessage {
+  id: string;
+  role: "user" | "assistant";
+  blocks: ConversationBlock[];
+  timestamp: number;
+  streaming?: boolean;
+}
+
+// --- Settings ---
 
 export interface Settings {
   theme: ThemeName;
   syntaxTheme: SyntaxThemeName;
-  layoutMode: LayoutMode;
   terminalFontSize: number;
   terminalFontFamily: string;
-  terminalCursorStyle: "bar" | "block" | "underline";
-  terminalCursorBlink: boolean;
   gitViewMode: "file" | "tree";
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   theme: "midnight",
   syntaxTheme: "github-dark",
-  layoutMode: "grid",
   terminalFontSize: 15,
   terminalFontFamily: "'Cascadia Code', 'Consolas', 'Monaco', monospace",
-  terminalCursorStyle: "bar",
-  terminalCursorBlink: true,
   gitViewMode: "file",
 };

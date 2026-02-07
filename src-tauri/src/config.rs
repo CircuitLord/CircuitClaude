@@ -123,8 +123,12 @@ fn default_syntax_theme() -> String {
     "github-dark".to_string()
 }
 
-fn default_layout_mode() -> String {
-    "grid".to_string()
+fn default_font_size() -> f64 {
+    15.0
+}
+
+fn default_font_family() -> String {
+    "'Cascadia Code', 'Consolas', 'Monaco', monospace".to_string()
 }
 
 fn default_git_view_mode() -> String {
@@ -138,12 +142,10 @@ pub struct SettingsConfig {
     pub theme: String,
     #[serde(default = "default_syntax_theme")]
     pub syntax_theme: String,
-    #[serde(default = "default_layout_mode")]
-    pub layout_mode: String,
+    #[serde(default = "default_font_size")]
     pub terminal_font_size: f64,
+    #[serde(default = "default_font_family")]
     pub terminal_font_family: String,
-    pub terminal_cursor_style: String,
-    pub terminal_cursor_blink: bool,
     #[serde(default = "default_git_view_mode")]
     pub git_view_mode: String,
 }

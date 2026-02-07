@@ -5,19 +5,15 @@ interface SessionStore {
   sessions: TerminalSession[];
   activeSessionId: string | null;
   activeProjectPath: string | null;
-  thinkingSessions: Set<string>;
-  needsAttentionSessions: Set<string>;
+  streamingSessions: Set<string>;
   sessionTitles: Map<string, string>;
-  companionVisible: boolean;
-  toggleCompanion: () => void;
   addSession: (session: TerminalSession) => void;
   removeSession: (id: string) => void;
   removeProjectSessions: (projectPath: string) => void;
   setActiveSession: (id: string | null) => void;
   setActiveProject: (path: string | null) => void;
   updateSessionPtyId: (id: string, sessionId: string) => void;
-  setThinking: (tabId: string, isThinking: boolean) => void;
-  setNeedsAttention: (tabId: string, needsAttention: boolean) => void;
+  setStreaming: (tabId: string, isStreaming: boolean) => void;
   setSessionTitle: (tabId: string, title: string) => void;
   markInteracted: (tabId: string) => void;
   confirmRestore: (tabId: string) => void;
@@ -34,11 +30,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   sessions: [],
   activeSessionId: null,
   activeProjectPath: null,
-  thinkingSessions: new Set(),
-  needsAttentionSessions: new Set(),
+  streamingSessions: new Set(),
   sessionTitles: new Map(),
-  companionVisible: false,
-  toggleCompanion: () => set((state) => ({ companionVisible: !state.companionVisible })),
 
   addSession: (session) =>
     set((state) => ({
@@ -56,7 +49,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             ? sessions[sessions.length - 1].id
             : null
           : state.activeSessionId;
-      // Stay on the same project even if last session is removed
       const activeProjectPath = state.activeProjectPath;
       return { sessions, activeSessionId, activeProjectPath };
     }),
@@ -92,26 +84,15 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       ),
     })),
 
-  setThinking: (tabId, isThinking) =>
+  setStreaming: (tabId, isStreaming) =>
     set((state) => {
-      const next = new Set(state.thinkingSessions);
-      if (isThinking) {
+      const next = new Set(state.streamingSessions);
+      if (isStreaming) {
         next.add(tabId);
       } else {
         next.delete(tabId);
       }
-      return { thinkingSessions: next };
-    }),
-
-  setNeedsAttention: (tabId, needsAttention) =>
-    set((state) => {
-      const next = new Set(state.needsAttentionSessions);
-      if (needsAttention) {
-        next.add(tabId);
-      } else {
-        next.delete(tabId);
-      }
-      return { needsAttentionSessions: next };
+      return { streamingSessions: next };
     }),
 
   setSessionTitle: (tabId, title) =>
@@ -148,7 +129,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             claudeSessionId: ps.claudeSessionId,
             createdAt: ps.createdAt,
             restored: true,
-            restorePending: true,
+            restorePending: false, // No longer pending — conversation view loads history directly
+            hasInteracted: true, // Restored sessions are considered interacted
           });
         }
       }
@@ -163,8 +145,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     const state = get();
     const byProject = new Map<string, TerminalSession[]>();
     for (const s of state.sessions) {
-      if (s.isShell) continue; // Shell sessions are ephemeral, don't persist
-      if (!s.hasInteracted && !s.restored && !s.restorePending) continue;
+      if (s.isShell) continue;
+      if (!s.hasInteracted && !s.restored) continue;
       const list = byProject.get(s.projectPath) ?? [];
       list.push(s);
       byProject.set(s.projectPath, list);

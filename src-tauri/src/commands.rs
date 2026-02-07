@@ -1,3 +1,4 @@
+use crate::claude_manager::{ClaudeEvent, ClaudeManager};
 use crate::config::{self, ProjectConfig, SessionsConfig, SettingsConfig};
 use crate::conversation;
 use crate::git;
@@ -226,6 +227,61 @@ fn resolve_claude_md_path(project_path: Option<String>) -> Result<std::path::Pat
 pub struct ClaudeMdFile {
     pub path: String,
     pub content: String,
+}
+
+#[tauri::command]
+pub fn create_claude_session(
+    claude_manager: State<'_, ClaudeManager>,
+    project_path: String,
+    on_event: Channel<ClaudeEvent>,
+) -> Result<String, String> {
+    claude_manager.create_session(&project_path, on_event)
+}
+
+#[tauri::command]
+pub fn send_claude_message(
+    claude_manager: State<'_, ClaudeManager>,
+    tab_id: String,
+    message: String,
+) -> Result<(), String> {
+    claude_manager.send_message(&tab_id, &message)
+}
+
+#[tauri::command]
+pub fn respond_to_permission(
+    claude_manager: State<'_, ClaudeManager>,
+    tab_id: String,
+    id: String,
+    allowed: bool,
+    message: Option<String>,
+) -> Result<(), String> {
+    claude_manager.respond_to_permission(&tab_id, &id, allowed, message)
+}
+
+#[tauri::command]
+pub fn respond_to_question(
+    claude_manager: State<'_, ClaudeManager>,
+    tab_id: String,
+    id: String,
+    answers: serde_json::Value,
+) -> Result<(), String> {
+    claude_manager.respond_to_question(&tab_id, &id, answers)
+}
+
+#[tauri::command]
+pub fn interrupt_claude_session(
+    claude_manager: State<'_, ClaudeManager>,
+    tab_id: String,
+) -> Result<(), String> {
+    claude_manager.interrupt_session(&tab_id)
+}
+
+#[tauri::command]
+pub fn destroy_claude_session(
+    claude_manager: State<'_, ClaudeManager>,
+    tab_id: String,
+) -> Result<(), String> {
+    claude_manager.destroy_session(&tab_id)
 }
 
 #[tauri::command]

@@ -1,13 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useSettingsStore } from "../stores/settingsStore";
-import { DEFAULT_SETTINGS, ThemeName, SyntaxThemeName, LayoutMode } from "../types";
+import { DEFAULT_SETTINGS, ThemeName, SyntaxThemeName } from "../types";
 import { THEME_OPTIONS, SYNTAX_THEME_OPTIONS } from "../lib/themes";
-import { SegmentedControl } from "./SegmentedControl";
-
-const LAYOUT_OPTIONS: Array<{ label: string; value: LayoutMode }> = [
-  { label: "grid", value: "grid" },
-  { label: "tabs", value: "tabs" },
-];
 
 export function GearIcon() {
   return (
@@ -37,12 +31,6 @@ const FONT_OPTIONS = [
   { label: "Consolas", value: "'Consolas', 'Monaco', monospace" },
   { label: "Fira Code", value: "'Fira Code', 'Consolas', monospace" },
   { label: "JetBrains Mono", value: "'JetBrains Mono', 'Consolas', monospace" },
-];
-
-const CURSOR_STYLE_OPTIONS: Array<{ label: string; value: "bar" | "block" | "underline" }> = [
-  { label: "bar", value: "bar" },
-  { label: "block", value: "block" },
-  { label: "underline", value: "underline" },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -83,28 +71,6 @@ function Stepper({
         +
       </button>
     </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Toggle — text [x] / [ ]                                          */
-/* ------------------------------------------------------------------ */
-function Toggle({
-  checked,
-  onChange,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <button
-      className={`settings-toggle ${checked ? "settings-toggle--on" : ""}`}
-      role="switch"
-      aria-checked={checked}
-      onClick={() => onChange(!checked)}
-    >
-      {checked ? "[x]" : "[ ]"}
-    </button>
   );
 }
 
@@ -175,12 +141,6 @@ function CustomSelect<T extends string>({
 function TerminalPreview() {
   const { settings } = useSettingsStore();
 
-  const cursorClass = [
-    "settings-preview-cursor",
-    `settings-preview-cursor--${settings.terminalCursorStyle}`,
-    settings.terminalCursorBlink ? "settings-preview-cursor--blink" : "",
-  ].filter(Boolean).join(" ");
-
   return (
     <div className="settings-preview">
       <span
@@ -193,7 +153,7 @@ function TerminalPreview() {
         {"$ claude --session "}
       </span>
       <span
-        className={cursorClass}
+        className="settings-preview-cursor settings-preview-cursor--bar settings-preview-cursor--blink"
         style={{
           fontSize: `${settings.terminalFontSize}px`,
         }}
@@ -222,20 +182,6 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
 
         <div className="settings-dialog-body">
           <TerminalPreview />
-
-          <div className="settings-section">
-            <div className="settings-section-title">~layout</div>
-            <div className="settings-row">
-              <div className="settings-row-label">
-                <span className="settings-row-name">layout-mode</span>
-              </div>
-              <SegmentedControl
-                value={settings.layoutMode}
-                options={LAYOUT_OPTIONS}
-                onChange={(v) => update({ layoutMode: v })}
-              />
-            </div>
-          </div>
 
           <div className="settings-section">
             <div className="settings-section-title">~theme</div>
@@ -300,30 +246,6 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                 max={24}
                 suffix="px"
                 onChange={(v) => update({ terminalFontSize: v })}
-              />
-            </div>
-          </div>
-
-          <div className="settings-section">
-            <div className="settings-section-title">~cursor</div>
-            <div className="settings-row">
-              <div className="settings-row-label">
-                <span className="settings-row-name">cursor-style</span>
-              </div>
-              <SegmentedControl
-                value={settings.terminalCursorStyle}
-                options={CURSOR_STYLE_OPTIONS}
-                onChange={(v) => update({ terminalCursorStyle: v })}
-              />
-            </div>
-
-            <div className="settings-row">
-              <div className="settings-row-label">
-                <span className="settings-row-name">cursor-blink</span>
-              </div>
-              <Toggle
-                checked={settings.terminalCursorBlink}
-                onChange={(v) => update({ terminalCursorBlink: v })}
               />
             </div>
           </div>

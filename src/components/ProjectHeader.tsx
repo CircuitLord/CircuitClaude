@@ -5,7 +5,7 @@ import { useClaudeMdStore } from "../stores/claudeMdStore";
 import { WindowControls } from "./WindowControls";
 
 export function ProjectHeader() {
-  const { activeProjectPath, sessions, companionVisible, toggleCompanion } = useSessionStore();
+  const { activeProjectPath, sessions } = useSessionStore();
   const openClaudeMdEditor = useClaudeMdStore((s) => s.open);
   const { projects } = useProjectStore();
 
@@ -32,13 +32,6 @@ export function ProjectHeader() {
       </div>
       <div className="project-header-actions">
         <span className="project-header-count">[{sessionCount}]</span>
-        <button
-          className={`project-header-companion-toggle ${companionVisible ? "project-header-companion-toggle--active" : ""}`}
-          onClick={toggleCompanion}
-          title="Toggle output panel"
-        >
-:output
-        </button>
         <button
           className="project-header-spawn"
           onClick={spawnNewSession}

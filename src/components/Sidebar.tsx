@@ -10,7 +10,7 @@ import type { ThemeName } from "../types";
 
 export function Sidebar() {
   const { projects, loaded, load, removeProject, reorderProjects, updateProjectTheme } = useProjectStore();
-  const { sessions, activeProjectPath, setActiveProject, thinkingSessions, needsAttentionSessions } = useSessionStore();
+  const { sessions, activeProjectPath, setActiveProject, streamingSessions } = useSessionStore();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
@@ -273,8 +273,7 @@ export function Sidebar() {
             (s) => s.projectPath === p.path
           );
           const sessionCount = projectSessions.length;
-          const isThinking = projectSessions.some((s) => thinkingSessions.has(s.id));
-          const needsAttention = projectSessions.some((s) => needsAttentionSessions.has(s.id));
+          const isStreamingAny = projectSessions.some((s) => streamingSessions.has(s.id));
           const isActive = p.path === activeProjectPath;
 
           const entryClasses = [
@@ -294,10 +293,8 @@ export function Sidebar() {
                 <span className="sidebar-entry-name">{p.name}</span>
               </div>
               <div className="sidebar-entry-status">
-                {needsAttention ? (
-                  <span className="sidebar-entry-status-text waiting"><span className="sidebar-entry-status-symbol">?</span> waiting</span>
-                ) : isThinking ? (
-                  <span className="sidebar-entry-status-text alive"><span className="sidebar-entry-status-symbol">*</span> thinking</span>
+                {isStreamingAny ? (
+                  <span className="sidebar-entry-status-text alive"><span className="sidebar-entry-status-symbol">*</span> streaming</span>
                 ) : (
                   <span className="sidebar-entry-status-text idle">idle</span>
                 )}

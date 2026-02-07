@@ -15,7 +15,8 @@ export function useHotkeys() {
       const target = e.target as HTMLElement;
       const tag = target?.tagName;
       if (tag === "INPUT" || tag === "SELECT") return;
-      if (tag === "TEXTAREA" && !target.closest(".xterm")) return;
+      if (tag === "TEXTAREA" && !target.closest(".xterm") && !target.closest(".conversation-input-area")) return;
+      if (target.closest(".prompt-input")) return;
 
       // Ctrl+T — new session
       if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key === "t") {
