@@ -27,7 +27,7 @@ pub enum ClaudeEvent {
     UserQuestion { id: String, questions: serde_json::Value },
     Result { subtype: String, duration_ms: f64, is_error: bool, num_turns: u32, session_id: String, model_usage: Option<ModelUsage> },
     Error { message: String },
-    System { session_id: String, model: String },
+    System { session_id: String, model: String, permission_mode: String, tool_count: u32 },
     Ready,
     MessageStop,
 }
@@ -39,7 +39,7 @@ enum BridgeCommand {
     #[serde(rename = "init")]
     Init { #[serde(rename = "projectPath")] project_path: String },
     #[serde(rename = "message")]
-    Message { text: String },
+    Message { text: String, #[serde(rename = "permissionMode", skip_serializing_if = "Option::is_none")] permission_mode: Option<String> },
     #[serde(rename = "permission_response")]
     PermissionResponse { id: String, allowed: bool, message: Option<String>, #[serde(rename = "updatedInput", skip_serializing_if = "Option::is_none")] updated_input: Option<serde_json::Value> },
     #[serde(rename = "abort")]
@@ -177,6 +177,7 @@ impl ClaudeManager {
         &self,
         tab_id: &str,
         message: &str,
+        permission_mode: Option<&str>,
     ) -> Result<(), String> {
         let mut sessions = self.sessions.lock().unwrap();
         let session = sessions
@@ -185,6 +186,7 @@ impl ClaudeManager {
 
         session.write_command(&BridgeCommand::Message {
             text: message.to_string(),
+            permission_mode: permission_mode.map(|s| s.to_string()),
         })
     }
 
@@ -281,7 +283,9 @@ fn parse_bridge_event(val: &serde_json::Value) -> Option<ClaudeEvent> {
         "system" => {
             let session_id = val.get("session_id").and_then(|v| v.as_str()).unwrap_or("").to_string();
             let model = val.get("model").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            Some(ClaudeEvent::System { session_id, model })
+            let permission_mode = val.get("permission_mode").and_then(|v| v.as_str()).unwrap_or("default").to_string();
+            let tool_count = val.get("tools").and_then(|v| v.as_array()).map(|a| a.len() as u32).unwrap_or(0);
+            Some(ClaudeEvent::System { session_id, model, permission_mode, tool_count })
         }
 
         "message_start" => Some(ClaudeEvent::MessageStart),

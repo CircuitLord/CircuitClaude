@@ -1,6 +1,14 @@
 import { create } from "zustand";
 import type { ClaudeEvent, ConversationMessage, SessionStats, PermissionStatus, QuestionStatus, UserQuestionItem } from "../types";
 
+/** Tools that can be auto-approved after plan approval (file ops & safe tools) */
+export const AUTO_APPROVABLE_TOOLS = new Set([
+  "Read", "Write", "Edit", "Glob", "Grep", "NotebookEdit",
+  "Task", "WebFetch", "WebSearch", "Skill",
+  "TaskCreate", "TaskUpdate", "TaskList", "TaskGet",
+  "EnterPlanMode", "ExitPlanMode",
+]);
+
 export type ActivePrompt =
   | { kind: "permission"; permissionId: string; tool: string; input: unknown; description: string }
   | { kind: "question"; questionId: string; questions: UserQuestionItem[] };
@@ -11,6 +19,8 @@ export interface ConversationState {
   sessionStats: Map<string, SessionStats>; // tabId → cumulative session stats
   pendingPermissions: Map<string, string>; // permissionId → tabId
   pendingQuestions: Map<string, string>; // questionId → tabId
+  planModeTabs: Set<string>; // tabs currently in plan mode
+  autoApproveTabs: Set<string>; // tabs with auto-approve active (post plan approval)
 
   addUserMessage: (tabId: string, text: string) => void;
   appendToAssistant: (tabId: string, event: ClaudeEvent) => void;
@@ -20,6 +30,10 @@ export interface ConversationState {
   removeConversation: (tabId: string) => void;
   resolvePermission: (tabId: string, permissionId: string, status: PermissionStatus) => void;
   resolveQuestion: (tabId: string, questionId: string, answers: Record<string, string>) => void;
+  togglePlanMode: (tabId: string) => void;
+  clearPlanMode: (tabId: string) => void;
+  setAutoApprove: (tabId: string) => void;
+  clearAutoApprove: (tabId: string) => void;
 }
 
 function getOrCreateMessages(map: Map<string, ConversationMessage[]>, tabId: string): ConversationMessage[] {
@@ -37,6 +51,8 @@ export const useConversationStore = create<ConversationState>((set) => ({
   sessionStats: new Map(),
   pendingPermissions: new Map(),
   pendingQuestions: new Map(),
+  planModeTabs: new Set(),
+  autoApproveTabs: new Set(),
 
   addUserMessage: (tabId, text) =>
     set((state) => {
@@ -142,6 +158,7 @@ export const useConversationStore = create<ConversationState>((set) => ({
           const last = msgs[msgs.length - 1];
           if (!last || last.role !== "assistant") break;
           const updated = { ...last, blocks: [...last.blocks] };
+          const shouldAutoApprove = state.autoApproveTabs.has(tabId) && AUTO_APPROVABLE_TOOLS.has(event.data.tool);
           updated.blocks.push({
             type: "permission_request",
             content: "",
@@ -149,13 +166,17 @@ export const useConversationStore = create<ConversationState>((set) => ({
             permissionTool: event.data.tool,
             toolInput: event.data.input,
             permissionDescription: event.data.description,
-            permissionStatus: "pending",
+            permissionStatus: shouldAutoApprove ? "auto_approved" : "pending",
           });
           msgs[msgs.length - 1] = updated;
-          const nextPending = new Map(state.pendingPermissions);
-          nextPending.set(event.data.id, tabId);
+          if (!shouldAutoApprove) {
+            const nextPending = new Map(state.pendingPermissions);
+            nextPending.set(event.data.id, tabId);
+            next.set(tabId, msgs);
+            return { conversations: next, pendingPermissions: nextPending };
+          }
           next.set(tabId, msgs);
-          return { conversations: next, pendingPermissions: nextPending };
+          return { conversations: next };
         }
 
         case "UserQuestion": {
@@ -193,8 +214,10 @@ export const useConversationStore = create<ConversationState>((set) => ({
           const nextStats = new Map(state.sessionStats);
           const prev = nextStats.get(tabId);
           nextStats.set(tabId, {
-            ...prev ?? { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, contextWindow: 0, turns: 0, durationMs: 0 },
+            ...prev ?? { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, contextWindow: 0, turns: 0, durationMs: 0, permissionMode: "default", toolCount: 0 },
             model: event.data.model || prev?.model || "",
+            permissionMode: event.data.permission_mode || prev?.permissionMode || "default",
+            toolCount: event.data.tool_count ?? prev?.toolCount ?? 0,
           });
           next.set(tabId, msgs);
           return { conversations: next, sessionStats: nextStats };
@@ -209,9 +232,11 @@ export const useConversationStore = create<ConversationState>((set) => ({
           const usage = event.data.model_usage;
           if (usage) {
             const nextStats = new Map(state.sessionStats);
-            const prev = nextStats.get(tabId) ?? { model: "", inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, contextWindow: 0, turns: 0, durationMs: 0 };
+            const prev = nextStats.get(tabId) ?? { model: "", permissionMode: "default", toolCount: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, contextWindow: 0, turns: 0, durationMs: 0 };
             nextStats.set(tabId, {
               model: usage.model || prev.model,
+              permissionMode: prev.permissionMode,
+              toolCount: prev.toolCount,
               inputTokens: prev.inputTokens + usage.input_tokens,
               outputTokens: prev.outputTokens + usage.output_tokens,
               cacheReadTokens: prev.cacheReadTokens + usage.cache_read_input_tokens,
@@ -341,7 +366,43 @@ export const useConversationStore = create<ConversationState>((set) => ({
       for (const [id, tid] of nextPendingQ) {
         if (tid === tabId) nextPendingQ.delete(id);
       }
-      return { conversations: next, streamingTabs: nextStreaming, sessionStats: nextStats, pendingPermissions: nextPending, pendingQuestions: nextPendingQ };
+      const nextPlanMode = new Set(state.planModeTabs);
+      nextPlanMode.delete(tabId);
+      const nextAutoApprove = new Set(state.autoApproveTabs);
+      nextAutoApprove.delete(tabId);
+      return { conversations: next, streamingTabs: nextStreaming, sessionStats: nextStats, pendingPermissions: nextPending, pendingQuestions: nextPendingQ, planModeTabs: nextPlanMode, autoApproveTabs: nextAutoApprove };
+    }),
+
+  togglePlanMode: (tabId) =>
+    set((state) => {
+      const next = new Set(state.planModeTabs);
+      if (next.has(tabId)) {
+        next.delete(tabId);
+      } else {
+        next.add(tabId);
+      }
+      return { planModeTabs: next };
+    }),
+
+  clearPlanMode: (tabId) =>
+    set((state) => {
+      const next = new Set(state.planModeTabs);
+      next.delete(tabId);
+      return { planModeTabs: next };
+    }),
+
+  setAutoApprove: (tabId) =>
+    set((state) => {
+      const next = new Set(state.autoApproveTabs);
+      next.add(tabId);
+      return { autoApproveTabs: next };
+    }),
+
+  clearAutoApprove: (tabId) =>
+    set((state) => {
+      const next = new Set(state.autoApproveTabs);
+      next.delete(tabId);
+      return { autoApproveTabs: next };
     }),
 }));
 

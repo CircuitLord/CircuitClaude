@@ -82,6 +82,8 @@ export interface ModelUsage {
 
 export interface SessionStats {
   model: string;
+  permissionMode: string;
+  toolCount: number;
   inputTokens: number;
   outputTokens: number;
   cacheReadTokens: number;
@@ -102,7 +104,7 @@ export interface ClaudeMessageStopEvent { type: "MessageStop"; data: null }
 export interface ClaudePermissionRequestEvent { type: "PermissionRequest"; data: { id: string; tool: string; input: unknown; description: string } }
 export interface ClaudeUserQuestionEvent { type: "UserQuestion"; data: { id: string; questions: UserQuestionItem[] } }
 export interface ClaudeReadyEvent { type: "Ready"; data: null }
-export interface ClaudeSystemEvent { type: "System"; data: { session_id: string; model: string } }
+export interface ClaudeSystemEvent { type: "System"; data: { session_id: string; model: string; permission_mode: string; tool_count: number } }
 
 export type ClaudeEvent =
   | ClaudeTextEvent
@@ -134,7 +136,7 @@ export interface UserQuestionItem {
 
 // --- Conversation model for display ---
 
-export type PermissionStatus = "pending" | "allowed" | "denied";
+export type PermissionStatus = "pending" | "allowed" | "denied" | "auto_approved";
 export type QuestionStatus = "pending" | "answered";
 
 export interface ConversationBlock {

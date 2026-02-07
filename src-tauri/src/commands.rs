@@ -243,8 +243,9 @@ pub fn send_claude_message(
     claude_manager: State<'_, ClaudeManager>,
     tab_id: String,
     message: String,
+    permission_mode: Option<String>,
 ) -> Result<(), String> {
-    claude_manager.send_message(&tab_id, &message)
+    claude_manager.send_message(&tab_id, &message, permission_mode.as_deref())
 }
 
 #[tauri::command]

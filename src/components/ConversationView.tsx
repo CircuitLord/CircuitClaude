@@ -6,6 +6,8 @@ import { useConversationStore, selectActivePrompt } from "../stores/conversation
 import type { ActivePrompt } from "../stores/conversationStore";
 import { useSessionStore } from "../stores/sessionStore";
 import { renderMarkdown } from "../lib/markdown";
+import { useSlashAutocomplete } from "../hooks/useSlashAutocomplete";
+import { SlashCommandMenu } from "./SlashCommandMenu";
 import type { ClaudeEvent, ConversationMessage, ConversationBlock, SessionStats, UserQuestionItem, PermissionStatus } from "../types";
 
 interface ConversationViewProps {
@@ -55,6 +57,16 @@ export function ConversationView({ tabId, projectPath, claudeSessionId, isRestor
   );
   const resolvePermission = useConversationStore((s) => s.resolvePermission);
   const resolveQuestion = useConversationStore((s) => s.resolveQuestion);
+  const isPlanMode = useConversationStore(
+    useCallback((s) => s.planModeTabs.has(tabId), [tabId])
+  );
+  const togglePlanMode = useConversationStore((s) => s.togglePlanMode);
+  const clearPlanMode = useConversationStore((s) => s.clearPlanMode);
+  const isAutoApprove = useConversationStore(
+    useCallback((s) => s.autoApproveTabs.has(tabId), [tabId])
+  );
+  const setAutoApprove = useConversationStore((s) => s.setAutoApprove);
+  const clearAutoApprove = useConversationStore((s) => s.clearAutoApprove);
   const markInteracted = useSessionStore((s) => s.markInteracted);
   const setStreaming = useSessionStore((s) => s.setStreaming);
 
@@ -89,6 +101,16 @@ export function ConversationView({ tabId, projectPath, claudeSessionId, isRestor
         appendToAssistant(tabId, event);
         if (event.type === "MessageStop") {
           setStreaming(tabId, false);
+        }
+        // Auto-respond to permissions that were auto-approved by the store
+        if (event.type === "PermissionRequest") {
+          const state = useConversationStore.getState();
+          // If the permission wasn't added to pendingPermissions, it was auto-approved
+          if (!state.pendingPermissions.has(event.data.id) && backendIdRef.current) {
+            respondToPermission(backendIdRef.current, event.data.id, true).catch((err) => {
+              console.error("Failed to auto-respond to permission:", err);
+            });
+          }
         }
       };
 
@@ -137,17 +159,37 @@ export function ConversationView({ tabId, projectPath, claudeSessionId, isRestor
     }
   }, [activeSessionId, tabId, isStreaming]);
 
+  // Escape key exits auto-approve mode
+  useEffect(() => {
+    if (!isAutoApprove) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        clearAutoApprove(tabId);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isAutoApprove, tabId, clearAutoApprove]);
+
   const handleSend = useCallback(async () => {
     const text = inputValue.trim();
     if (!text || isStreaming || !backendIdRef.current) return;
 
+    // Intercept /plan — toggle locally, don't send to backend
+    if (text === "/plan") {
+      setInputValue("");
+      togglePlanMode(tabId);
+      return;
+    }
+
     setInputValue("");
     addUserMessage(tabId, text);
     markInteracted(tabId);
+    clearAutoApprove(tabId);
     setStreaming(tabId, true);
 
     try {
-      await sendClaudeMessage(backendIdRef.current, text);
+      await sendClaudeMessage(backendIdRef.current, text, isPlanMode ? "plan" : undefined);
     } catch (err) {
       appendToAssistant(tabId, {
         type: "Error",
@@ -155,26 +197,64 @@ export function ConversationView({ tabId, projectPath, claudeSessionId, isRestor
       });
       setStreaming(tabId, false);
     }
-  }, [inputValue, isStreaming, tabId, addUserMessage, appendToAssistant, markInteracted, setStreaming]);
+  }, [inputValue, isStreaming, tabId, isPlanMode, addUserMessage, appendToAssistant, markInteracted, setStreaming, togglePlanMode, clearAutoApprove]);
+
+  const handleSendDirect = useCallback(async (text: string) => {
+    if (!text.trim() || isStreaming || !backendIdRef.current) return;
+
+    // Intercept /plan — toggle locally, don't send to backend
+    if (text.trim() === "/plan") {
+      togglePlanMode(tabId);
+      return;
+    }
+
+    addUserMessage(tabId, text);
+    markInteracted(tabId);
+    clearAutoApprove(tabId);
+    setStreaming(tabId, true);
+    try {
+      await sendClaudeMessage(backendIdRef.current, text, isPlanMode ? "plan" : undefined);
+    } catch (err) {
+      appendToAssistant(tabId, {
+        type: "Error",
+        data: { message: String(err) },
+      });
+      setStreaming(tabId, false);
+    }
+  }, [isStreaming, tabId, isPlanMode, addUserMessage, appendToAssistant, markInteracted, setStreaming, togglePlanMode, clearAutoApprove]);
+
+  const autocomplete = useSlashAutocomplete({
+    inputValue,
+    setInputValue,
+    sendDirect: handleSendDirect,
+  });
 
   const handleInterrupt = useCallback(async () => {
     if (!backendIdRef.current) return;
+    clearAutoApprove(tabId);
     try {
       await interruptClaudeSession(backendIdRef.current);
     } catch {
       // Already stopped
     }
-  }, []);
+  }, [tabId, clearAutoApprove]);
 
   const handlePermissionResponse = useCallback(async (permissionId: string, allowed: boolean) => {
     if (!backendIdRef.current) return;
     resolvePermission(tabId, permissionId, allowed ? "allowed" : "denied");
+
+    // Auto-clear plan mode and enable auto-approve when ExitPlanMode is approved
+    if (allowed && activePrompt?.kind === "permission" && activePrompt.tool === "ExitPlanMode") {
+      clearPlanMode(tabId);
+      setAutoApprove(tabId);
+    }
+
     try {
       await respondToPermission(backendIdRef.current, permissionId, allowed);
     } catch (err) {
       console.error("Failed to respond to permission:", err);
     }
-  }, [tabId, resolvePermission]);
+  }, [tabId, resolvePermission, activePrompt, clearPlanMode, setAutoApprove]);
 
   const handleQuestionResponse = useCallback(async (questionId: string, answers: Record<string, string>) => {
     if (!backendIdRef.current) return;
@@ -187,11 +267,12 @@ export function ConversationView({ tabId, projectPath, claudeSessionId, isRestor
   }, [tabId, resolveQuestion]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (autocomplete.handleKey(e)) return;
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
-  }, [handleSend]);
+  }, [autocomplete, handleSend]);
 
   return (
     <div className="conversation-view">
@@ -210,6 +291,13 @@ export function ConversationView({ tabId, projectPath, claudeSessionId, isRestor
         )}
       </div>
       <div className="conversation-input-wrapper">
+        {autocomplete.isOpen && (
+          <SlashCommandMenu
+            matches={autocomplete.matches}
+            selectedIndex={autocomplete.selectedIndex}
+            onSelect={autocomplete.selectByIndex}
+          />
+        )}
         <div className="conversation-input-area">
           {activePrompt ? (
             <PromptInput
@@ -221,39 +309,75 @@ export function ConversationView({ tabId, projectPath, claudeSessionId, isRestor
           ) : isStreaming ? (
             <div className="conversation-input-streaming">
               <span className="conversation-streaming-text">
-                <span className="tui-blink">*</span> responding...
+                <span className="tui-blink">*</span> {isAutoApprove ? "executing plan..." : "responding..."}
               </span>
-              <button
-                className="conversation-interrupt-btn"
-                onClick={handleInterrupt}
-              >
-                :interrupt
-              </button>
+              <div className="conversation-streaming-actions">
+                {isAutoApprove && (
+                  <button
+                    className="conversation-auto-exit-btn"
+                    onClick={() => clearAutoApprove(tabId)}
+                  >
+                    :stop-auto
+                  </button>
+                )}
+                <button
+                  className="conversation-interrupt-btn"
+                  onClick={handleInterrupt}
+                >
+                  :interrupt
+                </button>
+              </div>
             </div>
           ) : (
-            <div className="conversation-input-row">
-              <span className="conversation-input-prefix">{">"}</span>
-              <textarea
-                ref={inputRef}
-                className="conversation-textarea"
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="message claude..."
-                rows={1}
-                autoFocus
-              />
-              <button
-                className="conversation-send-btn"
-                onClick={handleSend}
-                disabled={!inputValue.trim()}
-              >
-                :send
-              </button>
-            </div>
+            <>
+              {isPlanMode && (
+                <div className="plan-mode-indicator">
+                  <span className="plan-mode-indicator-icon">~</span>
+                  <span className="plan-mode-indicator-label">plan mode</span>
+                  <button
+                    className="plan-mode-indicator-exit"
+                    onClick={() => togglePlanMode(tabId)}
+                  >
+                    :exit
+                  </button>
+                </div>
+              )}
+              {isAutoApprove && (
+                <div className="auto-approve-indicator">
+                  <span className="auto-approve-indicator-icon">+</span>
+                  <span className="auto-approve-indicator-label">auto-approve</span>
+                  <button
+                    className="auto-approve-indicator-exit"
+                    onClick={() => clearAutoApprove(tabId)}
+                  >
+                    :exit
+                  </button>
+                </div>
+              )}
+              <div className="conversation-input-row">
+                <span className={`conversation-input-prefix${isPlanMode ? " conversation-input-prefix--plan" : ""}`}>{isPlanMode ? "~" : ">"}</span>
+                <textarea
+                  ref={inputRef}
+                  className="conversation-textarea"
+                  value={inputValue}
+                  onChange={(e) => { setInputValue(e.target.value); autocomplete.updateFromInput(e.target.value); }}
+                  onKeyDown={handleKeyDown}
+                  placeholder={isPlanMode ? "describe your plan..." : "message claude..."}
+                  rows={1}
+                  autoFocus
+                />
+                <button
+                  className="conversation-send-btn"
+                  onClick={handleSend}
+                  disabled={!inputValue.trim()}
+                >
+                  :send
+                </button>
+              </div>
+            </>
           )}
         </div>
-        <InputStats stats={stats} />
+        <InputStats stats={stats} isAutoApprove={isAutoApprove} />
       </div>
     </div>
   );
@@ -273,7 +397,7 @@ function formatDuration(ms: number): string {
   return mins + "m" + (rem > 0 ? rem + "s" : "");
 }
 
-function InputStats({ stats }: { stats: SessionStats | undefined }) {
+function InputStats({ stats, isAutoApprove }: { stats: SessionStats | undefined; isAutoApprove?: boolean }) {
   if (!stats || !stats.model) {
     return (
       <div className="conversation-input-stats">
@@ -283,10 +407,19 @@ function InputStats({ stats }: { stats: SessionStats | undefined }) {
   }
 
   const totalTokens = stats.inputTokens + stats.outputTokens + stats.cacheReadTokens + stats.cacheCreationTokens;
+  const isPlan = stats.permissionMode === "plan";
 
   return (
     <div className="conversation-input-stats">
       <span className="conversation-input-stats-model">{stats.model}</span>
+      <span className="conversation-input-stats-sep">|</span>
+      <span className={isAutoApprove ? "conversation-input-stats-auto" : isPlan ? "conversation-input-stats-plan" : "conversation-input-stats-value"}>
+        {isAutoApprove ? "auto" : stats.permissionMode}
+      </span>
+      <span className="conversation-input-stats-sep">|</span>
+      <span className="conversation-input-stats-value">
+        {stats.toolCount} {stats.toolCount === 1 ? "tool" : "tools"}
+      </span>
       <span className="conversation-input-stats-sep">|</span>
       <span className="conversation-input-stats-value">
         {formatTokenCount(totalTokens)}
@@ -339,6 +472,14 @@ function BlockRenderer({ block }: BlockRendererProps) {
     case "error":
       return <ErrorBlock message={block.content} />;
     case "permission_request":
+      if (block.permissionTool === "ExitPlanMode") {
+        return (
+          <PlanApprovalBlock
+            input={block.toolInput}
+            status={block.permissionStatus!}
+          />
+        );
+      }
       return (
         <PermissionPrompt
           tool={block.permissionTool!}
@@ -430,6 +571,8 @@ function getToolSummary(name: string, input: unknown): string {
       return "";
     case "WebSearch":
       return typeof obj.query === "string" ? obj.query : "";
+    case "ExitPlanMode":
+      return "plan ready for execution";
     default:
       return "";
   }
@@ -513,6 +656,15 @@ interface PromptInputProps {
 
 function PromptInput({ prompt, onPermissionResponse, onQuestionResponse }: PromptInputProps) {
   if (prompt.kind === "permission") {
+    if (prompt.tool === "ExitPlanMode") {
+      return (
+        <PlanApprovalInput
+          permissionId={prompt.permissionId}
+          input={prompt.input}
+          onResponse={onPermissionResponse}
+        />
+      );
+    }
     return (
       <PermissionInput
         permissionId={prompt.permissionId}
@@ -706,15 +858,17 @@ function PermissionPrompt({ tool, input, description, status }: PermissionPrompt
   const summary = useMemo(() => getToolSummary(tool, input) || description, [tool, input, description]);
 
   if (status !== "pending") {
+    const icon = status === "denied" ? "-" : "+";
+    const label = status === "auto_approved" ? "auto" : status;
     return (
       <div className="conversation-permission conversation-permission--resolved">
         <span className="conversation-permission-icon">
-          {status === "allowed" ? "+" : "-"}
+          {icon}
         </span>
         <span className="conversation-permission-tool">{tool}</span>
         {summary && <span className="conversation-permission-summary"> {summary}</span>}
         <span className={`conversation-permission-status conversation-permission-status--${status}`}>
-          {status}
+          {label}
         </span>
       </div>
     );
@@ -727,6 +881,128 @@ function PermissionPrompt({ tool, input, description, status }: PermissionPrompt
         <span className="conversation-permission-tool">{tool}</span>
         {summary && <span className="conversation-permission-summary"> {summary}</span>}
       </div>
+      <span className="conversation-permission-pending-hint">respond below...</span>
+    </div>
+  );
+}
+
+// --- Plan Approval Input (renders in input area for ExitPlanMode) ---
+
+interface AllowedPromptItem {
+  tool: string;
+  prompt: string;
+}
+
+function PlanApprovalInput({
+  permissionId, input, onResponse,
+}: {
+  permissionId: string;
+  input: unknown;
+  onResponse: (id: string, allowed: boolean) => void;
+}) {
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const allowedPrompts = useMemo(() => {
+    if (!input || typeof input !== "object") return [];
+    const obj = input as Record<string, unknown>;
+    if (Array.isArray(obj.allowedPrompts)) {
+      return obj.allowedPrompts as AllowedPromptItem[];
+    }
+    return [];
+  }, [input]);
+
+  useEffect(() => {
+    containerRef.current?.focus();
+  }, []);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+      e.preventDefault();
+      setSelectedIndex((prev) => (prev === 0 ? 1 : 0));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      onResponse(permissionId, selectedIndex === 0);
+    }
+  }, [permissionId, selectedIndex, onResponse]);
+
+  return (
+    <div
+      className="prompt-input plan-approval-input"
+      ref={containerRef}
+      tabIndex={0}
+      onKeyDown={handleKeyDown}
+    >
+      <div className="prompt-input-header">
+        <span className="plan-approval-icon">~</span>
+        <span className="plan-approval-label">plan ready for execution</span>
+      </div>
+      {allowedPrompts.length > 0 && (
+        <div className="plan-approval-prompts">
+          {allowedPrompts.map((ap, i) => (
+            <div key={i} className="plan-approval-prompt-item">
+              <span className="plan-approval-prompt-tool">{ap.tool}</span>
+              <span className="plan-approval-prompt-desc">{ap.prompt}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="prompt-input-options">
+        <div className={`prompt-input-option prompt-input-option--allow ${selectedIndex === 0 ? "prompt-input-option--active" : ""}`}>
+          <span className="prompt-input-option-marker">{selectedIndex === 0 ? ">" : " "}</span>
+          <span>:approve</span>
+        </div>
+        <div className={`prompt-input-option prompt-input-option--deny ${selectedIndex === 1 ? "prompt-input-option--active" : ""}`}>
+          <span className="prompt-input-option-marker">{selectedIndex === 1 ? ">" : " "}</span>
+          <span>:deny</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- Plan Approval Block (inline display for ExitPlanMode) ---
+
+function PlanApprovalBlock({ input, status }: { input: unknown; status: PermissionStatus }) {
+  const allowedPrompts = useMemo(() => {
+    if (!input || typeof input !== "object") return [];
+    const obj = input as Record<string, unknown>;
+    if (Array.isArray(obj.allowedPrompts)) {
+      return obj.allowedPrompts as AllowedPromptItem[];
+    }
+    return [];
+  }, [input]);
+
+  if (status !== "pending") {
+    const isApproved = status === "allowed" || status === "auto_approved";
+    return (
+      <div className="conversation-permission conversation-permission--resolved plan-approval-block--resolved">
+        <span className="conversation-permission-icon">
+          {isApproved ? "+" : "-"}
+        </span>
+        <span className="plan-approval-resolved-text">
+          {isApproved ? "plan approved" : "plan denied"}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="plan-approval-block plan-approval-block--pending">
+      <div className="plan-approval-block-header">
+        <span className="plan-approval-icon">~</span>
+        <span className="plan-approval-label">plan ready</span>
+      </div>
+      {allowedPrompts.length > 0 && (
+        <div className="plan-approval-prompts">
+          {allowedPrompts.map((ap, i) => (
+            <div key={i} className="plan-approval-prompt-item">
+              <span className="plan-approval-prompt-tool">{ap.tool}</span>
+              <span className="plan-approval-prompt-desc">{ap.prompt}</span>
+            </div>
+          ))}
+        </div>
+      )}
       <span className="conversation-permission-pending-hint">respond below...</span>
     </div>
   );

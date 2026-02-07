@@ -5,7 +5,7 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { SerializeAddon } from "@xterm/addon-serialize";
 import { Channel } from "@tauri-apps/api/core";
-import { spawnShell, writeSession, resizeSession, killSession } from "../lib/pty";
+import { spawnSession, spawnShell, writeSession, resizeSession, killSession } from "../lib/pty";
 import { registerTerminal, unregisterTerminal } from "../lib/terminalRegistry";
 import { useSessionStore } from "../stores/sessionStore";
 import { useSettingsStore } from "../stores/settingsStore";
@@ -19,11 +19,13 @@ interface TerminalViewProps {
   projectPath: string;
   projectName: string;
   isShell?: boolean;
+  claudeSessionId?: string;
+  isRestored?: boolean;
   hideTitleBar?: boolean;
   onClose: () => void;
 }
 
-export function TerminalView({ tabId, projectPath, projectName, isShell, hideTitleBar, onClose }: TerminalViewProps) {
+export function TerminalView({ tabId, projectPath, projectName, isShell, claudeSessionId, isRestored, hideTitleBar, onClose }: TerminalViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const [title, setTitle] = useState(projectName);
@@ -92,7 +94,14 @@ export function TerminalView({ tabId, projectPath, projectName, isShell, hideTit
       const cols = terminal.cols;
       const rows = terminal.rows;
 
-      spawnShell(projectPath, cols, rows, channel)
+      const spawnPromise = isShell
+        ? spawnShell(projectPath, cols, rows, channel)
+        : spawnSession(projectPath, cols, rows, channel, {
+            claudeSessionId: claudeSessionId,
+            resumeSessionId: isRestored ? claudeSessionId : undefined,
+          });
+
+      spawnPromise
         .then((sid) => {
           if (cleanedUp) {
             killSession(sid).catch(() => {});
@@ -104,7 +113,8 @@ export function TerminalView({ tabId, projectPath, projectName, isShell, hideTit
         })
         .catch((err) => {
           if (!cleanedUp) {
-            terminal.write(`\r\n\x1b[31mFailed to spawn shell: ${err}\x1b[0m\r\n`);
+            const label = isShell ? "shell" : "Claude session";
+            terminal.write(`\r\n\x1b[31mFailed to spawn ${label}: ${err}\x1b[0m\r\n`);
           }
         });
     });
@@ -170,7 +180,7 @@ export function TerminalView({ tabId, projectPath, projectName, isShell, hideTit
       initializedRef.current = false;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectPath, tabId, isShell]);
+  }, [projectPath, tabId, isShell, claudeSessionId, isRestored]);
 
   // Re-fit and focus when this session becomes active
   useEffect(() => {

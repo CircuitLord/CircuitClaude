@@ -76,7 +76,7 @@ async function canUseTool(toolName, input, { signal }) {
   }
 
   return new Promise((resolve, reject) => {
-    pendingResponses.set(id, { resolve });
+    pendingResponses.set(id, { resolve, originalInput: input });
     signal?.addEventListener(
       "abort",
       () => {
@@ -90,7 +90,7 @@ async function canUseTool(toolName, input, { signal }) {
 
 // ---------- Run a single query ----------
 
-async function runQuery(text) {
+async function runQuery(text, permissionMode) {
   emit({ type: "message_start" });
 
   /** Accumulate tool_use input from stream deltas: blockIndex → { id, name, inputJson } */
@@ -101,7 +101,13 @@ async function runQuery(text) {
     canUseTool,
     includePartialMessages: true,
     abortController: new AbortController(),
+    systemPrompt: { type: "preset", preset: "claude_code" },
+    settingSources: ["user", "project"],
   };
+
+  if (permissionMode) {
+    options.permissionMode = permissionMode;
+  }
 
   if (sessionId) {
     options.resume = sessionId;
@@ -119,6 +125,8 @@ async function runQuery(text) {
               type: "system",
               session_id: msg.session_id,
               model: msg.model || "",
+              permission_mode: msg.permissionMode || "default",
+              tools: msg.tools || [],
             });
           }
           break;
@@ -255,7 +263,7 @@ rl.on("line", (line) => {
     }
 
     case "message": {
-      runQuery(cmd.text);
+      runQuery(cmd.text, cmd.permissionMode);
       break;
     }
 
@@ -267,7 +275,7 @@ rl.on("line", (line) => {
       if (cmd.allowed) {
         pending.resolve({
           behavior: "allow",
-          updatedInput: cmd.updatedInput || undefined,
+          updatedInput: cmd.updatedInput || pending.originalInput || {},
         });
       } else {
         pending.resolve({

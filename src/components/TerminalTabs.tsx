@@ -1,10 +1,8 @@
 import { useSessionStore } from "../stores/sessionStore";
 import { TerminalView } from "./TerminalView";
-import { ConversationView } from "./ConversationView";
 import { killSession } from "../lib/pty";
 import { deleteScrollback } from "../lib/config";
 import { spawnNewSession, activateShellSession } from "../lib/sessions";
-import { useConversationStore } from "../stores/conversationStore";
 
 interface TerminalTabsProps {
   projectPath: string;
@@ -13,9 +11,6 @@ interface TerminalTabsProps {
 export function TerminalTabs({ projectPath }: TerminalTabsProps) {
   const { sessions, activeSessionId, setActiveSession, removeSession, streamingSessions, sessionTitles } =
     useSessionStore();
-  const streamingTabs = useConversationStore((s) => s.streamingTabs);
-  const pendingPermissions = useConversationStore((s) => s.pendingPermissions);
-  const pendingQuestions = useConversationStore((s) => s.pendingQuestions);
 
   const projectSessions = sessions.filter((s) => s.projectPath === projectPath);
   const shellSession = projectSessions.find((s) => s.isShell);
@@ -30,7 +25,7 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
 
   async function handleCloseSession(id: string) {
     const session = projectSessions.find((s) => s.id === id);
-    if (session?.isShell && session?.sessionId) {
+    if (session?.sessionId) {
       try {
         await killSession(session.sessionId);
       } catch {
@@ -57,9 +52,7 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
         </button>
         {claudeSessions.map((s) => {
           const isActive = s.id === visibleSessionId;
-          const isTabStreaming = streamingSessions.has(s.id) || streamingTabs.has(s.id);
-          const hasPending = [...pendingPermissions.values()].includes(s.id)
-            || [...pendingQuestions.values()].includes(s.id);
+          const isTabStreaming = streamingSessions.has(s.id);
 
           return (
             <button
@@ -72,9 +65,7 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
               </span>
               <span className="terminal-tab-name">{sessionTitles.get(s.id) ?? s.projectName}</span>
               <span className="terminal-tab-trailing">
-                {hasPending ? (
-                  <span className="terminal-tab-status terminal-tab-attention">?</span>
-                ) : isTabStreaming ? (
+                {isTabStreaming ? (
                   <span className="terminal-tab-status terminal-tab-thinking">*</span>
                 ) : null}
                 <span
@@ -105,24 +96,16 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
             className="terminal-tabs-panel"
             style={{ display: s.id === visibleSessionId ? "flex" : "none" }}
           >
-            {s.isShell ? (
-              <TerminalView
-                tabId={s.id}
-                projectPath={s.projectPath}
-                projectName={s.projectName}
-                isShell
-                hideTitleBar
-                onClose={() => handleCloseSession(s.id)}
-              />
-            ) : (
-              <ConversationView
-                tabId={s.id}
-                projectPath={s.projectPath}
-                claudeSessionId={s.claudeSessionId}
-                isRestored={s.restored}
-                onClose={() => handleCloseSession(s.id)}
-              />
-            )}
+            <TerminalView
+              tabId={s.id}
+              projectPath={s.projectPath}
+              projectName={s.projectName}
+              isShell={s.isShell}
+              claudeSessionId={s.claudeSessionId}
+              isRestored={s.restored}
+              hideTitleBar
+              onClose={() => handleCloseSession(s.id)}
+            />
           </div>
         ))}
       </div>

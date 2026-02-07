@@ -2862,13 +2862,14 @@ body,
 /* --- Input wrapper (floating at bottom) --- */
 
 .conversation-input-wrapper {
+  position: relative;
   flex-shrink: 0;
   margin: 0 10px 10px;
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: 6px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
-  overflow: hidden;
+  overflow: visible;
 }
 
 .conversation-input-area {
@@ -2903,9 +2904,67 @@ body,
   color: var(--text-secondary);
 }
 
+.conversation-input-stats-plan {
+  color: var(--git-modified);
+}
+
 .conversation-input-stats-empty {
   color: var(--text-tertiary);
   font-style: italic;
+}
+
+/* --- Slash command autocomplete menu --- */
+
+.slash-command-menu {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-visible);
+  border-radius: 2px;
+  z-index: 10;
+  max-height: 280px;
+  overflow-y: auto;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.slash-command-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: color 0.1s, background 0.1s;
+}
+
+.slash-command-option:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.slash-command-option--active {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.slash-command-option-marker {
+  width: 1ch;
+  flex-shrink: 0;
+  color: var(--accent-text);
+}
+
+.slash-command-option-name {
+  flex-shrink: 0;
+  color: inherit;
+}
+
+.slash-command-option-desc {
+  color: var(--text-tertiary);
+  margin-left: auto;
 }
 
 .conversation-input-row {
@@ -3447,4 +3506,186 @@ body,
   font-size: 12px;
   font-family: var(--font-mono);
   color: var(--text-tertiary);
+}
+
+/* ========================================================================
+   Plan Mode — TUI Style
+   ======================================================================== */
+
+/* --- Plan mode input prefix --- */
+
+.conversation-input-prefix--plan {
+  color: var(--git-modified);
+}
+
+/* --- Plan mode indicator bar (above input row) --- */
+
+.plan-mode-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-family: var(--font-mono);
+}
+
+.plan-mode-indicator-icon {
+  color: var(--git-modified);
+  flex-shrink: 0;
+}
+
+.plan-mode-indicator-label {
+  color: var(--git-modified);
+}
+
+.plan-mode-indicator-exit {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 13px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  padding: 0;
+  margin-left: auto;
+  transition: color 0.1s;
+}
+
+.plan-mode-indicator-exit:hover {
+  color: var(--git-modified);
+}
+
+/* --- Plan approval input (renders in input area) --- */
+
+.plan-approval-input .prompt-input-header {
+  margin-bottom: 4px;
+}
+
+.plan-approval-icon {
+  color: var(--git-modified);
+  flex-shrink: 0;
+}
+
+.plan-approval-label {
+  color: var(--git-modified);
+}
+
+.plan-approval-prompts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 6px;
+  padding-left: 18px;
+}
+
+.plan-approval-prompt-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+.plan-approval-prompt-tool {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.plan-approval-prompt-desc {
+  color: var(--text-tertiary);
+}
+
+/* --- Plan approval block (inline display) --- */
+
+.plan-approval-block {
+  padding: 6px 16px;
+  margin: 4px 0;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  border-left: 2px solid var(--git-modified);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.plan-approval-block--pending {
+  border-left-color: var(--git-modified);
+}
+
+.plan-approval-block-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.plan-approval-block--resolved .conversation-permission-icon {
+  color: var(--git-modified);
+}
+
+.plan-approval-resolved-text {
+  color: var(--git-modified);
+}
+
+/* --- Auto-approve mode (post plan approval) --- */
+
+.auto-approve-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-family: var(--font-mono);
+}
+
+.auto-approve-indicator-icon {
+  color: var(--git-modified);
+  flex-shrink: 0;
+}
+
+.auto-approve-indicator-label {
+  color: var(--git-modified);
+}
+
+.auto-approve-indicator-exit {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 13px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  padding: 0;
+  margin-left: auto;
+  transition: color 0.1s;
+}
+
+.auto-approve-indicator-exit:hover {
+  color: var(--git-modified);
+}
+
+.conversation-permission-status--auto_approved {
+  color: var(--git-modified);
+}
+
+.conversation-input-stats-auto {
+  color: var(--git-modified);
+}
+
+.conversation-streaming-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.conversation-auto-exit-btn {
+  background: none;
+  border: none;
+  color: var(--git-modified);
+  font-size: 13px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.1s;
+}
+
+.conversation-auto-exit-btn:hover {
+  color: var(--text-primary);
 }

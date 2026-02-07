@@ -14,10 +14,12 @@ export function createClaudeSession(
 export function sendClaudeMessage(
   tabId: string,
   message: string,
+  permissionMode?: string,
 ): Promise<void> {
   return invoke("send_claude_message", {
     tabId,
     message,
+    permissionMode: permissionMode ?? null,
   });
 }
 
