@@ -21,7 +21,6 @@ export function ProjectHeader() {
     <div className="project-header">
       <div className="project-header-info" data-tauri-drag-region>
         <span className="project-header-name">{projectName}</span>
-        <span className="project-header-path">{activeProjectPath}</span>
         <button
           className="project-header-text-btn"
           onClick={() => openClaudeMdEditor(activeProjectPath)}
