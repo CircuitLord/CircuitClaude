@@ -1,11 +1,15 @@
 import { useEffect } from "react";
 import { useSessionStore } from "../stores/sessionStore";
+import { useProjectStore } from "../stores/projectStore";
 import { spawnNewSession } from "../lib/sessions";
 
 export function useHotkeys() {
   const sessions = useSessionStore((s) => s.sessions);
+  const activeSessionId = useSessionStore((s) => s.activeSessionId);
   const activeProjectPath = useSessionStore((s) => s.activeProjectPath);
   const setActiveSession = useSessionStore((s) => s.setActiveSession);
+  const setActiveProject = useSessionStore((s) => s.setActiveProject);
+  const projects = useProjectStore((s) => s.projects);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -38,9 +42,35 @@ export function useHotkeys() {
         }
         return;
       }
+
+      // Ctrl+Left/Right — cycle tabs within current project
+      if (e.ctrlKey && !e.shiftKey && !e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+        e.preventDefault();
+        if (!activeProjectPath) return;
+        const projectSessions = sessions.filter(
+          (s) => s.projectPath === activeProjectPath && !s.restorePending
+        );
+        if (projectSessions.length <= 1) return;
+        const currentIndex = projectSessions.findIndex((s) => s.id === activeSessionId);
+        const delta = e.key === "ArrowRight" ? 1 : -1;
+        const nextIndex = (currentIndex + delta + projectSessions.length) % projectSessions.length;
+        setActiveSession(projectSessions[nextIndex].id);
+        return;
+      }
+
+      // Ctrl+Up/Down — cycle between projects
+      if (e.ctrlKey && !e.shiftKey && !e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+        e.preventDefault();
+        if (projects.length <= 1) return;
+        const currentIndex = projects.findIndex((p) => p.path === activeProjectPath);
+        const delta = e.key === "ArrowDown" ? 1 : -1;
+        const nextIndex = (currentIndex + delta + projects.length) % projects.length;
+        setActiveProject(projects[nextIndex].path);
+        return;
+      }
     }
 
     window.addEventListener("keydown", handleKeyDown, { capture: true });
     return () => window.removeEventListener("keydown", handleKeyDown, { capture: true });
-  }, [sessions, activeProjectPath, setActiveSession]);
+  }, [sessions, activeSessionId, activeProjectPath, setActiveSession, setActiveProject, projects]);
 }

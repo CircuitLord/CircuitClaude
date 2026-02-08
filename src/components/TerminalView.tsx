@@ -14,6 +14,16 @@ import { THEMES } from "../lib/themes";
 import { PtyOutputEvent, SessionType } from "../types";
 import "@xterm/xterm/css/xterm.css";
 
+/** Scan raw PTY bytes for ESC[2J (clear entire screen) */
+function hasClearScreen(data: Uint8Array): boolean {
+  for (let i = 0; i + 3 < data.length; i++) {
+    if (data[i] === 0x1b && data[i + 1] === 0x5b && data[i + 2] === 0x32 && data[i + 3] === 0x4a) {
+      return true;
+    }
+  }
+  return false;
+}
+
 interface TerminalViewProps {
   tabId: string;
   projectPath: string;
@@ -34,6 +44,7 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, cla
   const initializedRef = useRef(false);
   const updateSessionPtyId = useSessionStore((s) => s.updateSessionPtyId);
   const markInteracted = useSessionStore((s) => s.markInteracted);
+  const setSessionTitle = useSessionStore((s) => s.setSessionTitle);
   const activeProjectPath = useSessionStore((s) => s.activeProjectPath);
   const activeSessionId = useSessionStore((s) => s.activeSessionId);
   const settings = useSettingsStore((s) => s.settings);
@@ -47,6 +58,8 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, cla
     if (!containerRef.current || initializedRef.current) return;
     initializedRef.current = true;
     let cleanedUp = false;
+    let titleChangedDuringWrite = false;
+    let titleResetTimer: ReturnType<typeof setTimeout> | null = null;
 
     const currentSettings = useSettingsStore.getState().settings;
     const currentProjectTheme = useProjectStore.getState().projects.find((p) => p.path === projectPath)?.theme ?? "midnight";
@@ -85,9 +98,24 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, cla
       const channel = new Channel<PtyOutputEvent>();
       channel.onmessage = (event: PtyOutputEvent) => {
         if (event.type === "Data" && Array.isArray(event.data)) {
-          terminal.write(new Uint8Array(event.data));
+          const bytes = new Uint8Array(event.data);
+          titleChangedDuringWrite = false;
+          terminal.write(bytes);
+          // When screen is cleared (e.g. /clear), reset title to project name
+          // unless a new OSC title already arrived in the same data chunk
+          if (hasClearScreen(bytes) && !titleChangedDuringWrite) {
+            if (titleResetTimer) clearTimeout(titleResetTimer);
+            titleResetTimer = setTimeout(() => {
+              setTitle(projectName);
+              setSessionTitle(tabId, projectName);
+              titleResetTimer = null;
+            }, 150);
+          }
         } else if (event.type === "Exit") {
           terminal.write("\r\n\x1b[90m[Process exited]\x1b[0m\r\n");
+          if (titleResetTimer) clearTimeout(titleResetTimer);
+          setTitle(projectName);
+          setSessionTitle(tabId, projectName);
         }
       };
 
@@ -152,8 +180,14 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, cla
 
     // Terminal title changes
     const onTitleDisposable = terminal.onTitleChange((t) => {
+      titleChangedDuringWrite = true;
+      if (titleResetTimer) {
+        clearTimeout(titleResetTimer);
+        titleResetTimer = null;
+      }
       const clean = t.replace(/^[^\x20-\x7E]+\s*/, '').trim() || t;
       setTitle(clean);
+      setSessionTitle(tabId, clean);
     });
 
     // Copy selection to clipboard
@@ -181,6 +215,7 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, cla
 
     return () => {
       cleanedUp = true;
+      if (titleResetTimer) clearTimeout(titleResetTimer);
       resizeObserver.disconnect();
       onDataDisposable.dispose();
       onResizeDisposable.dispose();
