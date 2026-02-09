@@ -63,6 +63,10 @@ fn default_git_view_mode() -> String {
     "file".to_string()
 }
 
+fn default_sidebar_panel_mode() -> String {
+    "source".to_string()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SettingsConfig {
@@ -76,6 +80,8 @@ pub struct SettingsConfig {
     pub terminal_font_family: String,
     #[serde(default = "default_git_view_mode")]
     pub git_view_mode: String,
+    #[serde(default = "default_sidebar_panel_mode")]
+    pub sidebar_panel_mode: String,
 }
 
 fn settings_path(app_handle: &tauri::AppHandle) -> PathBuf {

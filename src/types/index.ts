@@ -34,6 +34,13 @@ export interface GitStatus {
   files: GitFileEntry[];
 }
 
+export interface FileTreeEntry {
+  name: string;
+  path: string;
+  fullPath: string;
+  isDir: boolean;
+}
+
 export interface DiffStat {
   path: string;
   insertions: number;
@@ -155,6 +162,7 @@ export interface Settings {
   terminalFontSize: number;
   terminalFontFamily: string;
   gitViewMode: "file" | "tree";
+  sidebarPanelMode: "source" | "files";
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -163,4 +171,5 @@ export const DEFAULT_SETTINGS: Settings = {
   terminalFontSize: 15,
   terminalFontFamily: "'Cascadia Code', 'Consolas', 'Monaco', monospace",
   gitViewMode: "file",
+  sidebarPanelMode: "source",
 };

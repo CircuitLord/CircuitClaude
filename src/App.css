@@ -782,6 +782,89 @@ body,
   flex-shrink: 0;
 }
 
+/* --- File Tree View (~/files panel) --- */
+
+.filetree-section-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 2px 0;
+}
+
+.filetree-section-body::-webkit-scrollbar {
+  width: 4px;
+}
+
+.filetree-section-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.filetree-section-body::-webkit-scrollbar-thumb {
+  background: var(--border-visible);
+  border-radius: 2px;
+}
+
+.filetree-dir-header {
+  display: flex;
+  align-items: center;
+  height: 24px;
+  padding-right: 12px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 12px;
+  color: var(--text-secondary);
+  transition: background 0.1s, color 0.1s;
+}
+
+.filetree-dir-header:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.filetree-chevron {
+  width: 14px;
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+}
+
+.filetree-dir-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+
+.filetree-file-item {
+  display: flex;
+  align-items: center;
+  height: 24px;
+  padding-right: 12px;
+  font-size: 12px;
+  min-width: 0;
+  color: var(--text-secondary);
+  transition: background 0.1s, color 0.1s;
+}
+
+.filetree-file-item:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.filetree-spacer {
+  width: 14px;
+  flex-shrink: 0;
+}
+
+.filetree-file-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .git-tree-staged {
   flex-shrink: 0;
   font-size: 11px;
@@ -2016,7 +2099,7 @@ body,
   border: 1px solid var(--border-visible);
   border-radius: 12px;
   width: 80vw;
-  max-width: 900px;
+  max-width: 1200px;
   height: 80vh;
   display: flex;
   flex-direction: column;
@@ -2105,11 +2188,14 @@ body,
   line-height: 1.6;
   white-space: pre;
   tab-size: 4;
+  width: fit-content;
+  min-width: 100%;
 }
 
 .diff-content > div {
   padding: 0 16px 0 0;
   display: flex;
+  min-width: 100%;
 }
 
 .diff-ln {
@@ -3228,7 +3314,7 @@ body,
   background: var(--bg-surface);
   border: 1px solid var(--border-visible);
   border-radius: 2px;
-  width: 680px;
+  width: 1000px;
   max-width: calc(100vw - 32px);
   height: 80vh;
   max-height: 80vh;

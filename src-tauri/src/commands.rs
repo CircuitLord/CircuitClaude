@@ -6,6 +6,39 @@ use crate::pty_manager::{PtyManager, PtyOutputEvent};
 use tauri::ipc::Channel;
 use tauri::State;
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
+const HARDCODED_SKIP: &[&str] = &[
+    ".git",
+    "node_modules",
+    "target",
+    ".next",
+    ".nuxt",
+    "dist",
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    "venv",
+    ".venv",
+    ".tox",
+    "build",
+    ".DS_Store",
+    "Thumbs.db",
+];
+
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileTreeEntry {
+    pub name: String,
+    pub path: String,
+    pub full_path: String,
+    pub is_dir: bool,
+}
+
 #[tauri::command]
 pub fn spawn_session(
     pty_manager: State<'_, PtyManager>,
@@ -286,6 +319,126 @@ pub fn destroy_claude_session(
     tab_id: String,
 ) -> Result<(), String> {
     claude_manager.destroy_session(&tab_id)
+}
+
+#[tauri::command]
+pub fn read_directory(
+    project_path: String,
+    dir_path: Option<String>,
+) -> Result<Vec<FileTreeEntry>, String> {
+    let base = std::path::Path::new(&project_path);
+    let target = match &dir_path {
+        Some(rel) => base.join(rel),
+        None => base.to_path_buf(),
+    };
+
+    let entries =
+        std::fs::read_dir(&target).map_err(|e| format!("Failed to read directory: {}", e))?;
+
+    // Check if project is a git repo
+    let is_git_repo = base.join(".git").exists();
+
+    // Collect entry names for batch git check-ignore
+    let mut raw_entries: Vec<(String, String, String, bool)> = Vec::new(); // (name, rel_path, full_path, is_dir)
+
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+
+        // Always skip .git
+        if name == ".git" {
+            continue;
+        }
+
+        let is_dir = entry.file_type().map(|t| t.is_dir()).unwrap_or(false);
+        let full = entry.path();
+        let full_path = full.to_string_lossy().replace('\\', "/");
+
+        // Compute relative path from project root
+        let rel_path = match full.strip_prefix(base) {
+            Ok(r) => r.to_string_lossy().replace('\\', "/"),
+            Err(_) => full_path.clone(),
+        };
+
+        raw_entries.push((name, rel_path, full_path, is_dir));
+    }
+
+    // Filter ignored entries
+    let filtered: Vec<(String, String, String, bool)> = if is_git_repo {
+        // Use git check-ignore --stdin to batch-filter
+        let paths_input: String = raw_entries
+            .iter()
+            .map(|(_, rel, _, _)| rel.as_str())
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        let ignored_set: std::collections::HashSet<String> = if !paths_input.is_empty() {
+            let mut cmd = std::process::Command::new("git");
+            cmd.args(["check-ignore", "--stdin"])
+                .current_dir(&project_path)
+                .stdin(std::process::Stdio::piped())
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::null());
+
+            #[cfg(windows)]
+            cmd.creation_flags(CREATE_NO_WINDOW);
+
+            match cmd.spawn() {
+                Ok(mut child) => {
+                    if let Some(mut stdin) = child.stdin.take() {
+                        use std::io::Write;
+                        let _ = stdin.write_all(paths_input.as_bytes());
+                    }
+                    match child.wait_with_output() {
+                        Ok(output) => {
+                            String::from_utf8_lossy(&output.stdout)
+                                .lines()
+                                .map(|l| l.trim().to_string())
+                                .collect()
+                        }
+                        Err(_) => std::collections::HashSet::new(),
+                    }
+                }
+                Err(_) => std::collections::HashSet::new(),
+            }
+        } else {
+            std::collections::HashSet::new()
+        };
+
+        raw_entries
+            .into_iter()
+            .filter(|(name, rel, _, _)| {
+                // Always skip hardcoded entries even in git repos (e.g. node_modules might not be in .gitignore)
+                if HARDCODED_SKIP.contains(&name.as_str()) {
+                    return false;
+                }
+                !ignored_set.contains(rel)
+            })
+            .collect()
+    } else {
+        // Non-git: use hardcoded skip list
+        raw_entries
+            .into_iter()
+            .filter(|(name, _, _, _)| !HARDCODED_SKIP.contains(&name.as_str()))
+            .collect()
+    };
+
+    // Sort: dirs first, then alphabetically (case-insensitive)
+    let mut dirs: Vec<_> = filtered.iter().filter(|(_, _, _, d)| *d).collect();
+    let mut files: Vec<_> = filtered.iter().filter(|(_, _, _, d)| !*d).collect();
+    dirs.sort_by(|a, b| a.0.to_lowercase().cmp(&b.0.to_lowercase()));
+    files.sort_by(|a, b| a.0.to_lowercase().cmp(&b.0.to_lowercase()));
+
+    let mut result: Vec<FileTreeEntry> = Vec::new();
+    for (name, path, full_path, is_dir) in dirs.into_iter().chain(files.into_iter()) {
+        result.push(FileTreeEntry {
+            name: name.clone(),
+            path: path.clone(),
+            full_path: full_path.clone(),
+            is_dir: *is_dir,
+        });
+    }
+
+    Ok(result)
 }
 
 #[tauri::command]

@@ -70,6 +70,7 @@ pub fn run() {
             commands::get_conversation_mtime,
             commands::read_claude_md,
             commands::save_claude_md,
+            commands::read_directory,
             commands::exit_app,
         ])
         .build(tauri::generate_context!())

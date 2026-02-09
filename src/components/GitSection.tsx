@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import { useGitStore, fileKey } from "../stores/gitStore";
 import { useSessionStore } from "../stores/sessionStore";
+import { useSettingsStore } from "../stores/settingsStore";
+import { useFileTreeStore } from "../stores/fileTreeStore";
 import { GitFileEntry } from "../types";
 import { SegmentedControl } from "./SegmentedControl";
 import { CommitDialog } from "./CommitDialog";
+import { FileTreeView } from "./FileTreeView";
 
 const POLL_INTERVAL = 7000;
 const DEFAULT_RATIO = 0.5; // default to 50% of sidebar height
@@ -332,6 +335,11 @@ const VIEW_MODE_OPTIONS: Array<{ label: string; value: "file" | "tree" }> = [
   { label: "tree", value: "tree" },
 ];
 
+const PANEL_MODE_OPTIONS: Array<{ label: string; value: "source" | "files" }> = [
+  { label: "~/source", value: "source" },
+  { label: "~/files", value: "files" },
+];
+
 /* ---- Flat view components ---- */
 
 function FileItem({
@@ -456,6 +464,9 @@ function ActionBar({ projectPath }: { projectPath: string }) {
 export function GitSection() {
   const activeProjectPath = useSessionStore((s) => s.activeProjectPath);
   const { statuses, sectionOpen, fetchStatus, toggleSection, openDiff, viewMode, setViewMode, commitDialogOpen, closeCommitDialog } = useGitStore();
+  const { settings, update: updateSettings } = useSettingsStore();
+  const panelMode = settings.sidebarPanelMode;
+  const { fetchDirectory, clearProject } = useFileTreeStore();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
   const [heightRatio, setHeightRatio] = useState(DEFAULT_RATIO);
@@ -557,19 +568,38 @@ export function GitSection() {
       )}
       <div className="git-section-header" onClick={toggleSection}>
         <span className="git-section-chevron">{sectionOpen ? "v" : ">"}</span>
-        <span className="git-section-title">~/source</span>
-        {totalCount > 0 && (
+        <span className="git-section-title" onClick={(e) => e.stopPropagation()}>
+          <SegmentedControl
+            value={panelMode}
+            options={PANEL_MODE_OPTIONS}
+            onChange={(v) => updateSettings({ sidebarPanelMode: v })}
+          />
+        </span>
+        {panelMode === "source" && totalCount > 0 && (
           <span className="git-section-badge">[{totalCount}]</span>
         )}
-        {status?.branch && (
+        {panelMode === "source" && status?.branch && (
           <span className="git-branch-label">
             <span className="git-branch-prefix">@</span>
             {status.branch}
           </span>
         )}
+        {panelMode === "files" && (
+          <span
+            className="git-branch-label"
+            style={{ cursor: "pointer" }}
+            onClick={(e) => {
+              e.stopPropagation();
+              clearProject();
+              fetchDirectory(activeProjectPath);
+            }}
+          >
+            :refresh
+          </span>
+        )}
       </div>
       {sectionOpen && <div className="sidebar-divider" />}
-      {sectionOpen && (
+      {sectionOpen && panelMode === "source" && (
         <>
           <div className="git-section-body">
             {status && !status.isRepo ? (
@@ -628,6 +658,11 @@ export function GitSection() {
           </div>
           {totalCount > 0 && <ActionBar projectPath={activeProjectPath} />}
         </>
+      )}
+      {sectionOpen && panelMode === "files" && (
+        <div className="git-section-body">
+          <FileTreeView projectPath={activeProjectPath} />
+        </div>
       )}
       <CommitDialog
         isOpen={commitDialogOpen}
