@@ -71,8 +71,8 @@ export function CommitDialog({ isOpen, onClose, projectPath }: CommitDialogProps
   const busy = committing || pushing;
 
   return (
-    <div className="dialog-overlay" onClick={onClose}>
-      <div className="commit-dialog" onClick={(e) => e.stopPropagation()}>
+    <div className="dialog-overlay" onMouseDown={onClose}>
+      <div className="commit-dialog" onMouseDown={(e) => e.stopPropagation()}>
         <div className="commit-dialog-header">
           <span className="commit-dialog-header-title">commit [{selCount}]</span>
           <button className="commit-dialog-close" onClick={onClose}>:esc</button>

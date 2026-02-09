@@ -24,18 +24,31 @@ function hasClearScreen(data: Uint8Array): boolean {
   return false;
 }
 
+/** Check if any of the last N lines near the cursor contain "Chat about this" */
+function hasQuestionPrompt(terminal: Terminal): boolean {
+  const buf = terminal.buffer.active;
+  const cursorY = buf.baseY + buf.cursorY;
+  const startY = Math.max(0, cursorY - 4);
+  for (let y = startY; y <= cursorY; y++) {
+    const line = buf.getLine(y);
+    if (line && line.translateToString(true).includes("Chat about this")) {
+      return true;
+    }
+  }
+  return false;
+}
+
 interface TerminalViewProps {
   tabId: string;
   projectPath: string;
   projectName: string;
   sessionType: SessionType;
   claudeSessionId?: string;
-  isRestored?: boolean;
   hideTitleBar?: boolean;
   onClose: () => void;
 }
 
-export function TerminalView({ tabId, projectPath, projectName, sessionType, claudeSessionId, isRestored, hideTitleBar, onClose }: TerminalViewProps) {
+export function TerminalView({ tabId, projectPath, projectName, sessionType, claudeSessionId, hideTitleBar, onClose }: TerminalViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const [title, setTitle] = useState(projectName);
@@ -43,8 +56,8 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, cla
   const sessionIdRef = useRef<string | null>(null);
   const initializedRef = useRef(false);
   const updateSessionPtyId = useSessionStore((s) => s.updateSessionPtyId);
-  const markInteracted = useSessionStore((s) => s.markInteracted);
   const setSessionTitle = useSessionStore((s) => s.setSessionTitle);
+  const setTabStatus = useSessionStore((s) => s.setTabStatus);
   const activeProjectPath = useSessionStore((s) => s.activeProjectPath);
   const activeSessionId = useSessionStore((s) => s.activeSessionId);
   const settings = useSettingsStore((s) => s.settings);
@@ -60,6 +73,8 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, cla
     let cleanedUp = false;
     let titleChangedDuringWrite = false;
     let titleResetTimer: ReturnType<typeof setTimeout> | null = null;
+    let activityTimer: ReturnType<typeof setTimeout> | null = null;
+    let lastUserInputTime = 0;
 
     const currentSettings = useSettingsStore.getState().settings;
     const currentProjectTheme = useProjectStore.getState().projects.find((p) => p.path === projectPath)?.theme ?? "midnight";
@@ -111,9 +126,26 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, cla
               titleResetTimer = null;
             }, 150);
           }
+          // Activity detection: only trigger if data isn't just PTY echo from user typing
+          const timeSinceInput = Date.now() - lastUserInputTime;
+          if (timeSinceInput > 150) {
+            setTabStatus(tabId, "thinking");
+            if (activityTimer) clearTimeout(activityTimer);
+            activityTimer = setTimeout(() => {
+              // Output settled — check if there's a question prompt
+              if (hasQuestionPrompt(terminal)) {
+                setTabStatus(tabId, "waiting");
+              } else {
+                setTabStatus(tabId, null);
+              }
+              activityTimer = null;
+            }, 2000);
+          }
         } else if (event.type === "Exit") {
           terminal.write("\r\n\x1b[90m[Process exited]\x1b[0m\r\n");
           if (titleResetTimer) clearTimeout(titleResetTimer);
+          if (activityTimer) { clearTimeout(activityTimer); activityTimer = null; }
+          setTabStatus(tabId, null);
           setTitle(projectName);
           setSessionTitle(tabId, projectName);
         }
@@ -128,13 +160,10 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, cla
       } else if (sessionType === "codex") {
         spawnPromise = spawnCodex(projectPath, cols, rows, channel);
       } else if (sessionType === "opencode") {
-        spawnPromise = spawnOpencode(projectPath, cols, rows, channel, {
-          continueSession: isRestored,
-        });
+        spawnPromise = spawnOpencode(projectPath, cols, rows, channel);
       } else {
         spawnPromise = spawnSession(projectPath, cols, rows, channel, {
           claudeSessionId: claudeSessionId,
-          resumeSessionId: isRestored ? claudeSessionId : undefined,
         });
       }
 
@@ -146,7 +175,6 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, cla
           }
           sessionIdRef.current = sid;
           updateSessionPtyId(tabId, sid);
-          markInteracted(tabId);
         })
         .catch((err) => {
           if (!cleanedUp) {
@@ -165,6 +193,12 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, cla
 
     // User input → PTY
     const onDataDisposable = terminal.onData((data) => {
+      lastUserInputTime = Date.now();
+      // Clear "waiting" status when user types
+      const currentStatus = useSessionStore.getState().tabStatuses.get(tabId);
+      if (currentStatus === "waiting") {
+        setTabStatus(tabId, null);
+      }
       if (sessionIdRef.current) {
         const encoder = new TextEncoder();
         writeSession(sessionIdRef.current, encoder.encode(data)).catch(() => {});
@@ -216,6 +250,8 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, cla
     return () => {
       cleanedUp = true;
       if (titleResetTimer) clearTimeout(titleResetTimer);
+      if (activityTimer) clearTimeout(activityTimer);
+      setTabStatus(tabId, null);
       resizeObserver.disconnect();
       onDataDisposable.dispose();
       onResizeDisposable.dispose();
@@ -231,7 +267,7 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, cla
       initializedRef.current = false;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectPath, tabId, sessionType, claudeSessionId, isRestored]);
+  }, [projectPath, tabId, sessionType, claudeSessionId]);
 
   // Re-fit and focus when this session becomes active
   useEffect(() => {

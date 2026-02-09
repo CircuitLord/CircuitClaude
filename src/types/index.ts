@@ -1,5 +1,7 @@
 export type SessionType = "claude" | "codex" | "opencode" | "shell";
 
+export type TabStatus = "thinking" | "waiting";
+
 export interface Project {
   name: string;
   path: string;
@@ -13,30 +15,7 @@ export interface TerminalSession {
   sessionId: string | null; // PTY session ID from Rust
   claudeSessionId?: string; // UUID passed to Claude CLI via --session-id / --resume
   createdAt: number;
-  restored?: boolean;
-  hasInteracted?: boolean;
-  restorePending?: boolean;
   sessionType: SessionType;
-}
-
-export interface PersistedSession {
-  id: string;
-  projectName: string;
-  projectPath: string;
-  claudeSessionId?: string;
-  createdAt: number;
-  sessionType?: SessionType; // Defaults to "claude" for backward compat
-}
-
-export interface ProjectSessionLayout {
-  projectPath: string;
-  sessions: PersistedSession[];
-}
-
-export interface SessionsConfig {
-  layouts: ProjectSessionLayout[];
-  activeProjectPath: string | null;
-  activeSessionId: string | null;
 }
 
 export interface PtyOutputEvent {

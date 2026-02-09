@@ -171,8 +171,8 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="dialog-overlay" onClick={onClose}>
-      <div className="settings-dialog" onClick={(e) => e.stopPropagation()}>
+    <div className="dialog-overlay" onMouseDown={onClose}>
+      <div className="settings-dialog" onMouseDown={(e) => e.stopPropagation()}>
         <div className="settings-dialog-header">
           <span className="settings-dialog-header-title">settings</span>
           <button className="settings-dialog-close" onClick={onClose} aria-label="Close">

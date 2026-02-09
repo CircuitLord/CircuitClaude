@@ -59,8 +59,8 @@ export function ClaudeMdEditor() {
     : filePath.replace(/\\/g, "/").split("/").slice(-2).join("/");
 
   return (
-    <div className="dialog-overlay" onClick={close}>
-      <div className="claude-md-editor" onClick={(e) => e.stopPropagation()}>
+    <div className="dialog-overlay" onMouseDown={close}>
+      <div className="claude-md-editor" onMouseDown={(e) => e.stopPropagation()}>
         <div className="claude-md-editor-header">
           <span className="claude-md-editor-path">{fileName}</span>
           <div className="claude-md-editor-actions">

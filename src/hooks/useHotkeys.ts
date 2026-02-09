@@ -34,7 +34,7 @@ export function useHotkeys() {
         e.preventDefault();
         if (!activeProjectPath) return;
         const confirmed = sessions.filter(
-          (s) => s.projectPath === activeProjectPath && !s.restorePending
+          (s) => s.projectPath === activeProjectPath
         );
         const index = parseInt(e.key, 10) - 1;
         if (index < confirmed.length) {
@@ -48,7 +48,7 @@ export function useHotkeys() {
         e.preventDefault();
         if (!activeProjectPath) return;
         const projectSessions = sessions.filter(
-          (s) => s.projectPath === activeProjectPath && !s.restorePending
+          (s) => s.projectPath === activeProjectPath
         );
         if (projectSessions.length <= 1) return;
         const currentIndex = projectSessions.findIndex((s) => s.id === activeSessionId);

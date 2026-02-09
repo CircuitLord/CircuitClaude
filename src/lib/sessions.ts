@@ -15,7 +15,6 @@ export function spawnNewSession(type: SessionType = "claude") {
     sessionId: null,
     claudeSessionId: type === "claude" ? crypto.randomUUID() : undefined,
     createdAt: Date.now(),
-    restored: false,
     sessionType: type,
   });
 }

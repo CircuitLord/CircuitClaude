@@ -1,5 +1,5 @@
 use crate::claude_manager::{ClaudeEvent, ClaudeManager};
-use crate::config::{self, ProjectConfig, SessionsConfig, SettingsConfig};
+use crate::config::{self, ProjectConfig, SettingsConfig};
 use crate::conversation;
 use crate::git;
 use crate::pty_manager::{PtyManager, PtyOutputEvent};
@@ -116,38 +116,6 @@ pub fn save_projects(
     projects: Vec<ProjectConfig>,
 ) -> Result<(), String> {
     config::save(&app_handle, &projects)
-}
-
-#[tauri::command]
-pub fn load_sessions_config(app_handle: tauri::AppHandle) -> Option<SessionsConfig> {
-    config::load_sessions(&app_handle)
-}
-
-#[tauri::command]
-pub fn save_sessions_config(
-    app_handle: tauri::AppHandle,
-    config: SessionsConfig,
-) -> Result<(), String> {
-    config::save_sessions(&app_handle, &config)
-}
-
-#[tauri::command]
-pub fn save_scrollback(
-    app_handle: tauri::AppHandle,
-    tab_id: String,
-    data: String,
-) -> Result<(), String> {
-    config::save_scrollback(&app_handle, &tab_id, &data)
-}
-
-#[tauri::command]
-pub fn load_scrollback(app_handle: tauri::AppHandle, tab_id: String) -> Result<String, String> {
-    config::load_scrollback(&app_handle, &tab_id)
-}
-
-#[tauri::command]
-pub fn delete_scrollback(app_handle: tauri::AppHandle, tab_id: String) -> Result<(), String> {
-    config::delete_scrollback(&app_handle, &tab_id)
 }
 
 #[tauri::command]

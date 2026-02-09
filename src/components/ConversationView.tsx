@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { Channel } from "@tauri-apps/api/core";
 import { createClaudeSession, sendClaudeMessage, interruptClaudeSession, destroyClaudeSession, respondToPermission, respondToQuestion } from "../lib/claude";
-import { readConversation } from "../lib/conversation";
 import { useConversationStore, selectActivePrompt } from "../stores/conversationStore";
 import type { ActivePrompt } from "../stores/conversationStore";
 import { useSessionStore } from "../stores/sessionStore";
@@ -13,9 +12,6 @@ import type { ClaudeEvent, ConversationMessage, ConversationBlock, SessionStats,
 interface ConversationViewProps {
   tabId: string;
   projectPath: string;
-  claudeSessionId?: string;
-  isRestored?: boolean;
-  onClose: () => void;
 }
 
 const EMPTY_MESSAGES: ConversationMessage[] = [];
@@ -25,7 +21,7 @@ function getActivePromptKey(p: ActivePrompt | null): string | null {
   return p.kind === "permission" ? `p:${p.permissionId}` : `q:${p.questionId}`;
 }
 
-export function ConversationView({ tabId, projectPath, claudeSessionId, isRestored, onClose }: ConversationViewProps) {
+export function ConversationView({ tabId, projectPath }: ConversationViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const backendIdRef = useRef<string | null>(null);
@@ -43,7 +39,6 @@ export function ConversationView({ tabId, projectPath, claudeSessionId, isRestor
   );
   const addUserMessage = useConversationStore((s) => s.addUserMessage);
   const appendToAssistant = useConversationStore((s) => s.appendToAssistant);
-  const loadHistory = useConversationStore((s) => s.loadHistory);
   const removeConversation = useConversationStore((s) => s.removeConversation);
   // Subscribe to a stable string key to avoid infinite re-render from new object refs
   const activePromptKey = useConversationStore(
@@ -67,8 +62,7 @@ export function ConversationView({ tabId, projectPath, claudeSessionId, isRestor
   );
   const setAutoApprove = useConversationStore((s) => s.setAutoApprove);
   const clearAutoApprove = useConversationStore((s) => s.clearAutoApprove);
-  const markInteracted = useSessionStore((s) => s.markInteracted);
-  const setStreaming = useSessionStore((s) => s.setStreaming);
+  const setTabStatus = useSessionStore((s) => s.setTabStatus);
 
   // Register with backend on mount — channel lives for session lifetime
   useEffect(() => {
@@ -77,30 +71,12 @@ export function ConversationView({ tabId, projectPath, claudeSessionId, isRestor
     let cleanedUp = false;
 
     async function init() {
-      // Load history for restored sessions
-      if (isRestored && claudeSessionId) {
-        try {
-          const response = await readConversation(projectPath, claudeSessionId);
-          if (!cleanedUp && response.messages.length > 0) {
-            const converted: ConversationMessage[] = response.messages.map((msg) => ({
-              id: msg.uuid,
-              role: msg.role === "human" ? "user" : "assistant",
-              blocks: [{ type: "text" as const, content: msg.text }],
-              timestamp: msg.timestamp ? new Date(msg.timestamp).getTime() : Date.now(),
-            }));
-            loadHistory(tabId, converted);
-          }
-        } catch {
-          // No history — that's fine
-        }
-      }
-
       // Create session-lifetime channel
       const channel = new Channel<ClaudeEvent>();
       channel.onmessage = (event: ClaudeEvent) => {
         appendToAssistant(tabId, event);
         if (event.type === "MessageStop") {
-          setStreaming(tabId, false);
+          setTabStatus(tabId, null);
         }
         // Auto-respond to permissions that were auto-approved by the store
         if (event.type === "PermissionRequest") {
@@ -124,9 +100,6 @@ export function ConversationView({ tabId, projectPath, claudeSessionId, isRestor
         }
       } catch (err) {
         console.error("Failed to create Claude session:", err);
-        if (isRestored) {
-          onClose();
-        }
       }
     }
 
@@ -184,9 +157,8 @@ export function ConversationView({ tabId, projectPath, claudeSessionId, isRestor
 
     setInputValue("");
     addUserMessage(tabId, text);
-    markInteracted(tabId);
     clearAutoApprove(tabId);
-    setStreaming(tabId, true);
+    setTabStatus(tabId, "thinking");
 
     try {
       await sendClaudeMessage(backendIdRef.current, text, isPlanMode ? "plan" : undefined);
@@ -195,9 +167,9 @@ export function ConversationView({ tabId, projectPath, claudeSessionId, isRestor
         type: "Error",
         data: { message: String(err) },
       });
-      setStreaming(tabId, false);
+      setTabStatus(tabId, null);
     }
-  }, [inputValue, isStreaming, tabId, isPlanMode, addUserMessage, appendToAssistant, markInteracted, setStreaming, togglePlanMode, clearAutoApprove]);
+  }, [inputValue, isStreaming, tabId, isPlanMode, addUserMessage, appendToAssistant, setTabStatus, togglePlanMode, clearAutoApprove]);
 
   const handleSendDirect = useCallback(async (text: string) => {
     if (!text.trim() || isStreaming || !backendIdRef.current) return;
@@ -209,9 +181,8 @@ export function ConversationView({ tabId, projectPath, claudeSessionId, isRestor
     }
 
     addUserMessage(tabId, text);
-    markInteracted(tabId);
     clearAutoApprove(tabId);
-    setStreaming(tabId, true);
+    setTabStatus(tabId, "thinking");
     try {
       await sendClaudeMessage(backendIdRef.current, text, isPlanMode ? "plan" : undefined);
     } catch (err) {
@@ -219,9 +190,9 @@ export function ConversationView({ tabId, projectPath, claudeSessionId, isRestor
         type: "Error",
         data: { message: String(err) },
       });
-      setStreaming(tabId, false);
+      setTabStatus(tabId, null);
     }
-  }, [isStreaming, tabId, isPlanMode, addUserMessage, appendToAssistant, markInteracted, setStreaming, togglePlanMode, clearAutoApprove]);
+  }, [isStreaming, tabId, isPlanMode, addUserMessage, appendToAssistant, setTabStatus, togglePlanMode, clearAutoApprove]);
 
   const autocomplete = useSlashAutocomplete({
     inputValue,

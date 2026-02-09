@@ -2,14 +2,13 @@ import { useSessionStore } from "../stores/sessionStore";
 import { TerminalView } from "./TerminalView";
 import { NewSessionMenu } from "./NewSessionMenu";
 import { killSession } from "../lib/pty";
-import { deleteScrollback } from "../lib/config";
 
 interface TerminalTabsProps {
   projectPath: string;
 }
 
 export function TerminalTabs({ projectPath }: TerminalTabsProps) {
-  const { sessions, activeSessionId, setActiveSession, removeSession, streamingSessions, sessionTitles } =
+  const { sessions, activeSessionId, setActiveSession, removeSession, tabStatuses, sessionTitles } =
     useSessionStore();
 
   const projectSessions = sessions.filter((s) => s.projectPath === projectPath);
@@ -32,7 +31,6 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
         // Session may already be dead
       }
     }
-    deleteScrollback(id).catch(() => {});
     removeSession(id);
   }
 
@@ -44,7 +42,7 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
         <div className="terminal-tabs-bar">
           {allVisible.map((s) => {
             const isActive = s.id === visibleSessionId;
-            const isTabStreaming = streamingSessions.has(s.id);
+            const tabStatus = tabStatuses.get(s.id) ?? null;
             const prefix =
               s.sessionType === "opencode"
                 ? "o>"
@@ -66,8 +64,10 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
                 </span>
                 <span className="terminal-tab-name">{label}</span>
                 <span className="terminal-tab-trailing">
-                  {isTabStreaming ? (
+                  {tabStatus === "thinking" ? (
                     <span className="terminal-tab-status terminal-tab-thinking">*</span>
+                  ) : tabStatus === "waiting" ? (
+                    <span className="terminal-tab-status terminal-tab-attention">?</span>
                   ) : null}
                   <span
                     className="terminal-tab-close"
@@ -98,7 +98,6 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
               projectName={s.projectName}
               sessionType={s.sessionType}
               claudeSessionId={s.claudeSessionId}
-              isRestored={s.restored}
               hideTitleBar
               onClose={() => handleCloseSession(s.id)}
             />

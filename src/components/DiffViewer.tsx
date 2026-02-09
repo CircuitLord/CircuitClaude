@@ -72,8 +72,8 @@ export function DiffViewer() {
   if (!diffFile) return null;
 
   return (
-    <div className="diff-overlay" onClick={closeDiff}>
-      <div className="diff-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="diff-overlay" onMouseDown={closeDiff}>
+      <div className="diff-modal" onMouseDown={(e) => e.stopPropagation()}>
         <div className="diff-header">
           <span className="diff-header-status" style={{ color: statusColor(diffFile.status) }}>
             {diffFile.status}

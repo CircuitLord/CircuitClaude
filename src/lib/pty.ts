@@ -8,8 +8,6 @@ export function spawnSession(
   onOutput: Channel<PtyOutputEvent>,
   options?: {
     claudeSessionId?: string;
-    resumeSessionId?: string;
-    continueSession?: boolean;
   }
 ): Promise<string> {
   return invoke<string>("spawn_session", {
@@ -17,8 +15,8 @@ export function spawnSession(
     cols,
     rows,
     claudeSessionId: options?.claudeSessionId ?? null,
-    resumeSessionId: options?.resumeSessionId ?? null,
-    continueSession: options?.continueSession ?? false,
+    resumeSessionId: null,
+    continueSession: false,
     onOutput,
   });
 }
@@ -42,13 +40,12 @@ export function spawnOpencode(
   cols: number,
   rows: number,
   onOutput: Channel<PtyOutputEvent>,
-  options?: { continueSession?: boolean },
 ): Promise<string> {
   return invoke<string>("spawn_opencode", {
     projectPath,
     cols,
     rows,
-    continueSession: options?.continueSession ?? false,
+    continueSession: false,
     onOutput,
   });
 }
@@ -58,13 +55,12 @@ export function spawnCodex(
   cols: number,
   rows: number,
   onOutput: Channel<PtyOutputEvent>,
-  options?: { continueSession?: boolean },
 ): Promise<string> {
   return invoke<string>("spawn_codex", {
     projectPath,
     cols,
     rows,
-    continueSession: options?.continueSession ?? false,
+    continueSession: false,
     onOutput,
   });
 }

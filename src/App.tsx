@@ -11,27 +11,21 @@ import { useSessionStore } from "./stores/sessionStore";
 import { useSettingsStore } from "./stores/settingsStore";
 import { useProjectStore } from "./stores/projectStore";
 import { useGitStore } from "./stores/gitStore";
-import { loadSessionsConfig, saveSessionsConfig } from "./lib/config";
 import { killAllSessions, exitApp } from "./lib/pty";
 import { applyThemeToDOM, applySyntaxThemeToDOM } from "./lib/themes";
 import { useHotkeys } from "./hooks/useHotkeys";
 import "./App.css";
 
-async function saveAllSessionData() {
-  const config = useSessionStore.getState().toSessionsConfig();
-  await saveSessionsConfig(config).catch(() => {});
-}
-
 function App() {
   const { sessions, activeProjectPath } = useSessionStore();
   const projects = useProjectStore((s) => s.projects);
-  const restoredRef = useRef(false);
+  const initializedRef = useRef(false);
   useHotkeys();
 
-  // Restore sessions on startup
+  // Load settings and projects on startup
   useEffect(() => {
-    if (restoredRef.current) return;
-    restoredRef.current = true;
+    if (initializedRef.current) return;
+    initializedRef.current = true;
 
     document.documentElement.classList.add("no-transition");
 
@@ -41,12 +35,6 @@ function App() {
     ])
       .then(() => {
         useGitStore.getState().initViewModeFromSettings();
-        return loadSessionsConfig();
-      })
-      .then((config) => {
-        if (config && config.layouts.length > 0) {
-          useSessionStore.getState().restoreFromConfig(config);
-        }
       })
       .catch(() => {})
       .finally(() => {
@@ -75,21 +63,15 @@ function App() {
     applySyntaxThemeToDOM(syntaxTheme);
   }, [syntaxTheme]);
 
-  // Save on close + auto-save every 30s
+  // Kill all sessions on close
   useEffect(() => {
     const unlisten = getCurrentWindow().onCloseRequested(async (event) => {
       event.preventDefault();
-      await saveAllSessionData();
       await killAllSessions().catch(() => {});
       await exitApp().catch(() => {});
     });
 
-    const interval = setInterval(() => {
-      saveAllSessionData();
-    }, 30_000);
-
     return () => {
-      clearInterval(interval);
       unlisten.then((fn) => fn());
     };
   }, []);

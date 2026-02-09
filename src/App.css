@@ -3219,12 +3219,6 @@ body,
   color: var(--text-secondary);
 }
 
-/* --- Tab attention indicator --- */
-
-.terminal-tab-attention {
-  color: var(--accent-text);
-  animation: tui-blink 1.2s step-end infinite;
-}
 
 /* ========================================================================
    CLAUDE.md Editor — TUI Style
