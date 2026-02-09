@@ -147,8 +147,9 @@ body,
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 36px;
+  height: var(--header-height);
   padding: 0 12px;
+  flex-shrink: 0;
 }
 
 .sidebar-header-label {
@@ -3548,6 +3549,164 @@ body,
 }
 
 .claude-md-editor-hint {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+}
+
+/* ========================================================================
+   Notes Editor
+   ======================================================================== */
+
+.notes-editor {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-visible);
+  border-radius: 2px;
+  width: 600px;
+  max-width: calc(100vw - 32px);
+  height: 50vh;
+  max-height: 50vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.notes-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 36px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.notes-editor-path {
+  font-size: 13px;
+  font-weight: 400;
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notes-editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.notes-editor-status {
+  font-size: 13px;
+  font-family: var(--font-mono);
+  color: var(--accent-text);
+  animation: tui-waiting-pulse 1.5s step-end infinite;
+}
+
+.notes-editor-save-btn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  font-weight: 400;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: color 0.1s;
+}
+
+.notes-editor-save-btn:hover:not(:disabled) {
+  color: var(--accent-text);
+}
+
+.notes-editor-save-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.notes-editor-close {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  font-weight: 400;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: color 0.1s;
+}
+
+.notes-editor-close:hover {
+  color: var(--text-primary);
+}
+
+.notes-editor-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.notes-editor-textarea {
+  flex: 1;
+  width: 100%;
+  padding: 12px;
+  background: var(--bg-base);
+  border: none;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: var(--font-mono);
+  line-height: 1.6;
+  resize: none;
+  outline: none;
+  tab-size: 2;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow: auto;
+}
+
+.notes-editor-textarea::placeholder {
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+.notes-editor-textarea::selection {
+  background: rgba(124, 58, 237, 0.35);
+}
+
+.notes-editor-textarea::-webkit-scrollbar {
+  width: 4px;
+}
+
+.notes-editor-textarea::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.notes-editor-textarea::-webkit-scrollbar-thumb {
+  background: var(--border-visible);
+  border-radius: 2px;
+}
+
+.notes-editor-loading {
+  padding: 32px 12px;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+.notes-editor-footer {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 28px;
+  padding: 0 12px;
+  border-top: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.notes-editor-hint {
   font-size: 12px;
   font-family: var(--font-mono);
   color: var(--text-tertiary);

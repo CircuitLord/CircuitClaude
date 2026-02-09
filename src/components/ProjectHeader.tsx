@@ -1,12 +1,14 @@
 import { useSessionStore } from "../stores/sessionStore";
 import { useProjectStore } from "../stores/projectStore";
 import { useClaudeMdStore } from "../stores/claudeMdStore";
+import { useNotesStore } from "../stores/notesStore";
 import { WindowControls } from "./WindowControls";
 import { NewSessionMenu } from "./NewSessionMenu";
 
 export function ProjectHeader() {
   const { activeProjectPath, sessions } = useSessionStore();
   const openClaudeMdEditor = useClaudeMdStore((s) => s.open);
+  const openNotes = useNotesStore((s) => s.open);
   const { projects } = useProjectStore();
 
   if (!activeProjectPath) return null;
@@ -27,6 +29,13 @@ export function ProjectHeader() {
           title="Open project CLAUDE.md"
         >
           :claude.md
+        </button>
+        <button
+          className="project-header-text-btn"
+          onClick={() => openNotes(activeProjectPath)}
+          title="Open project notes"
+        >
+          :notes
         </button>
       </div>
       <div className="project-header-actions">

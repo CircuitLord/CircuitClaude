@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useSessionStore } from "../stores/sessionStore";
 import { useProjectStore } from "../stores/projectStore";
+import { useNotesStore } from "../stores/notesStore";
 import { spawnNewSession } from "../lib/sessions";
 
 export function useHotkeys() {
@@ -26,6 +27,19 @@ export function useHotkeys() {
       if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key === "t") {
         e.preventDefault();
         spawnNewSession();
+        return;
+      }
+
+      // Ctrl+N — toggle notes
+      if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key === "n") {
+        e.preventDefault();
+        if (!activeProjectPath) return;
+        const notesStore = useNotesStore.getState();
+        if (notesStore.isOpen) {
+          notesStore.close();
+        } else {
+          notesStore.open(activeProjectPath);
+        }
         return;
       }
 

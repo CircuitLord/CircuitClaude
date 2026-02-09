@@ -225,6 +225,21 @@ pub fn get_conversation_mtime(project_path: String, session_id: Option<String>) 
 }
 
 #[tauri::command]
+pub fn load_note(app_handle: tauri::AppHandle, project_path: String) -> String {
+    let notes = config::load_notes(&app_handle);
+    notes.get(&project_path).cloned().unwrap_or_default()
+}
+
+#[tauri::command]
+pub fn save_note(
+    app_handle: tauri::AppHandle,
+    project_path: String,
+    content: String,
+) -> Result<(), String> {
+    config::save_note(&app_handle, &project_path, &content)
+}
+
+#[tauri::command]
 pub fn read_claude_md(project_path: Option<String>) -> Result<ClaudeMdFile, String> {
     let path = resolve_claude_md_path(project_path)?;
 

@@ -10,6 +10,8 @@ import { FileTreeView } from "./FileTreeView";
 
 const POLL_INTERVAL = 7000;
 const DEFAULT_RATIO = 0.5; // default to 50% of sidebar height
+const MAX_RATIO = 0.7; // max 70% of sidebar height
+const MIN_RATIO = 0.3; // min 30% of sidebar height when expanded
 const MIN_HEIGHT = 38; // just the header
 const MIN_LIST_HEIGHT = 80; // minimum space for project list above
 const REVERT_CONFIRM_TIMEOUT = 3000;
@@ -489,7 +491,8 @@ export function GitSection() {
 
   const panelHeight = parentHeight > 0
     ? Math.min(
-        Math.max(MIN_HEIGHT, parentHeight * heightRatio),
+        Math.max(parentHeight * MIN_RATIO, parentHeight * heightRatio),
+        parentHeight * MAX_RATIO,
         parentHeight - MIN_LIST_HEIGHT
       )
     : MIN_HEIGHT;
@@ -501,9 +504,10 @@ export function GitSection() {
       const delta = dragRef.current.startY - e.clientY;
       const parentEl = sectionRef.current.parentElement;
       const parentH = parentEl ? parentEl.clientHeight : 600;
-      const maxHeight = parentH - MIN_LIST_HEIGHT;
+      const minHeight = parentH * MIN_RATIO;
+      const maxHeight = Math.min(parentH * MAX_RATIO, parentH - MIN_LIST_HEIGHT);
       const newHeight = Math.min(
-        Math.max(MIN_HEIGHT, dragRef.current.startHeight + delta),
+        Math.max(minHeight, dragRef.current.startHeight + delta),
         maxHeight
       );
       setHeightRatio(newHeight / parentH);

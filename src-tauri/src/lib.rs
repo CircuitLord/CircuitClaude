@@ -59,6 +59,8 @@ pub fn run() {
             commands::save_projects,
             commands::load_settings,
             commands::save_settings,
+            commands::load_note,
+            commands::save_note,
             commands::get_git_status,
             commands::get_git_diff,
             commands::git_commit,

@@ -7,6 +7,7 @@ import { EmptyState } from "./components/EmptyState";
 import { WindowControls } from "./components/WindowControls";
 import { DiffViewer } from "./components/DiffViewer";
 import { ClaudeMdEditor } from "./components/ClaudeMdEditor";
+import { NotesEditor } from "./components/NotesEditor";
 import { useSessionStore } from "./stores/sessionStore";
 import { useSettingsStore } from "./stores/settingsStore";
 import { useProjectStore } from "./stores/projectStore";
@@ -123,6 +124,7 @@ function App() {
       </div>
       <DiffViewer />
       <ClaudeMdEditor />
+      <NotesEditor />
     </>
   );
 }

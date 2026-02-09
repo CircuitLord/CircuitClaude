@@ -24,3 +24,11 @@ export function readClaudeMd(projectPath?: string): Promise<{ path: string; cont
 export function saveClaudeMd(projectPath: string | undefined, content: string): Promise<void> {
   return invoke("save_claude_md", { projectPath: projectPath ?? null, content });
 }
+
+export function loadNote(projectPath: string): Promise<string> {
+  return invoke<string>("load_note", { projectPath });
+}
+
+export function saveNote(projectPath: string, content: string): Promise<void> {
+  return invoke("save_note", { projectPath, content });
+}
