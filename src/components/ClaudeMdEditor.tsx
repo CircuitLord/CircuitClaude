@@ -5,6 +5,24 @@ import markdown from "highlight.js/lib/languages/markdown";
 
 hljs.registerLanguage("markdown", markdown);
 
+const INTRAWORD_UNDERSCORE_PLACEHOLDER = "\uE000";
+
+function protectIntrawordUnderscores(text: string): string {
+  return text.replace(/_(?=[A-Za-z0-9])/g, (match, offset, source) => {
+    const previousChar = source[offset - 1] ?? "";
+    return /[A-Za-z0-9]/.test(previousChar)
+      ? INTRAWORD_UNDERSCORE_PLACEHOLDER
+      : match;
+  });
+}
+
+function restoreIntrawordUnderscores(text: string): string {
+  return text.replace(
+    new RegExp(INTRAWORD_UNDERSCORE_PLACEHOLDER, "g"),
+    "&#95;"
+  );
+}
+
 export function ClaudeMdEditor() {
   const { isOpen, filePath, content, loading, saving, error, close, setContent, save } =
     useClaudeMdStore();
@@ -46,7 +64,10 @@ export function ClaudeMdEditor() {
   const highlightedHtml = useMemo(() => {
     if (!content) return "";
     try {
-      return hljs.highlight(content, { language: "markdown" }).value;
+      const highlightInput = protectIntrawordUnderscores(content);
+      return restoreIntrawordUnderscores(
+        hljs.highlight(highlightInput, { language: "markdown" }).value
+      );
     } catch {
       return content.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     }
