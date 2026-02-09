@@ -225,18 +225,22 @@ pub fn get_conversation_mtime(project_path: String, session_id: Option<String>) 
 }
 
 #[tauri::command]
-pub fn load_note(app_handle: tauri::AppHandle, project_path: String) -> String {
-    let notes = config::load_notes(&app_handle);
-    notes.get(&project_path).cloned().unwrap_or_default()
+pub fn load_note(project_path: String) -> String {
+    let path = std::path::Path::new(&project_path).join("notes.md");
+    std::fs::read_to_string(&path).unwrap_or_default()
 }
 
 #[tauri::command]
-pub fn save_note(
-    app_handle: tauri::AppHandle,
-    project_path: String,
-    content: String,
-) -> Result<(), String> {
-    config::save_note(&app_handle, &project_path, &content)
+pub fn save_note(project_path: String, content: String) -> Result<(), String> {
+    let path = std::path::Path::new(&project_path).join("notes.md");
+    if content.is_empty() {
+        if path.exists() {
+            std::fs::remove_file(&path).map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    } else {
+        std::fs::write(&path, &content).map_err(|e| e.to_string())
+    }
 }
 
 #[tauri::command]

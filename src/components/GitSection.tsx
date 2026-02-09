@@ -7,6 +7,7 @@ import { GitFileEntry } from "../types";
 import { SegmentedControl } from "./SegmentedControl";
 import { CommitDialog } from "./CommitDialog";
 import { FileTreeView } from "./FileTreeView";
+import { fileColorClass } from "../lib/files";
 
 const POLL_INTERVAL = 7000;
 const DEFAULT_RATIO = 0.5; // default to 50% of sidebar height
@@ -266,7 +267,7 @@ function TreeFileItem({
       <span className="git-file-status" style={{ color: statusColor(f.status) }}>
         {displayStatus(f.status)}
       </span>
-      <span className="git-file-name">{node.name}</span>
+      <span className={`git-file-name ${fileColorClass(node.name)}`}>{node.name}</span>
       <RevertButton onConfirm={() => revertFiles(projectPath, [f])} />
     </div>
   );
@@ -338,8 +339,8 @@ const VIEW_MODE_OPTIONS: Array<{ label: string; value: "file" | "tree" }> = [
 ];
 
 const PANEL_MODE_OPTIONS: Array<{ label: string; value: "source" | "files" }> = [
-  { label: "~/source", value: "source" },
   { label: "~/files", value: "files" },
+  { label: "~/source", value: "source" },
 ];
 
 /* ---- Flat view components ---- */
@@ -379,7 +380,7 @@ function FileItem({
       >
         {displayStatus(file.status)}
       </span>
-      <span className="git-file-name">{name}</span>
+      <span className={`git-file-name ${fileColorClass(name)}`}>{name}</span>
       {dir && <span className="git-file-dir">{dir}</span>}
       <RevertButton onConfirm={() => revertFiles(projectPath, [file])} />
     </div>

@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useFileTreeStore } from "../stores/fileTreeStore";
 import { FileTreeEntry } from "../types";
+import { fileColorClass } from "../lib/files";
 
 function FileTreeFileNode({
   entry,
@@ -15,7 +16,7 @@ function FileTreeFileNode({
       style={{ paddingLeft: 12 + depth * 12 }}
     >
       <span className="filetree-spacer" />
-      <span className="filetree-file-name">{entry.name}</span>
+      <span className={`filetree-file-name ${fileColorClass(entry.name)}`}>{entry.name}</span>
     </div>
   );
 }

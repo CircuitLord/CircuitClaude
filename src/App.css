@@ -733,6 +733,13 @@ body,
   display: none;
 }
 
+/* --- File extension color coding --- */
+.file-ext-code   { color: var(--text-primary); }
+.file-ext-markup { color: var(--git-renamed); }
+.file-ext-config { color: var(--text-tertiary); opacity: 0.7; }
+.file-ext-doc    { color: var(--text-tertiary); opacity: 0.7; }
+.file-ext-media  { color: var(--text-tertiary); opacity: 0.6; }
+
 /* --- View Mode Toggle --- */
 
 .git-view-toggle {
@@ -1096,6 +1103,10 @@ body,
 }
 
 .project-header-text-btn:hover {
+  color: var(--accent-text);
+}
+
+.project-header-text-btn.active {
   color: var(--accent-text);
 }
 
@@ -3555,23 +3566,37 @@ body,
 }
 
 /* ========================================================================
-   Notes Editor
+   Main Content Area
    ======================================================================== */
 
-.notes-editor {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-visible);
-  border-radius: 2px;
-  width: 600px;
-  max-width: calc(100vw - 32px);
-  height: 50vh;
-  max-height: 50vh;
+.main-content-area {
+  flex: 1;
   display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  min-height: 0;
 }
 
-.notes-editor-header {
+.terminal-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* ========================================================================
+   Notes Panel (right sidebar)
+   ======================================================================== */
+
+.notes-panel {
+  width: 350px;
+  min-width: 350px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-surface);
+  border-left: 1px solid var(--border-subtle);
+}
+
+.notes-panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -3581,30 +3606,33 @@ body,
   flex-shrink: 0;
 }
 
-.notes-editor-path {
+.notes-panel-path {
   font-size: 13px;
   font-weight: 400;
   font-family: var(--font-mono);
   color: var(--text-tertiary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.notes-editor-actions {
+.notes-panel-actions {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.notes-editor-status {
+.notes-panel-status {
   font-size: 13px;
   font-family: var(--font-mono);
   color: var(--accent-text);
   animation: tui-waiting-pulse 1.5s step-end infinite;
 }
 
-.notes-editor-save-btn {
+.notes-panel-dot {
+  font-size: 13px;
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+}
+
+.notes-panel-close {
   background: transparent;
   border: none;
   padding: 0;
@@ -3616,39 +3644,18 @@ body,
   transition: color 0.1s;
 }
 
-.notes-editor-save-btn:hover:not(:disabled) {
-  color: var(--accent-text);
-}
-
-.notes-editor-save-btn:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-.notes-editor-close {
-  background: transparent;
-  border: none;
-  padding: 0;
-  font-size: 13px;
-  font-family: var(--font-mono);
-  font-weight: 400;
-  color: var(--text-tertiary);
-  cursor: pointer;
-  transition: color 0.1s;
-}
-
-.notes-editor-close:hover {
+.notes-panel-close:hover {
   color: var(--text-primary);
 }
 
-.notes-editor-body {
+.notes-panel-body {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
 }
 
-.notes-editor-textarea {
+.notes-panel-textarea {
   flex: 1;
   width: 100%;
   padding: 12px;
@@ -3666,29 +3673,29 @@ body,
   overflow: auto;
 }
 
-.notes-editor-textarea::placeholder {
+.notes-panel-textarea::placeholder {
   color: var(--text-tertiary);
   font-style: italic;
 }
 
-.notes-editor-textarea::selection {
+.notes-panel-textarea::selection {
   background: rgba(124, 58, 237, 0.35);
 }
 
-.notes-editor-textarea::-webkit-scrollbar {
+.notes-panel-textarea::-webkit-scrollbar {
   width: 4px;
 }
 
-.notes-editor-textarea::-webkit-scrollbar-track {
+.notes-panel-textarea::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.notes-editor-textarea::-webkit-scrollbar-thumb {
+.notes-panel-textarea::-webkit-scrollbar-thumb {
   background: var(--border-visible);
   border-radius: 2px;
 }
 
-.notes-editor-loading {
+.notes-panel-loading {
   padding: 32px 12px;
   font-size: 13px;
   font-family: var(--font-mono);
@@ -3696,7 +3703,7 @@ body,
   font-style: italic;
 }
 
-.notes-editor-footer {
+.notes-panel-footer {
   display: flex;
   align-items: center;
   gap: 16px;
@@ -3706,7 +3713,7 @@ body,
   flex-shrink: 0;
 }
 
-.notes-editor-hint {
+.notes-panel-hint {
   font-size: 12px;
   font-family: var(--font-mono);
   color: var(--text-tertiary);

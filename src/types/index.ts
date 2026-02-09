@@ -163,6 +163,7 @@ export interface Settings {
   terminalFontFamily: string;
   gitViewMode: "file" | "tree";
   sidebarPanelMode: "source" | "files";
+  notesPanelOpen: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -172,4 +173,5 @@ export const DEFAULT_SETTINGS: Settings = {
   terminalFontFamily: "'Cascadia Code', 'Consolas', 'Monaco', monospace",
   gitViewMode: "file",
   sidebarPanelMode: "source",
+  notesPanelOpen: false,
 };

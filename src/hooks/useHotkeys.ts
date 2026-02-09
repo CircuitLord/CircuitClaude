@@ -16,6 +16,15 @@ export function useHotkeys() {
     function handleKeyDown(e: KeyboardEvent) {
       // Skip when dialog/overlay is open
       if (document.querySelector(".dialog-overlay") || document.querySelector(".diff-overlay")) return;
+
+      // Ctrl+N — toggle notes (before textarea guard so it works in notes textarea)
+      if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key === "n") {
+        e.preventDefault();
+        if (!activeProjectPath) return;
+        useNotesStore.getState().toggle();
+        return;
+      }
+
       // Skip if focus is in an input/textarea (but not xterm's internal textarea)
       const target = e.target as HTMLElement;
       const tag = target?.tagName;
@@ -27,19 +36,6 @@ export function useHotkeys() {
       if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key === "t") {
         e.preventDefault();
         spawnNewSession();
-        return;
-      }
-
-      // Ctrl+N — toggle notes
-      if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key === "n") {
-        e.preventDefault();
-        if (!activeProjectPath) return;
-        const notesStore = useNotesStore.getState();
-        if (notesStore.isOpen) {
-          notesStore.close();
-        } else {
-          notesStore.open(activeProjectPath);
-        }
         return;
       }
 

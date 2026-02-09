@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use tauri::Manager;
@@ -83,6 +82,8 @@ pub struct SettingsConfig {
     pub git_view_mode: String,
     #[serde(default = "default_sidebar_panel_mode")]
     pub sidebar_panel_mode: String,
+    #[serde(default)]
+    pub notes_panel_open: bool,
 }
 
 fn settings_path(app_handle: &tauri::AppHandle) -> PathBuf {
@@ -103,33 +104,5 @@ pub fn save_settings(
 ) -> Result<(), String> {
     let path = settings_path(app_handle);
     let json = serde_json::to_string_pretty(settings).map_err(|e| e.to_string())?;
-    fs::write(&path, json).map_err(|e| e.to_string())
-}
-
-fn notes_path(app_handle: &tauri::AppHandle) -> PathBuf {
-    config_dir(app_handle).join("notes.json")
-}
-
-pub fn load_notes(app_handle: &tauri::AppHandle) -> HashMap<String, String> {
-    let path = notes_path(app_handle);
-    match fs::read_to_string(&path) {
-        Ok(contents) => serde_json::from_str(&contents).unwrap_or_default(),
-        Err(_) => HashMap::new(),
-    }
-}
-
-pub fn save_note(
-    app_handle: &tauri::AppHandle,
-    project_path: &str,
-    content: &str,
-) -> Result<(), String> {
-    let mut notes = load_notes(app_handle);
-    if content.is_empty() {
-        notes.remove(project_path);
-    } else {
-        notes.insert(project_path.to_string(), content.to_string());
-    }
-    let path = notes_path(app_handle);
-    let json = serde_json::to_string_pretty(&notes).map_err(|e| e.to_string())?;
     fs::write(&path, json).map_err(|e| e.to_string())
 }

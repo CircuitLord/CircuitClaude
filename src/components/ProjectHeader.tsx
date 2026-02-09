@@ -8,7 +8,8 @@ import { NewSessionMenu } from "./NewSessionMenu";
 export function ProjectHeader() {
   const { activeProjectPath, sessions } = useSessionStore();
   const openClaudeMdEditor = useClaudeMdStore((s) => s.open);
-  const openNotes = useNotesStore((s) => s.open);
+  const notesOpen = useNotesStore((s) => s.isOpen);
+  const toggleNotes = useNotesStore((s) => s.toggle);
   const { projects } = useProjectStore();
 
   if (!activeProjectPath) return null;
@@ -30,17 +31,17 @@ export function ProjectHeader() {
         >
           :claude.md
         </button>
-        <button
-          className="project-header-text-btn"
-          onClick={() => openNotes(activeProjectPath)}
-          title="Open project notes"
-        >
-          :notes
-        </button>
       </div>
       <div className="project-header-actions">
         <span className="project-header-count">[{sessionCount}]</span>
         <NewSessionMenu variant="pill" />
+        <button
+          className={`project-header-text-btn${notesOpen ? " active" : ""}`}
+          onClick={toggleNotes}
+          title="Toggle project notes"
+        >
+          :notes
+        </button>
       </div>
       <WindowControls />
     </div>

@@ -7,8 +7,9 @@ import { EmptyState } from "./components/EmptyState";
 import { WindowControls } from "./components/WindowControls";
 import { DiffViewer } from "./components/DiffViewer";
 import { ClaudeMdEditor } from "./components/ClaudeMdEditor";
-import { NotesEditor } from "./components/NotesEditor";
+import { NotesPanel } from "./components/NotesPanel";
 import { useSessionStore } from "./stores/sessionStore";
+import { useNotesStore } from "./stores/notesStore";
 import { useSettingsStore } from "./stores/settingsStore";
 import { useProjectStore } from "./stores/projectStore";
 import { useGitStore } from "./stores/gitStore";
@@ -36,6 +37,13 @@ function App() {
     ])
       .then(() => {
         useGitStore.getState().initViewModeFromSettings();
+        const { notesPanelOpen } = useSettingsStore.getState().settings;
+        if (notesPanelOpen) {
+          useNotesStore.getState().toggle();
+        }
+        // Preload notes for all projects so switching is instant
+        const paths = useProjectStore.getState().projects.map((p) => p.path);
+        useNotesStore.getState().preloadAll(paths);
       })
       .catch(() => {})
       .finally(() => {
@@ -68,6 +76,7 @@ function App() {
   useEffect(() => {
     const unlisten = getCurrentWindow().onCloseRequested(async (event) => {
       event.preventDefault();
+      await useNotesStore.getState().flush();
       await killAllSessions().catch(() => {});
       await exitApp().catch(() => {});
     });
@@ -92,39 +101,44 @@ function App() {
         <Sidebar />
         <div className="main-panel">
           {activeProjectPath ? (
-            <>
-              <ProjectHeader />
-              {activeProjectSessions.length === 0 ? (
-                <div className="terminal-area">
-                  <EmptyState variant="no-sessions" />
-                </div>
-              ) : null}
-            </>
+            <ProjectHeader />
           ) : (
-            <>
-              <div className="titlebar-fallback" data-tauri-drag-region>
-                <WindowControls />
-              </div>
-              <div className="terminal-area">
-                <EmptyState />
-              </div>
-            </>
-          )}
-          {/* Render all project terminals simultaneously; only the active one is visible */}
-          {projectsWithSessions.map((path) => (
-            <div
-              key={path}
-              className="terminal-grid-wrapper"
-              style={{ display: path === activeProjectPath ? "flex" : "none" }}
-            >
-              <TerminalTabs projectPath={path} />
+            <div className="titlebar-fallback" data-tauri-drag-region>
+              <WindowControls />
             </div>
-          ))}
+          )}
+          <div className="main-content-area">
+            <div className="terminal-content">
+              {activeProjectPath ? (
+                <>
+                  {activeProjectSessions.length === 0 ? (
+                    <div className="terminal-area">
+                      <EmptyState variant="no-sessions" />
+                    </div>
+                  ) : null}
+                </>
+              ) : (
+                <div className="terminal-area">
+                  <EmptyState />
+                </div>
+              )}
+              {/* Render all project terminals simultaneously; only the active one is visible */}
+              {projectsWithSessions.map((path) => (
+                <div
+                  key={path}
+                  className="terminal-grid-wrapper"
+                  style={{ display: path === activeProjectPath ? "flex" : "none" }}
+                >
+                  <TerminalTabs projectPath={path} />
+                </div>
+              ))}
+            </div>
+            {activeProjectPath && <NotesPanel />}
+          </div>
         </div>
       </div>
       <DiffViewer />
       <ClaudeMdEditor />
-      <NotesEditor />
     </>
   );
 }
