@@ -3,10 +3,8 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { WebglAddon } from "@xterm/addon-webgl";
-import { SerializeAddon } from "@xterm/addon-serialize";
 import { Channel } from "@tauri-apps/api/core";
 import { spawnSession, spawnShell, spawnOpencode, spawnCodex, writeSession, resizeSession, killSession } from "../lib/pty";
-import { registerTerminal, unregisterTerminal } from "../lib/terminalRegistry";
 import { useSessionStore } from "../stores/sessionStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useProjectStore } from "../stores/projectStore";
@@ -87,9 +85,7 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, cla
     });
 
     const fitAddon = new FitAddon();
-    const serializeAddon = new SerializeAddon();
     terminal.loadAddon(fitAddon);
-    terminal.loadAddon(serializeAddon);
     terminal.loadAddon(new WebLinksAddon());
     terminal.open(containerRef.current);
 
@@ -105,8 +101,6 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, cla
 
     terminalRef.current = terminal;
     fitAddonRef.current = fitAddon;
-    registerTerminal(tabId, terminal, serializeAddon);
-
     requestAnimationFrame(() => {
       fitAddon.fit();
 
@@ -257,7 +251,6 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, cla
       onResizeDisposable.dispose();
       onTitleDisposable.dispose();
       onSelectionDisposable.dispose();
-      unregisterTerminal(tabId);
       if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
       if (sessionIdRef.current) {
         killSession(sessionIdRef.current).catch(() => {});

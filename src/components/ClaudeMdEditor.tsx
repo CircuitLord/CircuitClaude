@@ -107,7 +107,7 @@ export function ClaudeMdEditor() {
             <div className="claude-md-editor-code">
               <pre
                 ref={highlightRef}
-                className="claude-md-editor-highlight"
+                className="claude-md-editor-highlight md-highlight"
                 aria-hidden="true"
                 dangerouslySetInnerHTML={{ __html: highlightedHtml + "\n" }}
               />

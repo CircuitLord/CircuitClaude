@@ -164,6 +164,7 @@ export interface Settings {
   gitViewMode: "file" | "tree";
   sidebarPanelMode: "source" | "files";
   notesPanelOpen: boolean;
+  notesPanelWidth: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -174,4 +175,5 @@ export const DEFAULT_SETTINGS: Settings = {
   gitViewMode: "file",
   sidebarPanelMode: "source",
   notesPanelOpen: false,
+  notesPanelWidth: 350,
 };
