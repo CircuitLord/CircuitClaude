@@ -1,4 +1,5 @@
 use crate::claude_manager::{ClaudeEvent, ClaudeManager};
+use crate::codex_title;
 use crate::config::{self, ProjectConfig, SettingsConfig};
 use crate::conversation;
 use crate::git;
@@ -208,6 +209,23 @@ pub fn generate_commit_message(
     files: Vec<git::GitFileEntry>,
 ) -> Result<git::GenerateResult, String> {
     git::generate_commit_message(&project_path, &files)
+}
+
+#[tauri::command]
+pub async fn generate_codex_title(
+    project_path: String,
+    spawned_at_ms: f64,
+    max_chars: Option<u32>,
+    prompt_limit: Option<u32>,
+) -> Result<String, String> {
+    let max_chars = max_chars.unwrap_or(40) as usize;
+    let prompt_limit = prompt_limit.unwrap_or(3) as usize;
+
+    tauri::async_runtime::spawn_blocking(move || {
+        codex_title::generate_codex_title(&project_path, spawned_at_ms, max_chars, prompt_limit)
+    })
+    .await
+    .map_err(|e| format!("Codex title task join failed: {}", e))?
 }
 
 #[tauri::command]

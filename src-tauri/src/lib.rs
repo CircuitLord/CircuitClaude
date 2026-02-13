@@ -1,6 +1,7 @@
 use tauri::Manager;
 
 mod claude_manager;
+mod codex_title;
 mod commands;
 mod config;
 mod conversation;
@@ -68,6 +69,7 @@ pub fn run() {
             commands::get_git_diff_stats,
             commands::git_push,
             commands::generate_commit_message,
+            commands::generate_codex_title,
             commands::read_conversation,
             commands::get_conversation_mtime,
             commands::read_claude_md,

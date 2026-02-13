@@ -3,6 +3,7 @@ import { useSessionStore } from "../stores/sessionStore";
 import { useProjectStore } from "../stores/projectStore";
 import { useNotesStore } from "../stores/notesStore";
 import { spawnNewSession } from "../lib/sessions";
+import { regenerateCodexTitle } from "../lib/codexTitles";
 
 export function useHotkeys() {
   const sessions = useSessionStore((s) => s.sessions);
@@ -10,6 +11,7 @@ export function useHotkeys() {
   const activeProjectPath = useSessionStore((s) => s.activeProjectPath);
   const setActiveSession = useSessionStore((s) => s.setActiveSession);
   const setActiveProject = useSessionStore((s) => s.setActiveProject);
+  const setSessionTitle = useSessionStore((s) => s.setSessionTitle);
   const projects = useProjectStore((s) => s.projects);
 
   useEffect(() => {
@@ -36,6 +38,21 @@ export function useHotkeys() {
       if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key === "t") {
         e.preventDefault();
         spawnNewSession();
+        return;
+      }
+
+      // Ctrl+R — regenerate title for current Codex tab
+      if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "r") {
+        e.preventDefault();
+        if (!activeSessionId) return;
+        const active = sessions.find((s) => s.id === activeSessionId);
+        if (!active || active.sessionType !== "codex") return;
+        regenerateCodexTitle(active.projectPath, active.createdAt)
+          .then((title) => {
+            if (!title) return;
+            setSessionTitle(active.id, title);
+          })
+          .catch(() => {});
         return;
       }
 
@@ -82,5 +99,5 @@ export function useHotkeys() {
 
     window.addEventListener("keydown", handleKeyDown, { capture: true });
     return () => window.removeEventListener("keydown", handleKeyDown, { capture: true });
-  }, [sessions, activeSessionId, activeProjectPath, setActiveSession, setActiveProject, projects]);
+  }, [sessions, activeSessionId, activeProjectPath, setActiveSession, setActiveProject, setSessionTitle, projects]);
 }

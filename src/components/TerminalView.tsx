@@ -9,6 +9,7 @@ import { useSessionStore } from "../stores/sessionStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useProjectStore } from "../stores/projectStore";
 import { THEMES } from "../lib/themes";
+import { regenerateCodexTitle } from "../lib/codexTitles";
 import { PtyOutputEvent, SessionType } from "../types";
 import "@xterm/xterm/css/xterm.css";
 
@@ -80,8 +81,29 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
     let titleChangedDuringWrite = false;
     let titleResetTimer: ReturnType<typeof setTimeout> | null = null;
     let activityTimer: ReturnType<typeof setTimeout> | null = null;
+    let codexTitleTimer: ReturnType<typeof setTimeout> | null = null;
+    let codexSpawnedAtMs: number | null = null;
+    let codexTitleInFlight = false;
     let lastUserInputTime = 0;
     logPtyLifecycle("mount:init", { tabId, sessionType, projectPath, spawnGeneration });
+
+    const refreshCodexTitle = () => {
+      if (sessionType !== "codex") return;
+      if (codexSpawnedAtMs === null) return;
+      if (codexTitleInFlight) return;
+      codexTitleInFlight = true;
+      regenerateCodexTitle(projectPath, codexSpawnedAtMs)
+        .then((generatedTitle) => {
+          if (!generatedTitle) return;
+          if (cleanedUp || spawnGenerationRef.current !== spawnGeneration) return;
+          setTitle(generatedTitle);
+          setSessionTitle(tabId, generatedTitle);
+        })
+        .catch(() => {})
+        .finally(() => {
+          codexTitleInFlight = false;
+        });
+    };
 
     const currentSettings = useSettingsStore.getState().settings;
     const currentProjectTheme = useProjectStore.getState().projects.find((p) => p.path === projectPath)?.theme ?? "midnight";
@@ -162,6 +184,7 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
       if (sessionType === "shell") {
         spawnPromise = spawnShell(projectPath, cols, rows, channel);
       } else if (sessionType === "codex") {
+        codexSpawnedAtMs = Date.now();
         spawnPromise = spawnCodex(projectPath, cols, rows, channel);
       } else if (sessionType === "opencode") {
         spawnPromise = spawnOpencode(projectPath, cols, rows, channel);
@@ -208,6 +231,13 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
       if (sessionIdRef.current) {
         const encoder = new TextEncoder();
         writeSession(sessionIdRef.current, encoder.encode(data)).catch(() => {});
+      }
+      if (sessionType === "codex" && (data.includes("\r") || data.includes("\n"))) {
+        if (codexTitleTimer) clearTimeout(codexTitleTimer);
+        codexTitleTimer = setTimeout(() => {
+          codexTitleTimer = null;
+          refreshCodexTitle();
+        }, 800);
       }
     });
 
@@ -260,6 +290,7 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
       sessionIdRef.current = null;
       if (titleResetTimer) clearTimeout(titleResetTimer);
       if (activityTimer) clearTimeout(activityTimer);
+      if (codexTitleTimer) clearTimeout(codexTitleTimer);
       setTabStatus(tabId, null);
       resizeObserver.disconnect();
       onDataDisposable.dispose();
