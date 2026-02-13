@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useSettingsStore } from "../stores/settingsStore";
 import { DEFAULT_SETTINGS, ThemeName, SyntaxThemeName } from "../types";
 import { THEME_OPTIONS, SYNTAX_THEME_OPTIONS } from "../lib/themes";
@@ -32,6 +32,8 @@ const FONT_OPTIONS = [
   { label: "Fira Code", value: "'Fira Code', 'Consolas', monospace" },
   { label: "JetBrains Mono", value: "'JetBrains Mono', 'Consolas', monospace" },
 ];
+
+const DEFAULT_MIC_OPTIONS = [{ label: "system default", value: "default" }];
 
 /* ------------------------------------------------------------------ */
 /*  Custom Stepper — text +/-                                         */
@@ -78,11 +80,13 @@ function Stepper({
 /*  Custom Select — ASCII > trigger, * for selected                   */
 /* ------------------------------------------------------------------ */
 function CustomSelect<T extends string>({
+  className,
   value,
   options,
   renderOption,
   onChange,
 }: {
+  className?: string;
   value: T;
   options: Array<{ label: string; value: T }>;
   renderOption?: (opt: { label: string; value: T }) => React.ReactNode;
@@ -104,7 +108,7 @@ function CustomSelect<T extends string>({
   }, [open]);
 
   return (
-    <div className="settings-select" ref={ref}>
+    <div className={`settings-select${className ? ` ${className}` : ""}`} ref={ref}>
       <button
         className="settings-select-trigger"
         onClick={() => setOpen(!open)}
@@ -122,12 +126,14 @@ function CustomSelect<T extends string>({
                 onChange(opt.value);
                 setOpen(false);
               }}
-            >
-              <span className="settings-select-option-marker">
-                {opt.value === value ? "*" : " "}
-              </span>
-              {renderOption ? renderOption(opt) : opt.label}
-            </button>
+              >
+                <span className="settings-select-option-marker">
+                  {opt.value === value ? "*" : " "}
+                </span>
+                <span className="settings-select-option-content">
+                  {renderOption ? renderOption(opt) : opt.label}
+                </span>
+              </button>
           ))}
         </div>
       )}
@@ -167,6 +173,54 @@ function TerminalPreview() {
 /* ------------------------------------------------------------------ */
 export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
   const { settings, update } = useSettingsStore();
+  const [micOptions, setMicOptions] = useState(DEFAULT_MIC_OPTIONS);
+  const [micStatus, setMicStatus] = useState<string | null>(null);
+
+  const refreshMicrophones = useCallback(async () => {
+    if (!navigator.mediaDevices?.enumerateDevices) {
+      setMicOptions(DEFAULT_MIC_OPTIONS);
+      setMicStatus("microphone list unavailable");
+      return;
+    }
+
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const audioInputs = devices.filter((d) => d.kind === "audioinput");
+      const seen = new Set<string>();
+      const nextOptions = [...DEFAULT_MIC_OPTIONS];
+
+      for (let i = 0; i < audioInputs.length; i += 1) {
+        const device = audioInputs[i];
+        if (!device.deviceId || device.deviceId === "default") continue;
+        if (seen.has(device.deviceId)) continue;
+        seen.add(device.deviceId);
+        const label = device.label?.trim() || `microphone ${nextOptions.length}`;
+        nextOptions.push({ label, value: device.deviceId });
+      }
+
+      setMicOptions(nextOptions);
+      setMicStatus(nextOptions.length > 1 ? null : "only system default detected");
+
+      if (!nextOptions.some((opt) => opt.value === settings.voiceMicDeviceId)) {
+        await update({ voiceMicDeviceId: "default" });
+      }
+    } catch {
+      setMicOptions(DEFAULT_MIC_OPTIONS);
+      setMicStatus("unable to load microphones");
+    }
+  }, [settings.voiceMicDeviceId, update]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    void refreshMicrophones();
+
+    if (!navigator.mediaDevices?.addEventListener) return;
+    const onDeviceChange = () => {
+      void refreshMicrophones();
+    };
+    navigator.mediaDevices.addEventListener("devicechange", onDeviceChange);
+    return () => navigator.mediaDevices.removeEventListener("devicechange", onDeviceChange);
+  }, [isOpen, refreshMicrophones]);
 
   if (!isOpen) return null;
 
@@ -251,6 +305,28 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
           </div>
 
           <div className="settings-section">
+            <div className="settings-section-title">~voice</div>
+            <div className="settings-row">
+              <div className="settings-row-label">
+                <span className="settings-row-name">microphone</span>
+              </div>
+              <CustomSelect
+                className="settings-select--mic"
+                value={settings.voiceMicDeviceId}
+                options={micOptions}
+                onChange={(v) => update({ voiceMicDeviceId: v })}
+              />
+            </div>
+            {micStatus && (
+              <div className="settings-row">
+                <div className="settings-row-label">
+                  <span className="settings-row-name">{micStatus}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="settings-section">
             <div className="settings-section-title">~hotkeys</div>
             <div className="settings-row">
               <div className="settings-row-label">
@@ -275,6 +351,12 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                 <span className="settings-row-name">commit</span>
               </div>
               <kbd className="settings-hotkey-kbd">ctrl+enter</kbd>
+            </div>
+            <div className="settings-row">
+              <div className="settings-row-label">
+                <span className="settings-row-name">voice-to-text</span>
+              </div>
+              <kbd className="settings-hotkey-kbd">ctrl+space</kbd>
             </div>
           </div>
 

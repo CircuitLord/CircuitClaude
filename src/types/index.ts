@@ -165,6 +165,7 @@ export interface Settings {
   sidebarPanelMode: "source" | "files";
   notesPanelOpen: boolean;
   notesPanelWidth: number;
+  voiceMicDeviceId: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -176,4 +177,5 @@ export const DEFAULT_SETTINGS: Settings = {
   sidebarPanelMode: "source",
   notesPanelOpen: false,
   notesPanelWidth: 350,
+  voiceMicDeviceId: "default",
 };

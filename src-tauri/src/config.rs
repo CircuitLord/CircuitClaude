@@ -67,6 +67,10 @@ fn default_sidebar_panel_mode() -> String {
     "source".to_string()
 }
 
+fn default_voice_mic_device_id() -> String {
+    "default".to_string()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SettingsConfig {
@@ -84,6 +88,8 @@ pub struct SettingsConfig {
     pub sidebar_panel_mode: String,
     #[serde(default)]
     pub notes_panel_open: bool,
+    #[serde(default = "default_voice_mic_device_id")]
+    pub voice_mic_device_id: String,
 }
 
 fn settings_path(app_handle: &tauri::AppHandle) -> PathBuf {

@@ -1217,6 +1217,9 @@ body,
   background: var(--bg-elevated);
   border-top: 1px solid var(--border-subtle);
   pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   animation: status-line-in 0s step-end forwards;
 }
 
@@ -1520,7 +1523,7 @@ body,
   border-radius: 2px;
   width: 480px;
   max-width: calc(100vw - 32px);
-  overflow: hidden;
+  overflow: visible;
 }
 
 .settings-dialog-header {
@@ -1634,13 +1637,15 @@ body,
 .settings-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   height: 36px;
   padding: 0 12px 0 36px;
+  gap: 12px;
 }
 
 .settings-row-label {
   flex-shrink: 0;
+  flex: 1;
+  min-width: 0;
 }
 
 .settings-row-name {
@@ -1754,12 +1759,21 @@ body,
 
 .settings-select {
   position: relative;
+  min-width: 180px;
+  max-width: 100%;
+  flex-shrink: 0;
+}
+
+.settings-select--mic {
+  min-width: 180px;
+  max-width: min(240px, 46vw);
 }
 
 .settings-select-trigger {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 6px;
+  max-width: 100%;
   padding: 0;
   background: transparent;
   border: none;
@@ -1769,6 +1783,7 @@ body,
   cursor: pointer;
   white-space: nowrap;
   transition: color 0.1s;
+  margin-left: auto;
 }
 
 .settings-select-trigger:hover {
@@ -1782,16 +1797,41 @@ body,
   font-size: 13px;
 }
 
+.settings-select-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .settings-select-dropdown {
   position: absolute;
   top: calc(100% + 4px);
   right: 0;
   min-width: 100%;
+  max-width: min(280px, 60vw);
   background: var(--bg-surface);
   border: 1px solid var(--border-visible);
   border-radius: 2px;
   padding: 2px 0;
   z-index: 10;
+}
+
+.settings-select--mic .settings-select-trigger {
+  width: 100%;
+  margin-left: 0;
+}
+
+.settings-select--mic .settings-select-dropdown {
+  width: 100%;
+  max-width: none;
+  bottom: calc(100% + 4px);
+  top: auto;
+}
+
+.settings-select--mic .settings-select-option {
+  white-space: normal;
+  word-break: break-word;
 }
 
 .settings-select-option {
@@ -1824,6 +1864,13 @@ body,
   width: 1ch;
   flex-shrink: 0;
   color: var(--accent-text);
+}
+
+.settings-select-option-content {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* --- Segmented Control --- */

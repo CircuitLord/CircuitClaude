@@ -8,6 +8,7 @@ import { spawnSession, spawnShell, spawnOpencode, spawnCodex, writeSession, resi
 import { useSessionStore } from "../stores/sessionStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useProjectStore } from "../stores/projectStore";
+import { useVoiceStore } from "../stores/voiceStore";
 import { THEMES } from "../lib/themes";
 import { regenerateCodexTitle } from "../lib/codexTitles";
 import { PtyOutputEvent, SessionType } from "../types";
@@ -70,8 +71,11 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
   const projectTheme = useProjectStore(
     (s) => s.projects.find((p) => p.path === projectPath)?.theme ?? "midnight"
   );
+  const voiceStatusMessage = useVoiceStore((s) => s.statusMessage);
+  const voiceTargetTabId = useVoiceStore((s) => s.targetTabId);
   const [showCopied, setShowCopied] = useState(false);
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const statusLineMessage = voiceTargetTabId === tabId ? voiceStatusMessage : null;
 
   useEffect(() => {
     if (!containerRef.current || initializedRef.current) return;
@@ -340,9 +344,11 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
         </div>
       )}
       <div className="terminal-container" ref={containerRef} />
-      {showCopied && (
+      {statusLineMessage ? (
+        <div className="terminal-status-line">{statusLineMessage}</div>
+      ) : showCopied ? (
         <div className="terminal-status-line">copied to clipboard</div>
-      )}
+      ) : null}
     </div>
   );
 }
