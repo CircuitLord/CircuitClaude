@@ -8,6 +8,7 @@ import { writeSession } from "../lib/pty";
 import { voiceInputController, type VoiceInputState } from "../lib/voiceInput";
 import { useVoiceStore } from "../stores/voiceStore";
 import { useSettingsStore } from "../stores/settingsStore";
+import type { SessionType } from "../types";
 
 function isCtrlSpaceHotkey(e: KeyboardEvent): boolean {
   return (
@@ -30,6 +31,7 @@ export function useHotkeys() {
   const voiceMicDeviceId = useSettingsStore((s) => s.settings.voiceMicDeviceId);
   const voiceTargetTabIdRef = useRef<string | null>(null);
   const voiceTargetSessionIdRef = useRef<string | null>(null);
+  const voiceTargetSessionTypeRef = useRef<SessionType | null>(null);
   const voiceStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastInterimRef = useRef("");
   const voicePreviewRef = useRef("");
@@ -74,14 +76,31 @@ export function useHotkeys() {
   }
 
   function queuePreviewUpdate(sessionId: string, nextPreview: string) {
+    if (voiceTargetSessionTypeRef.current === "claude") {
+      const prev = voicePreviewRef.current;
+      if (nextPreview === prev) return;
+      // Claude input editing is less deterministic with control chars; only append forward growth.
+      if (!nextPreview.startsWith(prev)) return;
+      const delta = nextPreview.slice(prev.length);
+      const token = previewWriteTokenRef.current;
+      voicePreviewRef.current = nextPreview;
+      queueWrite(sessionId, delta, token);
+      return;
+    }
+
     const prev = voicePreviewRef.current;
     if (prev === nextPreview) return;
     const prefixLen = commonPrefixLength(prev, nextPreview);
-    const backspaces = "\b".repeat(prev.length - prefixLen);
+    const charsToDelete = prev.length - prefixLen;
     const appended = nextPreview.slice(prefixLen);
+    let patchText = appended;
+    if (charsToDelete > 0) {
+      const backspaces = "\b".repeat(charsToDelete);
+      patchText = `${backspaces}${" ".repeat(charsToDelete)}${backspaces}${appended}`;
+    }
     const token = previewWriteTokenRef.current;
     voicePreviewRef.current = nextPreview;
-    queueWrite(sessionId, backspaces + appended, token);
+    queueWrite(sessionId, patchText, token);
   }
 
   useEffect(() => {
@@ -121,8 +140,6 @@ export function useHotkeys() {
         if (targetSessionId) {
           queuePreviewUpdate(targetSessionId, normalized);
         }
-        const clipped = normalized.length > 140 ? `${normalized.slice(0, 137)}...` : normalized;
-        useVoiceStore.getState().setStatus(`hearing: ${clipped}`, targetTabId);
       },
       onFinalTranscript: (transcript: string) => {
         const targetTabId = voiceTargetTabIdRef.current;
@@ -134,6 +151,7 @@ export function useHotkeys() {
         lastInterimRef.current = "";
         voiceTargetTabIdRef.current = null;
         voiceTargetSessionIdRef.current = null;
+        voiceTargetSessionTypeRef.current = null;
 
         const normalized = transcript.trim();
         if (!normalized) {
@@ -181,6 +199,7 @@ export function useHotkeys() {
         }
         voiceTargetTabIdRef.current = null;
         voiceTargetSessionIdRef.current = null;
+        voiceTargetSessionTypeRef.current = null;
         useVoiceStore.getState().setError(message, targetTabId);
         clearVoiceStatusAfter();
       },
@@ -197,6 +216,7 @@ export function useHotkeys() {
         voiceStatusTimerRef.current = null;
       }
       voicePreviewRef.current = "";
+      voiceTargetSessionTypeRef.current = null;
       stopBySubmitRef.current = false;
       stopEditingAfterStopRef.current = false;
       invalidatePendingPreviewWrites();
@@ -268,6 +288,7 @@ export function useHotkeys() {
         invalidatePendingPreviewWrites();
         voiceTargetTabIdRef.current = active.id;
         voiceTargetSessionIdRef.current = active.sessionId;
+        voiceTargetSessionTypeRef.current = active.sessionType;
         stopBySubmitRef.current = false;
         stopEditingAfterStopRef.current = false;
         useVoiceStore.getState().setStatus("starting microphone...", active.id);
