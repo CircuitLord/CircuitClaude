@@ -13,7 +13,6 @@ export function spawnNewSession(type: SessionType = "claude") {
     projectName: name,
     projectPath: activeProjectPath,
     sessionId: null,
-    claudeSessionId: type === "claude" ? crypto.randomUUID() : undefined,
     createdAt: Date.now(),
     sessionType: type,
   });

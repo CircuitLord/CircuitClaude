@@ -1,8 +1,11 @@
 import { create } from "zustand";
-import { readClaudeMd, saveClaudeMd } from "../lib/config";
+import { readClaudeMd, saveClaudeMd, readAgentsMd, saveAgentsMd } from "../lib/config";
+
+type FileKind = "claude" | "agents";
 
 interface ClaudeMdState {
   isOpen: boolean;
+  fileKind: FileKind;
   projectPath: string | undefined; // undefined = global
   filePath: string;
   content: string;
@@ -10,6 +13,7 @@ interface ClaudeMdState {
   loading: boolean;
   error: string | null;
   open: (projectPath?: string) => void;
+  openAgents: (projectPath?: string) => void;
   close: () => void;
   setContent: (content: string) => void;
   save: () => Promise<void>;
@@ -17,6 +21,7 @@ interface ClaudeMdState {
 
 export const useClaudeMdStore = create<ClaudeMdState>((set, get) => ({
   isOpen: false,
+  fileKind: "claude",
   projectPath: undefined,
   filePath: "",
   content: "",
@@ -25,9 +30,19 @@ export const useClaudeMdStore = create<ClaudeMdState>((set, get) => ({
   error: null,
 
   open: async (projectPath?: string) => {
-    set({ isOpen: true, loading: true, error: null, projectPath });
+    set({ isOpen: true, fileKind: "claude", loading: true, error: null, projectPath });
     try {
       const result = await readClaudeMd(projectPath);
+      set({ filePath: result.path, content: result.content, loading: false });
+    } catch (e) {
+      set({ error: String(e), loading: false });
+    }
+  },
+
+  openAgents: async (projectPath?: string) => {
+    set({ isOpen: true, fileKind: "agents", loading: true, error: null, projectPath });
+    try {
+      const result = await readAgentsMd(projectPath);
       set({ filePath: result.path, content: result.content, loading: false });
     } catch (e) {
       set({ error: String(e), loading: false });
@@ -43,10 +58,14 @@ export const useClaudeMdStore = create<ClaudeMdState>((set, get) => ({
   },
 
   save: async () => {
-    const { projectPath, content } = get();
+    const { fileKind, projectPath, content } = get();
     set({ saving: true, error: null });
     try {
-      await saveClaudeMd(projectPath, content);
+      if (fileKind === "agents") {
+        await saveAgentsMd(projectPath, content);
+      } else {
+        await saveClaudeMd(projectPath, content);
+      }
       set({ saving: false });
     } catch (e) {
       set({ error: String(e), saving: false });

@@ -278,6 +278,40 @@ fn resolve_claude_md_path(project_path: Option<String>) -> Result<std::path::Pat
     }
 }
 
+#[tauri::command]
+pub fn read_agents_md(project_path: Option<String>) -> Result<ClaudeMdFile, String> {
+    let path = resolve_agents_md_path(project_path)?;
+
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    if !path.exists() {
+        std::fs::write(&path, "").map_err(|e| e.to_string())?;
+    }
+
+    let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    Ok(ClaudeMdFile {
+        path: path.to_string_lossy().to_string(),
+        content,
+    })
+}
+
+#[tauri::command]
+pub fn save_agents_md(project_path: Option<String>, content: String) -> Result<(), String> {
+    let path = resolve_agents_md_path(project_path)?;
+    std::fs::write(&path, content).map_err(|e| e.to_string())
+}
+
+fn resolve_agents_md_path(project_path: Option<String>) -> Result<std::path::PathBuf, String> {
+    if let Some(pp) = project_path {
+        Ok(std::path::PathBuf::from(pp).join("agents.md"))
+    } else {
+        dirs::home_dir()
+            .ok_or_else(|| "Could not find home directory".to_string())
+            .map(|h| h.join(".claude").join("agents.md"))
+    }
+}
+
 #[derive(serde::Serialize)]
 pub struct ClaudeMdFile {
     pub path: String,

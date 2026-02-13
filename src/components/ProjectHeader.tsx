@@ -8,6 +8,7 @@ import { NewSessionMenu } from "./NewSessionMenu";
 export function ProjectHeader() {
   const { activeProjectPath, sessions } = useSessionStore();
   const openClaudeMdEditor = useClaudeMdStore((s) => s.open);
+  const openAgentsMdEditor = useClaudeMdStore((s) => s.openAgents);
   const notesOpen = useNotesStore((s) => s.isOpen);
   const toggleNotes = useNotesStore((s) => s.toggle);
   const { projects } = useProjectStore();
@@ -30,6 +31,13 @@ export function ProjectHeader() {
           title="Open project CLAUDE.md"
         >
           :claude.md
+        </button>
+        <button
+          className="project-header-text-btn"
+          onClick={() => openAgentsMdEditor(activeProjectPath)}
+          title="Open project agents.md"
+        >
+          :agents.md
         </button>
       </div>
       <div className="project-header-actions">

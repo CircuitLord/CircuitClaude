@@ -1,8 +1,6 @@
 import { useSessionStore } from "../stores/sessionStore";
 import { TerminalView } from "./TerminalView";
 import { NewSessionMenu } from "./NewSessionMenu";
-import { killSession } from "../lib/pty";
-
 interface TerminalTabsProps {
   projectPath: string;
 }
@@ -22,15 +20,7 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
   const activeInProject = allVisible.find((s) => s.id === activeSessionId);
   const visibleSessionId = activeInProject?.id ?? agentSessions[0]?.id ?? shellSessions[0]?.id ?? null;
 
-  async function handleCloseSession(id: string) {
-    const session = projectSessions.find((s) => s.id === id);
-    if (session?.sessionId) {
-      try {
-        await killSession(session.sessionId);
-      } catch {
-        // Session may already be dead
-      }
-    }
+  function handleCloseSession(id: string) {
     removeSession(id);
   }
 
@@ -97,7 +87,6 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
               projectPath={s.projectPath}
               projectName={s.projectName}
               sessionType={s.sessionType}
-              claudeSessionId={s.claudeSessionId}
               hideTitleBar
               onClose={() => handleCloseSession(s.id)}
             />

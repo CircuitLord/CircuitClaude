@@ -41,17 +41,24 @@ interface TerminalViewProps {
   projectPath: string;
   projectName: string;
   sessionType: SessionType;
-  claudeSessionId?: string;
   hideTitleBar?: boolean;
   onClose: () => void;
 }
 
-export function TerminalView({ tabId, projectPath, projectName, sessionType, claudeSessionId, hideTitleBar, onClose }: TerminalViewProps) {
+const DEBUG_PTY_LIFECYCLE = false;
+
+function logPtyLifecycle(message: string, details?: Record<string, unknown>) {
+  if (!DEBUG_PTY_LIFECYCLE) return;
+  console.debug("[TerminalView]", message, details ?? {});
+}
+
+export function TerminalView({ tabId, projectPath, projectName, sessionType, hideTitleBar, onClose }: TerminalViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const [title, setTitle] = useState(projectName);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const sessionIdRef = useRef<string | null>(null);
+  const spawnGenerationRef = useRef(0);
   const initializedRef = useRef(false);
   const updateSessionPtyId = useSessionStore((s) => s.updateSessionPtyId);
   const setSessionTitle = useSessionStore((s) => s.setSessionTitle);
@@ -68,11 +75,13 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, cla
   useEffect(() => {
     if (!containerRef.current || initializedRef.current) return;
     initializedRef.current = true;
+    const spawnGeneration = ++spawnGenerationRef.current;
     let cleanedUp = false;
     let titleChangedDuringWrite = false;
     let titleResetTimer: ReturnType<typeof setTimeout> | null = null;
     let activityTimer: ReturnType<typeof setTimeout> | null = null;
     let lastUserInputTime = 0;
+    logPtyLifecycle("mount:init", { tabId, sessionType, projectPath, spawnGeneration });
 
     const currentSettings = useSettingsStore.getState().settings;
     const currentProjectTheme = useProjectStore.getState().projects.find((p) => p.path === projectPath)?.theme ?? "midnight";
@@ -106,6 +115,7 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, cla
 
       const channel = new Channel<PtyOutputEvent>();
       channel.onmessage = (event: PtyOutputEvent) => {
+        if (cleanedUp || spawnGenerationRef.current !== spawnGeneration) return;
         if (event.type === "Data" && Array.isArray(event.data)) {
           const bytes = new Uint8Array(event.data);
           titleChangedDuringWrite = false;
@@ -156,22 +166,24 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, cla
       } else if (sessionType === "opencode") {
         spawnPromise = spawnOpencode(projectPath, cols, rows, channel);
       } else {
-        spawnPromise = spawnSession(projectPath, cols, rows, channel, {
-          claudeSessionId: claudeSessionId,
-        });
+        // Normal Claude tabs should not force --session-id; explicit resume/attach flows can opt in separately.
+        spawnPromise = spawnSession(projectPath, cols, rows, channel);
       }
 
       spawnPromise
         .then((sid) => {
-          if (cleanedUp) {
+          if (cleanedUp || spawnGenerationRef.current !== spawnGeneration) {
+            logPtyLifecycle("spawn:stale", { tabId, spawnGeneration, sid });
             killSession(sid).catch(() => {});
             return;
           }
+          logPtyLifecycle("spawn:ready", { tabId, spawnGeneration, sid });
           sessionIdRef.current = sid;
           updateSessionPtyId(tabId, sid);
         })
         .catch((err) => {
-          if (!cleanedUp) {
+          if (!cleanedUp && spawnGenerationRef.current === spawnGeneration) {
+            logPtyLifecycle("spawn:error", { tabId, spawnGeneration, error: String(err) });
             const label =
               sessionType === "shell"
                 ? "shell"
@@ -243,6 +255,9 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, cla
 
     return () => {
       cleanedUp = true;
+      logPtyLifecycle("mount:cleanup:start", { tabId, spawnGeneration });
+      const ownedSessionId = sessionIdRef.current;
+      sessionIdRef.current = null;
       if (titleResetTimer) clearTimeout(titleResetTimer);
       if (activityTimer) clearTimeout(activityTimer);
       setTabStatus(tabId, null);
@@ -252,15 +267,16 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, cla
       onTitleDisposable.dispose();
       onSelectionDisposable.dispose();
       if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
-      if (sessionIdRef.current) {
-        killSession(sessionIdRef.current).catch(() => {});
-        sessionIdRef.current = null;
+      if (ownedSessionId) {
+        logPtyLifecycle("session:kill", { tabId, spawnGeneration, sid: ownedSessionId });
+        killSession(ownedSessionId).catch(() => {});
       }
       terminal.dispose();
       initializedRef.current = false;
+      logPtyLifecycle("mount:cleanup:done", { tabId, spawnGeneration });
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectPath, tabId, sessionType, claudeSessionId]);
+  }, [projectPath, tabId, sessionType]);
 
   // Re-fit and focus when this session becomes active
   useEffect(() => {

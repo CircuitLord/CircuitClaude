@@ -75,9 +75,13 @@ export function ClaudeMdEditor() {
 
   if (!isOpen) return null;
 
-  const fileName = filePath.includes(".claude")
-    ? "~/.claude/CLAUDE.md"
-    : filePath.replace(/\\/g, "/").split("/").slice(-2).join("/");
+  const fileName = filePath.endsWith("agents.md")
+    ? filePath.includes("/.claude/agents.md") || filePath.includes("\\.claude\\agents.md")
+      ? "~/.claude/agents.md"
+      : filePath.replace(/\\/g, "/").split("/").slice(-2).join("/")
+    : filePath.includes(".claude")
+      ? "~/.claude/CLAUDE.md"
+      : filePath.replace(/\\/g, "/").split("/").slice(-2).join("/");
 
   return (
     <div className="dialog-overlay" onMouseDown={close}>

@@ -42,9 +42,18 @@ impl PtyManager {
         on_output: Channel<PtyOutputEvent>,
     ) -> Result<SessionId, String> {
         let mut cmd = CommandBuilder::new("cmd.exe");
-        if let Some(ref id) = resume_session_id {
+        let resume_id = resume_session_id
+            .as_deref()
+            .map(str::trim)
+            .filter(|id| !id.is_empty());
+        let explicit_session_id = claude_session_id
+            .as_deref()
+            .map(str::trim)
+            .filter(|id| !id.is_empty());
+
+        if let Some(id) = resume_id {
             cmd.args(["/c", "claude", "--resume", id]);
-        } else if let Some(ref id) = claude_session_id {
+        } else if let Some(id) = explicit_session_id {
             cmd.args(["/c", "claude", "--session-id", id]);
         } else if continue_session {
             cmd.args(["/c", "claude", "--continue"]);
@@ -153,7 +162,7 @@ impl PtyManager {
 
         self.sessions
             .lock()
-            .unwrap()
+            .map_err(|e| format!("Lock poisoned in spawn: {}", e))?
             .insert(session_id.clone(), session);
 
         // Spawn reader thread
@@ -190,7 +199,8 @@ impl PtyManager {
     }
 
     pub fn write(&self, session_id: &str, data: &[u8]) -> Result<(), String> {
-        let mut sessions = self.sessions.lock().unwrap();
+        let mut sessions = self.sessions.lock()
+            .map_err(|e| format!("Lock poisoned in write: {}", e))?;
         let session = sessions
             .get_mut(session_id)
             .ok_or_else(|| format!("Session not found: {}", session_id))?;
@@ -205,7 +215,8 @@ impl PtyManager {
     }
 
     pub fn resize(&self, session_id: &str, cols: u16, rows: u16) -> Result<(), String> {
-        let sessions = self.sessions.lock().unwrap();
+        let sessions = self.sessions.lock()
+            .map_err(|e| format!("Lock poisoned in resize: {}", e))?;
         let session = sessions
             .get(session_id)
             .ok_or_else(|| format!("Session not found: {}", session_id))?;
@@ -221,22 +232,30 @@ impl PtyManager {
     }
 
     pub fn kill(&self, session_id: &str) -> Result<(), String> {
-        let mut sessions = self.sessions.lock().unwrap();
-        if let Some(mut session) = sessions.remove(session_id) {
-            session
-                .child
-                .kill()
-                .map_err(|e| format!("Kill failed: {}", e))
+        let removed = {
+            let mut sessions = self.sessions.lock()
+                .map_err(|e| format!("Lock poisoned in kill: {}", e))?;
+            sessions.remove(session_id)
+        };
+        // Dropped outside the lock — ConPTY cleanup can't poison the mutex
+        if let Some(mut session) = removed {
+            session.child.kill().map_err(|e| format!("Kill failed: {}", e))
         } else {
             Ok(()) // Already removed
         }
     }
 
     pub fn kill_all(&self) {
-        let mut sessions = self.sessions.lock().unwrap();
-        for (_, mut session) in sessions.drain() {
+        let drained: Vec<PtySession> = {
+            let mut guard = self.sessions.lock().unwrap_or_else(|poisoned| {
+                // Best-effort recovery at shutdown — drain even if poisoned
+                poisoned.into_inner()
+            });
+            guard.drain().map(|(_, s)| s).collect()
+        };
+        // Drop sessions outside the lock — ConPTY cleanup can't poison the mutex
+        for mut session in drained {
             let _ = session.child.kill();
-            // Dropping session closes master PTY handle → kills process tree
         }
     }
 }

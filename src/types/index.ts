@@ -13,7 +13,7 @@ export interface TerminalSession {
   projectName: string;
   projectPath: string;
   sessionId: string | null; // PTY session ID from Rust
-  claudeSessionId?: string; // UUID passed to Claude CLI via --session-id / --resume
+  claudeSessionId?: string; // Optional explicit Claude session ID for resume/attach workflows
   createdAt: number;
   sessionType: SessionType;
 }
