@@ -2370,8 +2370,8 @@ body,
 .terminal-tabs-bar-wrapper {
   display: flex;
   align-items: stretch;
-  height: 36px;
-  min-height: 36px;
+  height: 40px;
+  min-height: 40px;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border-subtle);
   user-select: none;
@@ -2413,6 +2413,11 @@ body,
 .terminal-tab:hover {
   background: var(--bg-elevated);
   color: var(--text-primary);
+}
+
+.terminal-tab:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
 }
 
 .terminal-tab--active {
@@ -2475,6 +2480,12 @@ body,
 
 .terminal-tab-close {
   display: none;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  line-height: 1;
   color: var(--text-tertiary);
   font-size: 13px;
   cursor: pointer;

@@ -513,6 +513,39 @@ pub fn read_directory(
 }
 
 #[tauri::command]
+pub fn save_clipboard_image(
+    app_handle: tauri::AppHandle,
+    data: Vec<u8>,
+    mime_type: String,
+) -> Result<String, String> {
+    let ext = match mime_type.as_str() {
+        "image/png" => "png",
+        "image/jpeg" | "image/jpg" => "jpg",
+        "image/gif" => "gif",
+        "image/webp" => "webp",
+        "image/bmp" => "bmp",
+        _ => "png",
+    };
+
+    let dir = config::screenshots_dir(&app_handle);
+    std::fs::create_dir_all(&dir).map_err(|e| format!("Failed to create screenshots dir: {}", e))?;
+
+    let now = chrono::Local::now();
+    let base_name = now.format("screenshot_%Y-%m-%d_%H%M%S").to_string();
+    let mut path = dir.join(format!("{}.{}", base_name, ext));
+
+    if path.exists() {
+        let suffix = uuid::Uuid::new_v4().to_string();
+        let short = &suffix[..8];
+        path = dir.join(format!("{}_{}.{}", base_name, short, ext));
+    }
+
+    std::fs::write(&path, &data).map_err(|e| format!("Failed to write screenshot: {}", e))?;
+
+    Ok(path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
 pub fn exit_app(app_handle: tauri::AppHandle) {
     app_handle.exit(0);
 }

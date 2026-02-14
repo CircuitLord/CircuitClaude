@@ -91,6 +91,10 @@ export function killAllSessions(): Promise<void> {
   return invoke("kill_all_sessions");
 }
 
+export function saveClipboardImage(data: number[], mimeType: string): Promise<string> {
+  return invoke<string>("save_clipboard_image", { data, mimeType });
+}
+
 export function exitApp(): Promise<void> {
   return invoke("exit_app");
 }

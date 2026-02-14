@@ -15,7 +15,7 @@ pub struct ProjectConfig {
     pub theme: String,
 }
 
-fn config_dir(app_handle: &tauri::AppHandle) -> PathBuf {
+pub(crate) fn config_dir(app_handle: &tauri::AppHandle) -> PathBuf {
     let dir = app_handle.path().app_config_dir().unwrap_or_else(|_| {
         dirs::config_dir()
             .unwrap_or_else(|| PathBuf::from("."))
@@ -23,6 +23,23 @@ fn config_dir(app_handle: &tauri::AppHandle) -> PathBuf {
     });
     fs::create_dir_all(&dir).ok();
     dir
+}
+
+pub(crate) fn screenshots_dir(app_handle: &tauri::AppHandle) -> PathBuf {
+    config_dir(app_handle).join("screenshots")
+}
+
+pub(crate) fn cleanup_old_screenshots(app_handle: &tauri::AppHandle) {
+    let dir = screenshots_dir(app_handle);
+    let Ok(entries) = fs::read_dir(&dir) else { return };
+    let cutoff = std::time::SystemTime::now() - std::time::Duration::from_secs(7 * 24 * 60 * 60);
+    for entry in entries.flatten() {
+        let Ok(meta) = entry.metadata() else { continue };
+        let Ok(modified) = meta.modified() else { continue };
+        if modified < cutoff {
+            let _ = fs::remove_file(entry.path());
+        }
+    }
 }
 
 fn config_path(app_handle: &tauri::AppHandle) -> PathBuf {

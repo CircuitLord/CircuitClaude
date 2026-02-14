@@ -53,29 +53,52 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       const removed = state.sessions.find((s) => s.id === id);
       const sessions = state.sessions.filter((s) => s.id !== id);
       let activeSessionId = state.activeSessionId;
+
       if (state.activeSessionId === id) {
         if (removed) {
-          const sameProjectSessions = sessions.filter(s => s.projectPath === removed.projectPath);
-          activeSessionId = sameProjectSessions.length > 0
-            ? sameProjectSessions[sameProjectSessions.length - 1].id
-            : null;
+          const sameProjectBeforeRemoval = state.sessions.filter((s) => s.projectPath === removed.projectPath);
+          const removedProjectIndex = sameProjectBeforeRemoval.findIndex((s) => s.id === id);
+          const fallback =
+            sameProjectBeforeRemoval[removedProjectIndex - 1]
+            ?? sameProjectBeforeRemoval[removedProjectIndex + 1]
+            ?? null;
+          activeSessionId = fallback?.id ?? null;
         } else {
           activeSessionId = null;
         }
       }
+
       const activeProjectPath = state.activeProjectPath;
       const tabStatuses = new Map(state.tabStatuses);
       tabStatuses.delete(id);
       const sessionTitles = new Map(state.sessionTitles);
       sessionTitles.delete(id);
-      // Clean up per-project mapping if the removed session was the remembered one
       const projectActiveSessionIds = new Map(state.projectActiveSessionIds);
+
       if (removed) {
-        const savedId = projectActiveSessionIds.get(removed.projectPath);
-        if (savedId === id) {
-          projectActiveSessionIds.delete(removed.projectPath);
+        const remainingProjectSessions = sessions.filter((s) => s.projectPath === removed.projectPath);
+        const rememberedId = projectActiveSessionIds.get(removed.projectPath);
+
+        if (rememberedId === id) {
+          const replacementId =
+            remainingProjectSessions.find((s) => s.id === activeSessionId)?.id
+            ?? remainingProjectSessions[0]?.id
+            ?? null;
+
+          if (replacementId) {
+            projectActiveSessionIds.set(removed.projectPath, replacementId);
+          } else {
+            projectActiveSessionIds.delete(removed.projectPath);
+          }
+        } else if (
+          activeProjectPath === removed.projectPath
+          && activeSessionId
+          && remainingProjectSessions.some((s) => s.id === activeSessionId)
+        ) {
+          projectActiveSessionIds.set(removed.projectPath, activeSessionId);
         }
       }
+
       return { sessions, activeSessionId, activeProjectPath, tabStatuses, sessionTitles, projectActiveSessionIds };
     }),
 

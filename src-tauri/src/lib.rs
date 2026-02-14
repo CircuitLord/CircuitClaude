@@ -77,6 +77,7 @@ pub fn run() {
             commands::read_agents_md,
             commands::save_agents_md,
             commands::read_directory,
+            commands::save_clipboard_image,
             commands::exit_app,
         ])
         .build(tauri::generate_context!())
@@ -87,6 +88,7 @@ pub fn run() {
                 pty_manager.kill_all();
                 let claude_manager = app.state::<claude_manager::ClaudeManager>();
                 claude_manager.destroy_all();
+                config::cleanup_old_screenshots(&app.app_handle());
             }
         });
 }

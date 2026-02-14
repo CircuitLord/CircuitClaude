@@ -4,7 +4,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { Channel } from "@tauri-apps/api/core";
-import { spawnSession, spawnShell, spawnOpencode, spawnCodex, writeSession, resizeSession, killSession } from "../lib/pty";
+import { spawnSession, spawnShell, spawnOpencode, spawnCodex, writeSession, resizeSession, killSession, saveClipboardImage } from "../lib/pty";
 import { useSessionStore } from "../stores/sessionStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useProjectStore } from "../stores/projectStore";
@@ -24,14 +24,16 @@ function hasClearScreen(data: Uint8Array): boolean {
   return false;
 }
 
-/** Check if any of the last N lines near the cursor contain "Chat about this" */
+/** Check if any of the last N lines near the cursor contain an interactive prompt indicator */
 function hasQuestionPrompt(terminal: Terminal): boolean {
   const buf = terminal.buffer.active;
   const cursorY = buf.baseY + buf.cursorY;
-  const startY = Math.max(0, cursorY - 4);
+  const startY = Math.max(0, cursorY - 11);
   for (let y = startY; y <= cursorY; y++) {
     const line = buf.getLine(y);
-    if (line && line.translateToString(true).includes("Chat about this")) {
+    if (!line) continue;
+    const text = line.translateToString(true);
+    if (text.includes("Would you like to proceed?") || text.includes("Chat about this")) {
       return true;
     }
   }
@@ -75,10 +77,13 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
   const voiceTargetTabId = useVoiceStore((s) => s.targetTabId);
   const [showCopied, setShowCopied] = useState(false);
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [screenshotStatus, setScreenshotStatus] = useState<string | null>(null);
+  const screenshotTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const statusLineMessage = voiceTargetTabId === tabId ? voiceStatusMessage : null;
 
   useEffect(() => {
     if (!containerRef.current || initializedRef.current) return;
+    const containerEl = containerRef.current;
     initializedRef.current = true;
     const spawnGeneration = ++spawnGenerationRef.current;
     let cleanedUp = false;
@@ -122,7 +127,7 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
     const fitAddon = new FitAddon();
     terminal.loadAddon(fitAddon);
     terminal.loadAddon(new WebLinksAddon());
-    terminal.open(containerRef.current);
+    terminal.open(containerEl);
 
     try {
       const webglAddon = new WebglAddon();
@@ -277,6 +282,102 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
       }
     });
 
+    const showScreenshotStatus = (message: string) => {
+      setScreenshotStatus(message);
+      if (screenshotTimerRef.current) clearTimeout(screenshotTimerRef.current);
+      screenshotTimerRef.current = setTimeout(() => setScreenshotStatus(null), 2000);
+    };
+
+    const pasteImageBlob = async (imageBlob: Blob, mimeType: string) => {
+      const sid = sessionIdRef.current;
+      if (!sid) {
+        showScreenshotStatus("no active session");
+        return;
+      }
+
+      const buffer = await imageBlob.arrayBuffer();
+      const data = Array.from(new Uint8Array(buffer));
+      const filePath = await saveClipboardImage(data, mimeType);
+      const encoder = new TextEncoder();
+      await writeSession(sid, encoder.encode(filePath));
+      showScreenshotStatus("screenshot pasted");
+    };
+
+    const handleClipboardPaste = async (clipboardEvent?: ClipboardEvent) => {
+      let imageBlob: Blob | null = null;
+      let mimeType = "";
+
+      const eventItems = clipboardEvent?.clipboardData?.items;
+      if (eventItems) {
+        for (const item of eventItems) {
+          if (item.type.startsWith("image/")) {
+            const file = item.getAsFile();
+            if (file) {
+              imageBlob = file;
+              mimeType = item.type;
+              break;
+            }
+          }
+        }
+      }
+
+      if (!imageBlob && navigator.clipboard && typeof navigator.clipboard.read === "function") {
+        try {
+          const items = await navigator.clipboard.read();
+          for (const item of items) {
+            for (const type of item.types) {
+              if (type.startsWith("image/")) {
+                imageBlob = await item.getType(type);
+                mimeType = type;
+                break;
+              }
+            }
+            if (imageBlob) break;
+          }
+        } catch {
+          // Ignore and fall back to text clipboard APIs below.
+        }
+      }
+
+      if (imageBlob) {
+        await pasteImageBlob(imageBlob, mimeType || "image/png");
+        return;
+      }
+
+      let text = clipboardEvent?.clipboardData?.getData("text/plain") ?? "";
+      if (!text) {
+        try {
+          text = await navigator.clipboard.readText();
+        } catch {
+          text = "";
+        }
+      }
+      if (text) terminal.paste(text);
+    };
+
+    const onPaste = (ev: ClipboardEvent) => {
+      ev.preventDefault();
+      void handleClipboardPaste(ev);
+    };
+    containerEl.addEventListener("paste", onPaste);
+
+    // Intercept paste key bindings so image data can be captured before xterm
+    // does its default text-only paste path.
+    terminal.attachCustomKeyEventHandler((ev) => {
+      const isPasteShortcut = ev.type === "keydown"
+        && !ev.altKey
+        && (
+          ((ev.ctrlKey || ev.metaKey) && ev.code === "KeyV")
+          || (ev.shiftKey && ev.code === "Insert")
+        );
+
+      if (isPasteShortcut) {
+        void handleClipboardPaste();
+        return false;
+      }
+      return true;
+    });
+
     // ResizeObserver for container size changes
     const resizeObserver = new ResizeObserver((entries) => {
       const entry = entries[0];
@@ -291,10 +392,24 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
       cleanedUp = true;
       logPtyLifecycle("mount:cleanup:start", { tabId, spawnGeneration });
       const ownedSessionId = sessionIdRef.current;
+      const latestStoreSessionId = useSessionStore
+        .getState()
+        .sessions
+        .find((session) => session.id === tabId)
+        ?.sessionId ?? null;
+      if (ownedSessionId && latestStoreSessionId && latestStoreSessionId !== ownedSessionId) {
+        logPtyLifecycle("cleanup:session-mismatch", {
+          tabId,
+          spawnGeneration,
+          ownedSessionId,
+          latestStoreSessionId,
+        });
+      }
       sessionIdRef.current = null;
       if (titleResetTimer) clearTimeout(titleResetTimer);
       if (activityTimer) clearTimeout(activityTimer);
       if (codexTitleTimer) clearTimeout(codexTitleTimer);
+      containerEl.removeEventListener("paste", onPaste);
       setTabStatus(tabId, null);
       resizeObserver.disconnect();
       onDataDisposable.dispose();
@@ -302,6 +417,7 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
       onTitleDisposable.dispose();
       onSelectionDisposable.dispose();
       if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+      if (screenshotTimerRef.current) clearTimeout(screenshotTimerRef.current);
       if (ownedSessionId) {
         logPtyLifecycle("session:kill", { tabId, spawnGeneration, sid: ownedSessionId });
         killSession(ownedSessionId).catch(() => {});
@@ -346,6 +462,8 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
       <div className="terminal-container" ref={containerRef} />
       {statusLineMessage ? (
         <div className="terminal-status-line">{statusLineMessage}</div>
+      ) : screenshotStatus ? (
+        <div className="terminal-status-line">{screenshotStatus}</div>
       ) : showCopied ? (
         <div className="terminal-status-line">copied to clipboard</div>
       ) : null}

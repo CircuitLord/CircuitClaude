@@ -9,6 +9,9 @@ interface VoiceInputHandlers {
 }
 
 const DEFAULT_LANG = "en-US";
+const RESTART_BASE_MS = 300;
+const RESTART_MAX_MS = 2000;
+const RECOVERY_STATUS_MESSAGE = "recovering microphone...";
 
 function normalizeTranscript(value: string): string {
   return value.replace(/\s+/g, " ").trim();
@@ -31,14 +34,28 @@ function mapSpeechError(error: SpeechRecognitionErrorCode): string {
   }
 }
 
+function isRecoverableSpeechError(error: SpeechRecognitionErrorCode): boolean {
+  switch (error) {
+    case "aborted":
+    case "network":
+    case "no-speech":
+      return true;
+    default:
+      return false;
+  }
+}
+
 export class VoiceInputController {
   private recognition: SpeechRecognition | null = null;
   private micStream: MediaStream | null = null;
+  private restartTimer: ReturnType<typeof setTimeout> | null = null;
   private handlers: VoiceInputHandlers = {};
   private finalSegments: string[] = [];
   private stopRequested = false;
+  private sessionActive = false;
   private selectedDeviceId = "default";
   private starting = false;
+  private restartAttempt = 0;
   private state: VoiceInputState = "idle";
 
   configureHandlers(handlers: VoiceInputHandlers): void {
@@ -50,7 +67,7 @@ export class VoiceInputController {
   }
 
   isListening(): boolean {
-    return this.state === "listening";
+    return this.state === "listening" || (this.sessionActive && !this.stopRequested);
   }
 
   setDeviceId(deviceId: string | null | undefined): void {
@@ -58,19 +75,67 @@ export class VoiceInputController {
   }
 
   async start(): Promise<boolean> {
-    if (this.state === "listening" || this.starting) return true;
+    if (this.sessionActive || this.starting || this.state === "listening") return true;
+    if (!this.getCtor()) {
+      this.updateState("unsupported");
+      this.handlers.onError?.("voice unavailable on this system");
+      return false;
+    }
+    this.clearRestartTimer();
+    this.detachRecognition();
+    this.cleanupMicStream();
+    this.finalSegments = [];
+    this.stopRequested = false;
+    this.sessionActive = true;
+    this.restartAttempt = 0;
+
+    return this.startRecognition(false);
+  }
+
+  stop(): void {
+    this.starting = false;
+    if (!this.sessionActive && !this.recognition && !this.restartTimer) return;
+    this.stopRequested = true;
+    this.sessionActive = false;
+    this.clearRestartTimer();
+    this.updateState("processing");
+
+    if (this.recognition) {
+      try {
+        this.recognition.stop();
+        return;
+      } catch {
+        this.stopRequested = false;
+        this.finalSegments = [];
+        this.detachRecognition();
+        this.cleanupMicStream();
+        this.updateState("idle");
+        this.handlers.onError?.("unable to stop voice capture");
+        return;
+      }
+    }
+
+    const finalized = normalizeTranscript(this.finalSegments.join(" "));
+    this.stopRequested = false;
+    this.finalSegments = [];
+    this.detachRecognition();
+    this.cleanupMicStream();
+    this.handlers.onFinalTranscript?.(finalized);
+    this.updateState("idle");
+  }
+
+  private async startRecognition(isRecoveryStart: boolean): Promise<boolean> {
     const Ctor = this.getCtor();
     if (!Ctor) {
+      this.sessionActive = false;
       this.updateState("unsupported");
       this.handlers.onError?.("voice unavailable on this system");
       return false;
     }
     this.starting = true;
-
+    this.clearRestartTimer();
     this.detachRecognition();
     this.cleanupMicStream();
-    this.finalSegments = [];
-    this.stopRequested = false;
 
     const recognition = new Ctor();
     recognition.continuous = true;
@@ -87,6 +152,7 @@ export class VoiceInputController {
           preferredTrack = await this.getPreferredAudioTrack();
         } catch (err) {
           this.starting = false;
+          this.sessionActive = false;
           this.updateState("error");
           this.handlers.onError?.(String(err));
           return false;
@@ -96,6 +162,7 @@ export class VoiceInputController {
 
     recognition.onstart = () => {
       this.starting = false;
+      this.restartAttempt = 0;
       this.updateState("listening");
     };
 
@@ -118,6 +185,21 @@ export class VoiceInputController {
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       this.starting = false;
+      if (!this.sessionActive) return;
+      if (isRecoverableSpeechError(event.error)) {
+        this.handlers.onInfo?.(RECOVERY_STATUS_MESSAGE);
+        try {
+          recognition.stop();
+        } catch {
+          this.detachRecognition();
+          this.cleanupMicStream();
+          this.scheduleRestart();
+        }
+        return;
+      }
+      this.stopRequested = false;
+      this.sessionActive = false;
+      this.clearRestartTimer();
       this.updateState("error");
       this.handlers.onError?.(mapSpeechError(event.error));
     };
@@ -128,10 +210,27 @@ export class VoiceInputController {
       const shouldEmitTranscript = this.stopRequested;
       this.detachRecognition();
       this.cleanupMicStream();
+
       if (shouldEmitTranscript) {
+        this.stopRequested = false;
+        this.sessionActive = false;
+        this.clearRestartTimer();
+        this.finalSegments = [];
         this.handlers.onFinalTranscript?.(finalized);
+        this.updateState("idle");
+        return;
       }
-      this.updateState("idle");
+
+      if (!this.sessionActive) {
+        this.stopRequested = false;
+        this.finalSegments = [];
+        this.clearRestartTimer();
+        this.updateState("idle");
+        return;
+      }
+
+      this.handlers.onInfo?.(RECOVERY_STATUS_MESSAGE);
+      this.scheduleRestart();
     };
 
     try {
@@ -146,24 +245,15 @@ export class VoiceInputController {
       this.starting = false;
       this.detachRecognition();
       this.cleanupMicStream();
+      if (isRecoveryStart && this.sessionActive) {
+        this.handlers.onInfo?.(RECOVERY_STATUS_MESSAGE);
+        this.scheduleRestart();
+        return false;
+      }
+      this.sessionActive = false;
       this.updateState("error");
       this.handlers.onError?.("unable to start voice capture");
       return false;
-    }
-  }
-
-  stop(): void {
-    this.starting = false;
-    if (!this.recognition) return;
-    this.stopRequested = true;
-    this.updateState("processing");
-    try {
-      this.recognition.stop();
-    } catch {
-      this.detachRecognition();
-      this.cleanupMicStream();
-      this.updateState("idle");
-      this.handlers.onError?.("unable to stop voice capture");
     }
   }
 
@@ -187,6 +277,24 @@ export class VoiceInputController {
       track.stop();
     }
     this.micStream = null;
+  }
+
+  private clearRestartTimer(): void {
+    if (!this.restartTimer) return;
+    clearTimeout(this.restartTimer);
+    this.restartTimer = null;
+  }
+
+  private scheduleRestart(): void {
+    if (!this.sessionActive || this.stopRequested) return;
+    this.clearRestartTimer();
+    const delayMs = Math.min(RESTART_BASE_MS * 2 ** this.restartAttempt, RESTART_MAX_MS);
+    this.restartAttempt += 1;
+    this.restartTimer = setTimeout(() => {
+      this.restartTimer = null;
+      if (!this.sessionActive || this.stopRequested) return;
+      void this.startRecognition(true);
+    }, delayMs);
   }
 
   private async getPreferredAudioTrack(): Promise<MediaStreamTrack | undefined> {
