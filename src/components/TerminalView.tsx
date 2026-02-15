@@ -230,13 +230,6 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
     });
 
     // User input → PTY
-    // Let Ctrl+V pass through to the browser so the native paste event fires
-    terminal.attachCustomKeyEventHandler((ev) => {
-      if (ev.ctrlKey && !ev.shiftKey && !ev.altKey && ev.key === "v") {
-        return false;
-      }
-      return true;
-    });
 
     const onDataDisposable = terminal.onData((data) => {
       lastUserInputTime = Date.now();
@@ -363,11 +356,13 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
       if (text) terminal.paste(text);
     };
 
-    const onPaste = (ev: ClipboardEvent) => {
+    const onPasteCapture = (ev: ClipboardEvent) => {
+      // Handle all paste inputs in one place (keyboard and context menu) before xterm.
       ev.preventDefault();
+      ev.stopPropagation();
       void handleClipboardPaste(ev);
     };
-    containerEl.addEventListener("paste", onPaste);
+    containerEl.addEventListener("paste", onPasteCapture, true);
 
     // ResizeObserver for container size changes
     const resizeObserver = new ResizeObserver((entries) => {
@@ -400,7 +395,7 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
       if (titleResetTimer) clearTimeout(titleResetTimer);
       if (activityTimer) clearTimeout(activityTimer);
       if (codexTitleTimer) clearTimeout(codexTitleTimer);
-      containerEl.removeEventListener("paste", onPaste);
+      containerEl.removeEventListener("paste", onPasteCapture, true);
       setTabStatus(tabId, null);
       resizeObserver.disconnect();
       onDataDisposable.dispose();
