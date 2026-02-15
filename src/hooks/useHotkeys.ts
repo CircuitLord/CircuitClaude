@@ -76,17 +76,6 @@ export function useHotkeys() {
   }
 
   function queuePreviewUpdate(sessionId: string, nextPreview: string) {
-    if (voiceTargetSessionTypeRef.current === "claude") {
-      const prev = voicePreviewRef.current;
-      if (nextPreview === prev) return;
-      // Claude input editing is less deterministic with control chars; only append forward growth.
-      if (!nextPreview.startsWith(prev)) return;
-      const delta = nextPreview.slice(prev.length);
-      const token = previewWriteTokenRef.current;
-      voicePreviewRef.current = nextPreview;
-      queueWrite(sessionId, delta, token);
-      return;
-    }
 
     const prev = voicePreviewRef.current;
     if (prev === nextPreview) return;

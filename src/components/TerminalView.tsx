@@ -230,6 +230,14 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
     });
 
     // User input → PTY
+    // Let Ctrl+V pass through to the browser so the native paste event fires
+    terminal.attachCustomKeyEventHandler((ev) => {
+      if (ev.ctrlKey && !ev.shiftKey && !ev.altKey && ev.key === "v") {
+        return false;
+      }
+      return true;
+    });
+
     const onDataDisposable = terminal.onData((data) => {
       lastUserInputTime = Date.now();
       // Clear "waiting" status when user types
@@ -360,23 +368,6 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
       void handleClipboardPaste(ev);
     };
     containerEl.addEventListener("paste", onPaste);
-
-    // Intercept paste key bindings so image data can be captured before xterm
-    // does its default text-only paste path.
-    terminal.attachCustomKeyEventHandler((ev) => {
-      const isPasteShortcut = ev.type === "keydown"
-        && !ev.altKey
-        && (
-          ((ev.ctrlKey || ev.metaKey) && ev.code === "KeyV")
-          || (ev.shiftKey && ev.code === "Insert")
-        );
-
-      if (isPasteShortcut) {
-        void handleClipboardPaste();
-        return false;
-      }
-      return true;
-    });
 
     // ResizeObserver for container size changes
     const resizeObserver = new ResizeObserver((entries) => {
