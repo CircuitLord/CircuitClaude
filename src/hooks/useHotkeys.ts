@@ -66,29 +66,15 @@ export function useHotkeys() {
       .catch(() => {});
   }
 
-  function commonPrefixLength(a: string, b: string): number {
-    const max = Math.min(a.length, b.length);
-    let i = 0;
-    while (i < max && a[i] === b[i]) {
-      i += 1;
-    }
-    return i;
-  }
-
   function queuePreviewUpdate(sessionId: string, nextPreview: string) {
 
     const prev = voicePreviewRef.current;
-    if (prev === nextPreview) return;
-    const prefixLen = commonPrefixLength(prev, nextPreview);
-    const charsToDelete = prev.length - prefixLen;
-    const appended = nextPreview.slice(prefixLen);
-    let patchText = appended;
-    if (charsToDelete > 0) {
-      const backspaces = "\b".repeat(charsToDelete);
-      patchText = `${backspaces}${" ".repeat(charsToDelete)}${backspaces}${appended}`;
-    }
+    if (nextPreview.length <= prev.length) return;
+    // Append-only mode: never rewrite previously inserted preview text.
+    const patchText = nextPreview.slice(prev.length);
     const token = previewWriteTokenRef.current;
-    voicePreviewRef.current = nextPreview;
+    if (!patchText) return;
+    voicePreviewRef.current = prev + patchText;
     queueWrite(sessionId, patchText, token);
   }
 
@@ -119,9 +105,9 @@ export function useHotkeys() {
             useVoiceStore.getState().setListening(targetTabId);
             lastInterimRef.current = "";
           }
-          if (targetSessionId) {
-            queuePreviewUpdate(targetSessionId, "");
-          }
+          // Ignore transient empty interim packets. Some recognizers emit
+          // empty frames during rescoring/restarts; clearing here can wipe
+          // the full draft before the next non-empty interim arrives.
           return;
         }
         if (normalized === lastInterimRef.current) return;

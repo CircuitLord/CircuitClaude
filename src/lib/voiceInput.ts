@@ -50,7 +50,10 @@ export class VoiceInputController {
   private micStream: MediaStream | null = null;
   private restartTimer: ReturnType<typeof setTimeout> | null = null;
   private handlers: VoiceInputHandlers = {};
-  private finalSegments: string[] = [];
+  private committedFinalSegments: string[] = [];
+  private activeSegmentsByIndex: string[] = [];
+  private activeFinalizedIndices: Set<number> = new Set();
+  private lastLiveTranscript = "";
   private stopRequested = false;
   private sessionActive = false;
   private selectedDeviceId = "default";
@@ -84,7 +87,7 @@ export class VoiceInputController {
     this.clearRestartTimer();
     this.detachRecognition();
     this.cleanupMicStream();
-    this.finalSegments = [];
+    this.resetTranscriptState();
     this.stopRequested = false;
     this.sessionActive = true;
     this.restartAttempt = 0;
@@ -106,7 +109,7 @@ export class VoiceInputController {
         return;
       } catch {
         this.stopRequested = false;
-        this.finalSegments = [];
+        this.resetTranscriptState();
         this.detachRecognition();
         this.cleanupMicStream();
         this.updateState("idle");
@@ -115,9 +118,9 @@ export class VoiceInputController {
       }
     }
 
-    const finalized = normalizeTranscript(this.finalSegments.join(" "));
+    const finalized = this.buildFinalTranscript();
     this.stopRequested = false;
-    this.finalSegments = [];
+    this.resetTranscriptState();
     this.detachRecognition();
     this.cleanupMicStream();
     this.handlers.onFinalTranscript?.(finalized);
@@ -167,19 +170,40 @@ export class VoiceInputController {
     };
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
-      const interimSegments: string[] = [];
+      // Keep active segments index-addressed because Web Speech mutates prior
+      // results by index (`resultIndex`) during pauses and rescoring.
+      if (event.results.length < this.activeSegmentsByIndex.length) {
+        this.activeSegmentsByIndex.length = event.results.length;
+        this.activeFinalizedIndices.forEach((idx) => {
+          if (idx >= event.results.length) {
+            this.activeFinalizedIndices.delete(idx);
+          }
+        });
+      }
+
       for (let i = event.resultIndex; i < event.results.length; i += 1) {
         const result = event.results[i];
         const transcript = result[0]?.transcript ?? "";
         const normalized = normalizeTranscript(transcript);
-        if (!normalized) continue;
+        this.activeSegmentsByIndex[i] = normalized;
         if (result.isFinal) {
-          this.finalSegments.push(normalized);
+          this.activeFinalizedIndices.add(i);
         } else {
-          interimSegments.push(normalized);
+          this.activeFinalizedIndices.delete(i);
         }
       }
-      const liveTranscript = normalizeTranscript([...this.finalSegments, ...interimSegments].join(" "));
+
+      const liveTranscript = this.buildLiveTranscript();
+      if (
+        import.meta.env.DEV &&
+        this.lastLiveTranscript &&
+        liveTranscript &&
+        !liveTranscript.startsWith(this.lastLiveTranscript) &&
+        !this.lastLiveTranscript.startsWith(liveTranscript)
+      ) {
+        console.debug("[voice] transcript re-aligned from recognizer results");
+      }
+      this.lastLiveTranscript = liveTranscript;
       this.handlers.onInterimTranscript?.(liveTranscript);
     };
 
@@ -206,7 +230,7 @@ export class VoiceInputController {
 
     recognition.onend = () => {
       this.starting = false;
-      const finalized = normalizeTranscript(this.finalSegments.join(" "));
+      const finalized = this.buildFinalTranscript();
       const shouldEmitTranscript = this.stopRequested;
       this.detachRecognition();
       this.cleanupMicStream();
@@ -215,7 +239,7 @@ export class VoiceInputController {
         this.stopRequested = false;
         this.sessionActive = false;
         this.clearRestartTimer();
-        this.finalSegments = [];
+        this.resetTranscriptState();
         this.handlers.onFinalTranscript?.(finalized);
         this.updateState("idle");
         return;
@@ -223,12 +247,13 @@ export class VoiceInputController {
 
       if (!this.sessionActive) {
         this.stopRequested = false;
-        this.finalSegments = [];
+        this.resetTranscriptState();
         this.clearRestartTimer();
         this.updateState("idle");
         return;
       }
 
+      this.commitActiveFinalSegments();
       this.handlers.onInfo?.(RECOVERY_STATUS_MESSAGE);
       this.scheduleRestart();
     };
@@ -260,6 +285,38 @@ export class VoiceInputController {
   private updateState(state: VoiceInputState): void {
     this.state = state;
     this.handlers.onStateChange?.(state);
+  }
+
+  private commitActiveFinalSegments(): void {
+    const ordered = [...this.activeFinalizedIndices].sort((a, b) => a - b);
+    for (const idx of ordered) {
+      const text = this.activeSegmentsByIndex[idx] ?? "";
+      if (!text) continue;
+      this.committedFinalSegments.push(text);
+    }
+    this.activeSegmentsByIndex = [];
+    this.activeFinalizedIndices.clear();
+    this.lastLiveTranscript = this.buildLiveTranscript();
+  }
+
+  private buildLiveTranscript(): string {
+    const activeSegments = this.activeSegmentsByIndex.filter((segment) => segment.length > 0);
+    return normalizeTranscript([...this.committedFinalSegments, ...activeSegments].join(" "));
+  }
+
+  private buildFinalTranscript(): string {
+    const finalizedActiveSegments = [...this.activeFinalizedIndices]
+      .sort((a, b) => a - b)
+      .map((idx) => this.activeSegmentsByIndex[idx] ?? "")
+      .filter((segment) => segment.length > 0);
+    return normalizeTranscript([...this.committedFinalSegments, ...finalizedActiveSegments].join(" "));
+  }
+
+  private resetTranscriptState(): void {
+    this.committedFinalSegments = [];
+    this.activeSegmentsByIndex = [];
+    this.activeFinalizedIndices.clear();
+    this.lastLiveTranscript = "";
   }
 
   private detachRecognition(): void {
