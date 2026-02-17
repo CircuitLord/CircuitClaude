@@ -31,11 +31,15 @@ pub(crate) fn screenshots_dir(app_handle: &tauri::AppHandle) -> PathBuf {
 
 pub(crate) fn cleanup_old_screenshots(app_handle: &tauri::AppHandle) {
     let dir = screenshots_dir(app_handle);
-    let Ok(entries) = fs::read_dir(&dir) else { return };
+    let Ok(entries) = fs::read_dir(&dir) else {
+        return;
+    };
     let cutoff = std::time::SystemTime::now() - std::time::Duration::from_secs(7 * 24 * 60 * 60);
     for entry in entries.flatten() {
         let Ok(meta) = entry.metadata() else { continue };
-        let Ok(modified) = meta.modified() else { continue };
+        let Ok(modified) = meta.modified() else {
+            continue;
+        };
         if modified < cutoff {
             let _ = fs::remove_file(entry.path());
         }

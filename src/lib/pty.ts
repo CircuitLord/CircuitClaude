@@ -1,94 +1,85 @@
 import { invoke, Channel } from "@tauri-apps/api/core";
-import { PtyOutputEvent } from "../types";
+import { PtyOutputEvent, SessionType } from "../types";
 
-export function spawnSession(
-  projectPath: string,
-  cols: number,
-  rows: number,
-  onOutput: Channel<PtyOutputEvent>,
-  options?: {
-    claudeSessionId?: string;
-  }
-): Promise<string> {
-  return invoke<string>("spawn_session", {
-    projectPath,
-    cols,
-    rows,
-    claudeSessionId: options?.claudeSessionId ?? null,
-    resumeSessionId: null,
-    continueSession: false,
-    onOutput,
-  });
+export interface CreatePtySessionRequest {
+  projectPath: string;
+  cols: number;
+  rows: number;
+  sessionType: SessionType;
+  claudeSessionId?: string;
+  resumeSessionId?: string;
+  continueSession?: boolean;
 }
 
-export function spawnShell(
-  projectPath: string,
-  cols: number,
-  rows: number,
-  onOutput: Channel<PtyOutputEvent>,
-): Promise<string> {
-  return invoke<string>("spawn_shell", {
-    projectPath,
-    cols,
-    rows,
-    onOutput,
-  });
+export interface CreatePtySessionResponse {
+  sessionId: string;
 }
 
-export function spawnOpencode(
-  projectPath: string,
-  cols: number,
-  rows: number,
-  onOutput: Channel<PtyOutputEvent>,
-): Promise<string> {
-  return invoke<string>("spawn_opencode", {
-    projectPath,
-    cols,
-    rows,
-    continueSession: false,
-    onOutput,
-  });
+export interface AttachPtySessionStreamResponse {
+  subscriberId: string;
+  lastSeq: number;
 }
 
-export function spawnCodex(
-  projectPath: string,
-  cols: number,
-  rows: number,
-  onOutput: Channel<PtyOutputEvent>,
-): Promise<string> {
-  return invoke<string>("spawn_codex", {
-    projectPath,
-    cols,
-    rows,
-    continueSession: false,
-    onOutput,
-  });
+export interface PtySessionInfo {
+  sessionId: string;
+  sessionType: string;
+  state: "running" | "exited" | "closing" | "closed";
+  subscribers: number;
+  startedAtMs: number;
+  lastSeq: number;
+  lastExitCode: number | null;
 }
 
-export function writeSession(
+export function createPtySession(
+  request: CreatePtySessionRequest,
+): Promise<CreatePtySessionResponse> {
+  return invoke<CreatePtySessionResponse>("create_pty_session", { request });
+}
+
+export function attachPtySessionStream(
   sessionId: string,
-  data: Uint8Array
+  onOutput: Channel<PtyOutputEvent>,
+  replayFromSeq?: number | null,
+): Promise<AttachPtySessionStreamResponse> {
+  return invoke<AttachPtySessionStreamResponse>("attach_pty_session_stream", {
+    sessionId,
+    replayFromSeq: replayFromSeq ?? null,
+    onOutput,
+  });
+}
+
+export function detachPtySessionStream(
+  sessionId: string,
+  subscriberId: string,
 ): Promise<void> {
-  return invoke("write_session", {
+  return invoke("detach_pty_session_stream", { sessionId, subscriberId });
+}
+
+export function writePtySession(sessionId: string, data: Uint8Array): Promise<void> {
+  return invoke("write_pty_session", {
     sessionId,
     data: Array.from(data),
   });
 }
 
-export function resizeSession(
+export function resizePtySession(
   sessionId: string,
   cols: number,
-  rows: number
+  rows: number,
 ): Promise<void> {
-  return invoke("resize_session", { sessionId, cols, rows });
+  return invoke("resize_pty_session", { sessionId, cols, rows });
 }
 
-export function killSession(sessionId: string): Promise<void> {
-  return invoke("kill_session", { sessionId });
+export function closePtySession(sessionId: string): Promise<void> {
+  return invoke("close_pty_session", { sessionId });
 }
 
-export function killAllSessions(): Promise<void> {
-  return invoke("kill_all_sessions");
+export function closeAllPtySessions(): Promise<void> {
+  return invoke("close_all_pty_sessions");
+}
+
+export function getPtySessionInfo(sessionId: string): Promise<PtySessionInfo> {
+  return invoke<PtySessionInfo>("get_pty_session_info", { sessionId });
 }
 
 export function saveClipboardImage(data: number[], mimeType: string): Promise<string> {

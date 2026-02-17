@@ -4,7 +4,15 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { Channel } from "@tauri-apps/api/core";
-import { spawnSession, spawnShell, spawnOpencode, spawnCodex, writeSession, resizeSession, killSession, saveClipboardImage } from "../lib/pty";
+import {
+  attachPtySessionStream,
+  closePtySession,
+  createPtySession,
+  detachPtySessionStream,
+  saveClipboardImage,
+  resizePtySession,
+  writePtySession,
+} from "../lib/pty";
 import { useSessionStore } from "../stores/sessionStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useProjectStore } from "../stores/projectStore";
@@ -13,16 +21,6 @@ import { THEMES } from "../lib/themes";
 import { regenerateCodexTitle } from "../lib/codexTitles";
 import { PtyOutputEvent, SessionType } from "../types";
 import "@xterm/xterm/css/xterm.css";
-
-/** Scan raw PTY bytes for ESC[2J (clear entire screen) */
-function hasClearScreen(data: Uint8Array): boolean {
-  for (let i = 0; i + 3 < data.length; i++) {
-    if (data[i] === 0x1b && data[i + 1] === 0x5b && data[i + 2] === 0x32 && data[i + 3] === 0x4a) {
-      return true;
-    }
-  }
-  return false;
-}
 
 /** Check if any of the last N lines near the cursor contain an interactive prompt indicator */
 function hasQuestionPrompt(terminal: Terminal): boolean {
@@ -59,9 +57,11 @@ function logPtyLifecycle(message: string, details?: Record<string, unknown>) {
 export function TerminalView({ tabId, projectPath, projectName, sessionType, hideTitleBar, onClose }: TerminalViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
-  const [title, setTitle] = useState(projectName);
+  const persistedTitle = useSessionStore((s) => s.sessionTitles.get(tabId) ?? projectName);
+  const [title, setTitle] = useState(persistedTitle);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const sessionIdRef = useRef<string | null>(null);
+  const subscriberIdRef = useRef<string | null>(null);
   const spawnGenerationRef = useRef(0);
   const initializedRef = useRef(false);
   const updateSessionPtyId = useSessionStore((s) => s.updateSessionPtyId);
@@ -82,13 +82,15 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
   const statusLineMessage = voiceTargetTabId === tabId ? voiceStatusMessage : null;
 
   useEffect(() => {
+    setTitle(persistedTitle);
+  }, [persistedTitle]);
+
+  useEffect(() => {
     if (!containerRef.current || initializedRef.current) return;
     const containerEl = containerRef.current;
     initializedRef.current = true;
     const spawnGeneration = ++spawnGenerationRef.current;
     let cleanedUp = false;
-    let titleChangedDuringWrite = false;
-    let titleResetTimer: ReturnType<typeof setTimeout> | null = null;
     let activityTimer: ReturnType<typeof setTimeout> | null = null;
     let codexTitleTimer: ReturnType<typeof setTimeout> | null = null;
     let codexSpawnedAtMs: number | null = null;
@@ -143,31 +145,17 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
     fitAddonRef.current = fitAddon;
     requestAnimationFrame(() => {
       fitAddon.fit();
-
       const channel = new Channel<PtyOutputEvent>();
       channel.onmessage = (event: PtyOutputEvent) => {
         if (cleanedUp || spawnGenerationRef.current !== spawnGeneration) return;
-        if (event.type === "Data" && Array.isArray(event.data)) {
-          const bytes = new Uint8Array(event.data);
-          titleChangedDuringWrite = false;
+        if (event.type === "Data") {
+          const bytes = new Uint8Array(event.data.bytes);
           terminal.write(bytes);
-          // When screen is cleared (e.g. /clear), reset title to project name
-          // unless a new OSC title already arrived in the same data chunk
-          if (hasClearScreen(bytes) && !titleChangedDuringWrite) {
-            if (titleResetTimer) clearTimeout(titleResetTimer);
-            titleResetTimer = setTimeout(() => {
-              setTitle(projectName);
-              setSessionTitle(tabId, projectName);
-              titleResetTimer = null;
-            }, 150);
-          }
-          // Activity detection: only trigger if data isn't just PTY echo from user typing
           const timeSinceInput = Date.now() - lastUserInputTime;
           if (timeSinceInput > 150) {
             setTabStatus(tabId, "thinking");
             if (activityTimer) clearTimeout(activityTimer);
             activityTimer = setTimeout(() => {
-              // Output settled — check if there's a question prompt
               if (hasQuestionPrompt(terminal)) {
                 setTabStatus(tabId, "waiting");
               } else {
@@ -178,69 +166,77 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
           }
         } else if (event.type === "Exit") {
           terminal.write("\r\n\x1b[90m[Process exited]\x1b[0m\r\n");
-          if (titleResetTimer) clearTimeout(titleResetTimer);
           if (activityTimer) { clearTimeout(activityTimer); activityTimer = null; }
           setTabStatus(tabId, null);
-          setTitle(projectName);
-          setSessionTitle(tabId, projectName);
+        } else if (event.type === "Closed") {
+          terminal.write(`\r\n\x1b[90m[Session closed: ${event.data.reason}]\x1b[0m\r\n`);
+          if (activityTimer) { clearTimeout(activityTimer); activityTimer = null; }
+          setTabStatus(tabId, null);
+        } else if (event.type === "Error") {
+          terminal.write(`\r\n\x1b[31m${event.data.message}\x1b[0m\r\n`);
         }
       };
 
       const cols = terminal.cols;
       const rows = terminal.rows;
 
-      let spawnPromise: Promise<string>;
-      if (sessionType === "shell") {
-        spawnPromise = spawnShell(projectPath, cols, rows, channel);
-      } else if (sessionType === "codex") {
-        codexSpawnedAtMs = Date.now();
-        spawnPromise = spawnCodex(projectPath, cols, rows, channel);
-      } else if (sessionType === "opencode") {
-        spawnPromise = spawnOpencode(projectPath, cols, rows, channel);
-      } else {
-        // Normal Claude tabs should not force --session-id; explicit resume/attach flows can opt in separately.
-        spawnPromise = spawnSession(projectPath, cols, rows, channel);
-      }
+      const ensureSessionAndAttach = async () => {
+        let sid = useSessionStore
+          .getState()
+          .sessions
+          .find((session) => session.id === tabId)
+          ?.sessionId ?? null;
 
-      spawnPromise
-        .then((sid) => {
+        if (!sid) {
+          if (sessionType === "codex") {
+            codexSpawnedAtMs = Date.now();
+          }
+          const created = await createPtySession({
+            projectPath,
+            cols,
+            rows,
+            sessionType,
+            continueSession: false,
+          });
+          sid = created.sessionId;
           if (cleanedUp || spawnGenerationRef.current !== spawnGeneration) {
-            logPtyLifecycle("spawn:stale", { tabId, spawnGeneration, sid });
-            killSession(sid).catch(() => {});
+            void closePtySession(sid).catch(() => {});
             return;
           }
-          logPtyLifecycle("spawn:ready", { tabId, spawnGeneration, sid });
-          sessionIdRef.current = sid;
           updateSessionPtyId(tabId, sid);
-        })
-        .catch((err) => {
-          if (!cleanedUp && spawnGenerationRef.current === spawnGeneration) {
-            logPtyLifecycle("spawn:error", { tabId, spawnGeneration, error: String(err) });
-            const label =
-              sessionType === "shell"
-                ? "shell"
-                : sessionType === "opencode"
-                  ? "opencode session"
-                  : sessionType === "codex"
-                    ? "codex session"
-                    : "Claude session";
-            terminal.write(`\r\n\x1b[31mFailed to spawn ${label}: ${err}\x1b[0m\r\n`);
-          }
-        });
-    });
+        } else if (sessionType === "codex") {
+          codexSpawnedAtMs = Date.now();
+        }
 
-    // User input → PTY
+        if (cleanedUp || spawnGenerationRef.current !== spawnGeneration) return;
+        sessionIdRef.current = sid;
+        const attached = await attachPtySessionStream(sid, channel, null);
+        if (cleanedUp || spawnGenerationRef.current !== spawnGeneration) {
+          void detachPtySessionStream(sid, attached.subscriberId).catch(() => {});
+          return;
+        }
+        subscriberIdRef.current = attached.subscriberId;
+        void resizePtySession(sid, terminal.cols, terminal.rows).catch(() => {});
+        logPtyLifecycle("stream:attached", { tabId, spawnGeneration, sid, subscriberId: attached.subscriberId });
+      };
+
+      ensureSessionAndAttach().catch((err) => {
+        if (!cleanedUp && spawnGenerationRef.current === spawnGeneration) {
+          logPtyLifecycle("attach:error", { tabId, spawnGeneration, error: String(err) });
+          terminal.write(`\r\n\x1b[31mFailed to initialize terminal session: ${err}\x1b[0m\r\n`);
+        }
+      });
+    });
 
     const onDataDisposable = terminal.onData((data) => {
       lastUserInputTime = Date.now();
-      // Clear "waiting" status when user types
       const currentStatus = useSessionStore.getState().tabStatuses.get(tabId);
       if (currentStatus === "waiting") {
         setTabStatus(tabId, null);
       }
       if (sessionIdRef.current) {
         const encoder = new TextEncoder();
-        writeSession(sessionIdRef.current, encoder.encode(data)).catch(() => {});
+        writePtySession(sessionIdRef.current, encoder.encode(data)).catch(() => {});
       }
       if (sessionType === "codex" && (data.includes("\r") || data.includes("\n"))) {
         if (codexTitleTimer) clearTimeout(codexTitleTimer);
@@ -251,26 +247,18 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
       }
     });
 
-    // Resize handling
     const onResizeDisposable = terminal.onResize(({ cols, rows }) => {
       if (sessionIdRef.current) {
-        resizeSession(sessionIdRef.current, cols, rows).catch(() => {});
+        resizePtySession(sessionIdRef.current, cols, rows).catch(() => {});
       }
     });
 
-    // Terminal title changes
-    const onTitleDisposable = terminal.onTitleChange((t) => {
-      titleChangedDuringWrite = true;
-      if (titleResetTimer) {
-        clearTimeout(titleResetTimer);
-        titleResetTimer = null;
-      }
-      const clean = t.replace(/^[^\x20-\x7E]+\s*/, '').trim() || t;
+    const onTitleDisposable = terminal.onTitleChange((nextTitle) => {
+      const clean = nextTitle.replace(/^[^\x20-\x7E]+\s*/, "").trim() || nextTitle;
       setTitle(clean);
       setSessionTitle(tabId, clean);
     });
 
-    // Copy selection to clipboard
     const onSelectionDisposable = terminal.onSelectionChange(() => {
       const selection = terminal.getSelection();
       if (selection) {
@@ -300,7 +288,7 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
       const data = Array.from(new Uint8Array(buffer));
       const filePath = await saveClipboardImage(data, mimeType);
       const encoder = new TextEncoder();
-      await writeSession(sid, encoder.encode(filePath));
+      await writePtySession(sid, encoder.encode(filePath));
       showScreenshotStatus("screenshot pasted");
     };
 
@@ -357,14 +345,12 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
     };
 
     const onPasteCapture = (ev: ClipboardEvent) => {
-      // Handle all paste inputs in one place (keyboard and context menu) before xterm.
       ev.preventDefault();
       ev.stopPropagation();
       void handleClipboardPaste(ev);
     };
     containerEl.addEventListener("paste", onPasteCapture, true);
 
-    // ResizeObserver for container size changes
     const resizeObserver = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (!entry || entry.contentRect.width === 0 || entry.contentRect.height === 0) return;
@@ -377,22 +363,7 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
     return () => {
       cleanedUp = true;
       logPtyLifecycle("mount:cleanup:start", { tabId, spawnGeneration });
-      const ownedSessionId = sessionIdRef.current;
-      const latestStoreSessionId = useSessionStore
-        .getState()
-        .sessions
-        .find((session) => session.id === tabId)
-        ?.sessionId ?? null;
-      if (ownedSessionId && latestStoreSessionId && latestStoreSessionId !== ownedSessionId) {
-        logPtyLifecycle("cleanup:session-mismatch", {
-          tabId,
-          spawnGeneration,
-          ownedSessionId,
-          latestStoreSessionId,
-        });
-      }
-      sessionIdRef.current = null;
-      if (titleResetTimer) clearTimeout(titleResetTimer);
+
       if (activityTimer) clearTimeout(activityTimer);
       if (codexTitleTimer) clearTimeout(codexTitleTimer);
       containerEl.removeEventListener("paste", onPasteCapture, true);
@@ -404,10 +375,15 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
       onSelectionDisposable.dispose();
       if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
       if (screenshotTimerRef.current) clearTimeout(screenshotTimerRef.current);
-      if (ownedSessionId) {
-        logPtyLifecycle("session:kill", { tabId, spawnGeneration, sid: ownedSessionId });
-        killSession(ownedSessionId).catch(() => {});
+
+      const sid = sessionIdRef.current;
+      const subscriberId = subscriberIdRef.current;
+      sessionIdRef.current = null;
+      subscriberIdRef.current = null;
+      if (sid && subscriberId) {
+        void detachPtySessionStream(sid, subscriberId).catch(() => {});
       }
+
       terminal.dispose();
       initializedRef.current = false;
       logPtyLifecycle("mount:cleanup:done", { tabId, spawnGeneration });
@@ -415,7 +391,6 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectPath, tabId, sessionType]);
 
-  // Re-fit and focus when this session becomes active
   useEffect(() => {
     if (activeProjectPath !== projectPath) return;
     if (activeSessionId !== tabId) return;
@@ -426,7 +401,6 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
     return () => cancelAnimationFrame(raf);
   }, [activeProjectPath, projectPath, activeSessionId, tabId]);
 
-  // Apply settings changes
   useEffect(() => {
     const terminal = terminalRef.current;
     if (!terminal) return;

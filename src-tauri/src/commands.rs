@@ -3,7 +3,7 @@ use crate::codex_title;
 use crate::config::{self, ProjectConfig, SettingsConfig};
 use crate::conversation;
 use crate::git;
-use crate::pty_manager::{PtyManager, PtyOutputEvent};
+use crate::pty_manager::{AttachStreamResult, PtyManager, PtyOutputEvent, PtySessionInfo};
 use tauri::ipc::Channel;
 use tauri::State;
 
@@ -40,77 +40,62 @@ pub struct FileTreeEntry {
     pub is_dir: bool,
 }
 
-#[tauri::command]
-pub fn spawn_session(
-    pty_manager: State<'_, PtyManager>,
-    project_path: String,
-    cols: u16,
-    rows: u16,
-    claude_session_id: Option<String>,
-    resume_session_id: Option<String>,
-    continue_session: Option<bool>,
-    on_output: Channel<PtyOutputEvent>,
-) -> Result<String, String> {
-    pty_manager.spawn(
-        &project_path,
-        cols,
-        rows,
-        claude_session_id,
-        resume_session_id,
-        continue_session.unwrap_or(false),
-        on_output,
-    )
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreatePtySessionRequest {
+    pub project_path: String,
+    pub cols: u16,
+    pub rows: u16,
+    pub session_type: String,
+    pub claude_session_id: Option<String>,
+    pub resume_session_id: Option<String>,
+    pub continue_session: Option<bool>,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreatePtySessionResponse {
+    pub session_id: String,
 }
 
 #[tauri::command]
-pub fn spawn_opencode(
+pub fn create_pty_session(
     pty_manager: State<'_, PtyManager>,
-    project_path: String,
-    cols: u16,
-    rows: u16,
-    continue_session: Option<bool>,
-    on_output: Channel<PtyOutputEvent>,
-) -> Result<String, String> {
-    pty_manager.spawn_opencode(
-        &project_path,
-        cols,
-        rows,
-        continue_session.unwrap_or(false),
-        on_output,
-    )
+    request: CreatePtySessionRequest,
+) -> Result<CreatePtySessionResponse, String> {
+    let session_id = pty_manager.create_session(
+        &request.project_path,
+        request.cols,
+        request.rows,
+        &request.session_type,
+        request.claude_session_id,
+        request.resume_session_id,
+        request.continue_session.unwrap_or(false),
+    )?;
+    Ok(CreatePtySessionResponse { session_id })
 }
 
 #[tauri::command]
-pub fn spawn_codex(
+pub fn attach_pty_session_stream(
     pty_manager: State<'_, PtyManager>,
-    project_path: String,
-    cols: u16,
-    rows: u16,
-    continue_session: Option<bool>,
+    session_id: String,
+    replay_from_seq: Option<u64>,
     on_output: Channel<PtyOutputEvent>,
-) -> Result<String, String> {
-    pty_manager.spawn_codex(
-        &project_path,
-        cols,
-        rows,
-        continue_session.unwrap_or(false),
-        on_output,
-    )
+) -> Result<AttachStreamResult, String> {
+    pty_manager.attach_stream(&session_id, replay_from_seq, on_output)
 }
 
 #[tauri::command]
-pub fn spawn_shell(
+pub fn detach_pty_session_stream(
     pty_manager: State<'_, PtyManager>,
-    project_path: String,
-    cols: u16,
-    rows: u16,
-    on_output: Channel<PtyOutputEvent>,
-) -> Result<String, String> {
-    pty_manager.spawn_shell(&project_path, cols, rows, on_output)
+    session_id: String,
+    subscriber_id: String,
+) -> Result<(), String> {
+    pty_manager.detach_stream(&session_id, &subscriber_id)
 }
 
 #[tauri::command]
-pub fn write_session(
+pub fn write_pty_session(
     pty_manager: State<'_, PtyManager>,
     session_id: String,
     data: Vec<u8>,
@@ -119,7 +104,7 @@ pub fn write_session(
 }
 
 #[tauri::command]
-pub fn resize_session(
+pub fn resize_pty_session(
     pty_manager: State<'_, PtyManager>,
     session_id: String,
     cols: u16,
@@ -129,14 +114,25 @@ pub fn resize_session(
 }
 
 #[tauri::command]
-pub fn kill_session(pty_manager: State<'_, PtyManager>, session_id: String) -> Result<(), String> {
-    pty_manager.kill(&session_id)
+pub fn close_pty_session(
+    pty_manager: State<'_, PtyManager>,
+    session_id: String,
+) -> Result<(), String> {
+    pty_manager.close_session(&session_id, "closed_by_client")
 }
 
 #[tauri::command]
-pub fn kill_all_sessions(pty_manager: State<'_, PtyManager>) -> Result<(), String> {
-    pty_manager.kill_all();
+pub fn close_all_pty_sessions(pty_manager: State<'_, PtyManager>) -> Result<(), String> {
+    pty_manager.close_all("closed_all_by_client");
     Ok(())
+}
+
+#[tauri::command]
+pub fn get_pty_session_info(
+    pty_manager: State<'_, PtyManager>,
+    session_id: String,
+) -> Result<PtySessionInfo, String> {
+    pty_manager.get_info(&session_id)
 }
 
 #[tauri::command]
@@ -460,12 +456,10 @@ pub fn read_directory(
                         let _ = stdin.write_all(paths_input.as_bytes());
                     }
                     match child.wait_with_output() {
-                        Ok(output) => {
-                            String::from_utf8_lossy(&output.stdout)
-                                .lines()
-                                .map(|l| l.trim().to_string())
-                                .collect()
-                        }
+                        Ok(output) => String::from_utf8_lossy(&output.stdout)
+                            .lines()
+                            .map(|l| l.trim().to_string())
+                            .collect(),
                         Err(_) => std::collections::HashSet::new(),
                     }
                 }
@@ -528,7 +522,8 @@ pub fn save_clipboard_image(
     };
 
     let dir = config::screenshots_dir(&app_handle);
-    std::fs::create_dir_all(&dir).map_err(|e| format!("Failed to create screenshots dir: {}", e))?;
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| format!("Failed to create screenshots dir: {}", e))?;
 
     let now = chrono::Local::now();
     let base_name = now.format("screenshot_%Y-%m-%d_%H%M%S").to_string();

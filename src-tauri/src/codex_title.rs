@@ -42,7 +42,10 @@ pub fn generate_codex_title(
     }
 }
 
-fn find_matching_session_file(project_path: &str, spawned_at_ms: f64) -> Result<Option<PathBuf>, String> {
+fn find_matching_session_file(
+    project_path: &str,
+    spawned_at_ms: f64,
+) -> Result<Option<PathBuf>, String> {
     let home = dirs::home_dir().ok_or_else(|| "Could not find home directory".to_string())?;
     let sessions_root = home.join(".codex").join("sessions");
     if !sessions_root.exists() {
@@ -140,7 +143,11 @@ fn extract_session_meta(path: &Path) -> Option<(String, f64)> {
     None
 }
 
-fn extract_user_prompts(path: &Path, spawned_at_ms: f64, prompt_limit: usize) -> Result<Vec<String>, String> {
+fn extract_user_prompts(
+    path: &Path,
+    spawned_at_ms: f64,
+    prompt_limit: usize,
+) -> Result<Vec<String>, String> {
     let file = File::open(path).map_err(|e| format!("Failed to open session file: {}", e))?;
     let reader = BufReader::new(file);
     let mut prompts_oldest_first: Vec<String> = Vec::new();
@@ -399,7 +406,10 @@ fn is_viable_title(input: &str) -> bool {
     s.chars().any(|c| c.is_ascii_alphanumeric())
 }
 
-fn deterministic_title_from_prompts(prompts_newest_first: &[String], max_chars: usize) -> Option<String> {
+fn deterministic_title_from_prompts(
+    prompts_newest_first: &[String],
+    max_chars: usize,
+) -> Option<String> {
     let mut combined = String::new();
 
     for prompt in prompts_newest_first {
@@ -448,9 +458,7 @@ fn strip_wrapping_quotes(input: &str) -> String {
         let ends = out.chars().last();
         let wrapped = matches!(
             (starts, ends),
-            (Some('"'), Some('"'))
-                | (Some('\''), Some('\''))
-                | (Some('`'), Some('`'))
+            (Some('"'), Some('"')) | (Some('\''), Some('\'')) | (Some('`'), Some('`'))
         );
         if wrapped && out.chars().count() >= 2 {
             out = out

@@ -18,10 +18,11 @@ export interface TerminalSession {
   sessionType: SessionType;
 }
 
-export interface PtyOutputEvent {
-  type: "Data" | "Exit";
-  data: number[] | number | null;
-}
+export type PtyOutputEvent =
+  | { type: "Data"; data: { seq: number; bytes: number[] } }
+  | { type: "Exit"; data: { code: number | null } }
+  | { type: "Closed"; data: { reason: string } }
+  | { type: "Error"; data: { message: string } };
 
 export interface GitFileEntry {
   path: string;

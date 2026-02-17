@@ -13,7 +13,6 @@ import { useNotesStore } from "./stores/notesStore";
 import { useSettingsStore } from "./stores/settingsStore";
 import { useProjectStore } from "./stores/projectStore";
 import { useGitStore } from "./stores/gitStore";
-import { killAllSessions, exitApp } from "./lib/pty";
 import { applyThemeToDOM, applySyntaxThemeToDOM } from "./lib/themes";
 import { useHotkeys } from "./hooks/useHotkeys";
 import "./App.css";
@@ -72,13 +71,18 @@ function App() {
     applySyntaxThemeToDOM(syntaxTheme);
   }, [syntaxTheme]);
 
-  // Kill all sessions on close
+  // Flush notes before closing this window.
   useEffect(() => {
-    const unlisten = getCurrentWindow().onCloseRequested(async (event) => {
+    let closing = false;
+    const window = getCurrentWindow();
+    const unlisten = window.onCloseRequested(async (event) => {
+      if (closing) return;
       event.preventDefault();
+      closing = true;
       await useNotesStore.getState().flush();
-      await killAllSessions().catch(() => {});
-      await exitApp().catch(() => {});
+      await window.close().catch(() => {
+        closing = false;
+      });
     });
 
     return () => {

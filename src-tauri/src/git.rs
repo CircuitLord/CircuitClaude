@@ -72,11 +72,7 @@ pub fn get_status(project_path: &str) -> GitStatus {
     }
 }
 
-pub fn get_diff(
-    project_path: &str,
-    file_path: &str,
-    status: &str,
-) -> Result<String, String> {
+pub fn get_diff(project_path: &str, file_path: &str, status: &str) -> Result<String, String> {
     if status == "?" {
         // Untracked file: read contents and format as synthetic diff
         let full_path = std::path::Path::new(project_path).join(file_path);

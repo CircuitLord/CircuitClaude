@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSessionStore } from "../stores/sessionStore";
 import { TerminalView } from "./TerminalView";
 import { NewSessionMenu } from "./NewSessionMenu";
+import { closePtySession } from "../lib/pty";
 interface TerminalTabsProps {
   projectPath: string;
 }
@@ -52,7 +53,11 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
     [allVisible]
   );
 
-  function handleCloseSession(id: string) {
+  async function handleCloseSession(id: string) {
+    const session = sessions.find((s) => s.id === id);
+    if (session?.sessionId) {
+      await closePtySession(session.sessionId).catch(() => {});
+    }
     removeSession(id);
   }
 
@@ -107,7 +112,7 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
                     onMouseDown={(e) => e.stopPropagation()}
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleCloseSession(s.id);
+                      void handleCloseSession(s.id);
                     }}
                   >
                     x
@@ -135,7 +140,9 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
                 projectName={session.projectName}
                 sessionType={session.sessionType}
                 hideTitleBar
-                onClose={() => handleCloseSession(session.id)}
+                onClose={() => {
+                  void handleCloseSession(session.id);
+                }}
               />
             </div>
           );

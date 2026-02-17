@@ -42,14 +42,14 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            commands::spawn_session,
-            commands::spawn_opencode,
-            commands::spawn_codex,
-            commands::spawn_shell,
-            commands::write_session,
-            commands::resize_session,
-            commands::kill_session,
-            commands::kill_all_sessions,
+            commands::create_pty_session,
+            commands::attach_pty_session_stream,
+            commands::detach_pty_session_stream,
+            commands::write_pty_session,
+            commands::resize_pty_session,
+            commands::close_pty_session,
+            commands::close_all_pty_sessions,
+            commands::get_pty_session_info,
             commands::create_claude_session,
             commands::send_claude_message,
             commands::respond_to_permission,
@@ -85,7 +85,7 @@ pub fn run() {
         .run(|app, event| {
             if let tauri::RunEvent::Exit = event {
                 let pty_manager = app.state::<pty_manager::PtyManager>();
-                pty_manager.kill_all();
+                pty_manager.close_all("app_exit");
                 let claude_manager = app.state::<claude_manager::ClaudeManager>();
                 claude_manager.destroy_all();
                 config::cleanup_old_screenshots(&app.app_handle());

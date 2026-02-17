@@ -4,7 +4,7 @@ import { useProjectStore } from "../stores/projectStore";
 import { useNotesStore } from "../stores/notesStore";
 import { spawnNewSession } from "../lib/sessions";
 import { regenerateCodexTitle } from "../lib/codexTitles";
-import { writeSession } from "../lib/pty";
+import { writePtySession } from "../lib/pty";
 import { voiceInputController, type VoiceInputState } from "../lib/voiceInput";
 import { useVoiceStore } from "../stores/voiceStore";
 import { useSettingsStore } from "../stores/settingsStore";
@@ -61,7 +61,7 @@ export function useHotkeys() {
     voiceWriteQueueRef.current = voiceWriteQueueRef.current
       .then(() => {
         if (token !== previewWriteTokenRef.current) return;
-        return writeSession(sessionId, bytes);
+        return writePtySession(sessionId, bytes);
       })
       .catch(() => {});
   }
