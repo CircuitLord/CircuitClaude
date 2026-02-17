@@ -54,6 +54,22 @@ function logPtyLifecycle(message: string, details?: Record<string, unknown>) {
   console.debug("[TerminalView]", message, details ?? {});
 }
 
+function fitTerminalPreservingViewport(terminal: Terminal, fitAddon: FitAddon) {
+  const activeBuffer = terminal.buffer.active;
+  const viewportYBeforeFit = activeBuffer.viewportY;
+  const wasAtBottom = activeBuffer.baseY - viewportYBeforeFit <= 1;
+
+  fitAddon.fit();
+
+  if (wasAtBottom) {
+    terminal.scrollToBottom();
+    return;
+  }
+
+  const maxScrollableLine = terminal.buffer.active.baseY;
+  terminal.scrollToLine(Math.min(viewportYBeforeFit, maxScrollableLine));
+}
+
 export function TerminalView({ tabId, projectPath, projectName, sessionType, hideTitleBar, onClose }: TerminalViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
@@ -92,28 +108,43 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
     const spawnGeneration = ++spawnGenerationRef.current;
     let cleanedUp = false;
     let activityTimer: ReturnType<typeof setTimeout> | null = null;
-    let codexTitleTimer: ReturnType<typeof setTimeout> | null = null;
+    let codexAutoTitleTimer: ReturnType<typeof setTimeout> | null = null;
     let codexSpawnedAtMs: number | null = null;
     let codexTitleInFlight = false;
     let lastUserInputTime = 0;
     logPtyLifecycle("mount:init", { tabId, sessionType, projectPath, spawnGeneration });
 
-    const refreshCodexTitle = () => {
-      if (sessionType !== "codex") return;
-      if (codexSpawnedAtMs === null) return;
-      if (codexTitleInFlight) return;
+    const refreshCodexTitle = async (): Promise<boolean> => {
+      if (sessionType !== "codex") return false;
+      if (codexSpawnedAtMs === null) return false;
+      if (codexTitleInFlight) return false;
       codexTitleInFlight = true;
-      regenerateCodexTitle(projectPath, codexSpawnedAtMs)
-        .then((generatedTitle) => {
-          if (!generatedTitle) return;
-          if (cleanedUp || spawnGenerationRef.current !== spawnGeneration) return;
-          setTitle(generatedTitle);
-          setSessionTitle(tabId, generatedTitle);
-        })
-        .catch(() => {})
-        .finally(() => {
-          codexTitleInFlight = false;
-        });
+      try {
+        const generatedTitle = await regenerateCodexTitle(projectPath, codexSpawnedAtMs);
+        if (!generatedTitle) return false;
+        if (cleanedUp || spawnGenerationRef.current !== spawnGeneration) return false;
+        setTitle(generatedTitle);
+        setSessionTitle(tabId, generatedTitle);
+        return true;
+      } catch {
+        return false;
+      } finally {
+        codexTitleInFlight = false;
+      }
+    };
+
+    const maybeAutoGenerateCodexTitle = () => {
+      if (sessionType !== "codex") return;
+      const store = useSessionStore.getState();
+      if (store.codexAutoTitleDone.has(tabId)) return;
+      if (codexSpawnedAtMs === null) {
+        codexSpawnedAtMs = Date.now();
+      }
+      void refreshCodexTitle().then((generated) => {
+        if (generated) {
+          useSessionStore.getState().markCodexAutoTitleDone(tabId);
+        }
+      });
     };
 
     const currentSettings = useSettingsStore.getState().settings;
@@ -144,7 +175,7 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
     terminalRef.current = terminal;
     fitAddonRef.current = fitAddon;
     requestAnimationFrame(() => {
-      fitAddon.fit();
+      fitTerminalPreservingViewport(terminal, fitAddon);
       const channel = new Channel<PtyOutputEvent>();
       channel.onmessage = (event: PtyOutputEvent) => {
         if (cleanedUp || spawnGenerationRef.current !== spawnGeneration) return;
@@ -239,10 +270,10 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
         writePtySession(sessionIdRef.current, encoder.encode(data)).catch(() => {});
       }
       if (sessionType === "codex" && (data.includes("\r") || data.includes("\n"))) {
-        if (codexTitleTimer) clearTimeout(codexTitleTimer);
-        codexTitleTimer = setTimeout(() => {
-          codexTitleTimer = null;
-          refreshCodexTitle();
+        if (codexAutoTitleTimer) return;
+        codexAutoTitleTimer = setTimeout(() => {
+          codexAutoTitleTimer = null;
+          maybeAutoGenerateCodexTitle();
         }, 800);
       }
     });
@@ -355,7 +386,7 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
       const entry = entries[0];
       if (!entry || entry.contentRect.width === 0 || entry.contentRect.height === 0) return;
       requestAnimationFrame(() => {
-        fitAddon.fit();
+        fitTerminalPreservingViewport(terminal, fitAddon);
       });
     });
     resizeObserver.observe(containerRef.current);
@@ -365,7 +396,7 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
       logPtyLifecycle("mount:cleanup:start", { tabId, spawnGeneration });
 
       if (activityTimer) clearTimeout(activityTimer);
-      if (codexTitleTimer) clearTimeout(codexTitleTimer);
+      if (codexAutoTitleTimer) clearTimeout(codexAutoTitleTimer);
       containerEl.removeEventListener("paste", onPasteCapture, true);
       setTabStatus(tabId, null);
       resizeObserver.disconnect();
@@ -395,8 +426,11 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
     if (activeProjectPath !== projectPath) return;
     if (activeSessionId !== tabId) return;
     const raf = requestAnimationFrame(() => {
-      fitAddonRef.current?.fit();
-      terminalRef.current?.focus();
+      const terminal = terminalRef.current;
+      const fitAddon = fitAddonRef.current;
+      if (!terminal) return;
+      if (fitAddon) fitTerminalPreservingViewport(terminal, fitAddon);
+      terminal.focus();
     });
     return () => cancelAnimationFrame(raf);
   }, [activeProjectPath, projectPath, activeSessionId, tabId]);
@@ -408,7 +442,8 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
     terminal.options.fontSize = settings.terminalFontSize;
     terminal.options.fontFamily = settings.terminalFontFamily;
     terminal.options.theme = THEMES[projectTheme].xterm;
-    fitAddonRef.current?.fit();
+    const fitAddon = fitAddonRef.current;
+    if (fitAddon) fitTerminalPreservingViewport(terminal, fitAddon);
   }, [settings.terminalFontSize, settings.terminalFontFamily, projectTheme]);
 
   return (

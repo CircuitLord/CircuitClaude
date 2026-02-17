@@ -12,29 +12,31 @@ use std::os::windows::process::CommandExt;
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 const TITLE_MODEL: &str = "claude-haiku-4-5-20251001";
-const MAX_HAIKU_USER_PROMPT_CHARS: usize = 200;
 
 pub fn generate_codex_title(
     project_path: &str,
     spawned_at_ms: f64,
     max_chars: usize,
     prompt_limit: usize,
+    context_char_budget: usize,
 ) -> Result<String, String> {
     let max_chars = max_chars.clamp(8, 120);
     let prompt_limit = prompt_limit.clamp(1, 12);
+    let context_char_budget = context_char_budget.clamp(40, 4000);
 
     let session_file = find_matching_session_file(project_path, spawned_at_ms)?
         .ok_or_else(|| "No matching Codex session file found".to_string())?;
     let prompts = extract_user_prompts(&session_file, spawned_at_ms, prompt_limit)?;
+    let prompt_context = pack_prompt_context(&prompts, context_char_budget);
 
-    if prompts.is_empty() {
+    if prompt_context.is_empty() {
         return Err("No user prompts found in matching Codex session file".to_string());
     }
 
-    match run_haiku_title_generation(project_path, &prompts, max_chars) {
+    match run_haiku_title_generation(project_path, &prompt_context, max_chars) {
         Ok(title) if !title.is_empty() => Ok(title),
         Ok(_) | Err(_) => {
-            let fallback = deterministic_title_from_prompts(&prompts, max_chars)
+            let fallback = deterministic_title_from_prompts(&prompt_context, max_chars)
                 .ok_or_else(|| "Failed to generate a Codex tab title".to_string())?;
             eprintln!("[codex_title] fallback_title title={}", fallback);
             Ok(fallback)
@@ -362,17 +364,42 @@ fn build_haiku_command(project_path: &str) -> Command {
 }
 
 fn build_title_generation_prompt(prompts_newest_first: &[String], max_chars: usize) -> String {
-    let header = format!(
-        "Generate a brief terminal tab title for this user prompt. \
+    let mut prompt = format!(
+        "Generate a brief terminal tab title from these recent user prompts (newest first). \
 Rules: output ONLY the title, no quotes, no prefixes, no explanation. \
-Use 2-5 words. Maximum {} characters.\n\nUser prompt: ",
+Use 2-5 words. Maximum {} characters.\n\nRecent user prompts:\n",
         max_chars
     );
-    let primary_prompt = prompts_newest_first
-        .first()
-        .map(|p| enforce_max_chars(p, MAX_HAIKU_USER_PROMPT_CHARS))
-        .unwrap_or_default();
-    format!("{}{}", header, primary_prompt)
+    for (index, item) in prompts_newest_first.iter().enumerate() {
+        prompt.push_str(&format!("{}. {}\n", index + 1, item));
+    }
+    prompt
+}
+
+fn pack_prompt_context(prompts_newest_first: &[String], context_char_budget: usize) -> Vec<String> {
+    let mut packed = Vec::new();
+    let mut remaining = context_char_budget;
+
+    for prompt in prompts_newest_first {
+        if remaining == 0 {
+            break;
+        }
+        let clean = collapse_whitespace(prompt);
+        if clean.is_empty() {
+            continue;
+        }
+        let clean_len = clean.chars().count();
+        if clean_len <= remaining {
+            packed.push(clean);
+            remaining -= clean_len;
+            continue;
+        }
+
+        packed.push(take_chars(&clean, remaining));
+        break;
+    }
+
+    packed
 }
 
 fn sanitize_user_prompt_for_title(input: &str) -> Option<String> {
@@ -510,6 +537,13 @@ fn enforce_max_chars(input: &str, max_chars: usize) -> String {
     truncated = truncated.trim_end().to_string();
     truncated.push_str("...");
     truncated
+}
+
+fn take_chars(input: &str, max_chars: usize) -> String {
+    if max_chars == 0 {
+        return String::new();
+    }
+    input.chars().take(max_chars).collect::<String>().trim().to_string()
 }
 
 fn normalize_compare_path(path: &str) -> String {

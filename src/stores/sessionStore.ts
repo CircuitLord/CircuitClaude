@@ -9,6 +9,7 @@ interface SessionStore {
   projectActiveSessionIds: Map<string, string>;
   tabStatuses: Map<string, TabStatus>;
   sessionTitles: Map<string, string>;
+  codexAutoTitleDone: Set<string>;
   addSession: (session: TerminalSession) => void;
   removeSession: (id: string) => void;
   removeProjectSessions: (projectPath: string) => void;
@@ -17,6 +18,7 @@ interface SessionStore {
   updateSessionPtyId: (id: string, sessionId: string) => void;
   setTabStatus: (tabId: string, status: TabStatus | null) => void;
   setSessionTitle: (tabId: string, title: string) => void;
+  markCodexAutoTitleDone: (tabId: string) => void;
 }
 
 export function generateTabId(): string {
@@ -30,6 +32,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   projectActiveSessionIds: new Map(),
   tabStatuses: new Map(),
   sessionTitles: new Map(),
+  codexAutoTitleDone: new Set(),
 
   addSession: (session) =>
     set((state) => {
@@ -73,6 +76,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       tabStatuses.delete(id);
       const sessionTitles = new Map(state.sessionTitles);
       sessionTitles.delete(id);
+      const codexAutoTitleDone = new Set(state.codexAutoTitleDone);
+      codexAutoTitleDone.delete(id);
       const projectActiveSessionIds = new Map(state.projectActiveSessionIds);
 
       if (removed) {
@@ -99,7 +104,15 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         }
       }
 
-      return { sessions, activeSessionId, activeProjectPath, tabStatuses, sessionTitles, projectActiveSessionIds };
+      return {
+        sessions,
+        activeSessionId,
+        activeProjectPath,
+        tabStatuses,
+        sessionTitles,
+        codexAutoTitleDone,
+        projectActiveSessionIds,
+      };
     }),
 
   removeProjectSessions: (projectPath) =>
@@ -121,7 +134,22 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           : state.activeProjectPath;
       const projectActiveSessionIds = new Map(state.projectActiveSessionIds);
       projectActiveSessionIds.delete(projectPath);
-      return { sessions, activeSessionId, activeProjectPath, projectActiveSessionIds };
+      const removedIds = new Set(
+        state.sessions
+          .filter((s) => s.projectPath === projectPath)
+          .map((s) => s.id)
+      );
+      const codexAutoTitleDone = new Set(state.codexAutoTitleDone);
+      for (const id of removedIds) {
+        codexAutoTitleDone.delete(id);
+      }
+      return {
+        sessions,
+        activeSessionId,
+        activeProjectPath,
+        projectActiveSessionIds,
+        codexAutoTitleDone,
+      };
     }),
 
   setActiveSession: (id) => {
@@ -178,5 +206,13 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       const next = new Map(state.sessionTitles);
       next.set(tabId, title);
       return { sessionTitles: next };
+    }),
+
+  markCodexAutoTitleDone: (tabId) =>
+    set((state) => {
+      if (state.codexAutoTitleDone.has(tabId)) return {};
+      const next = new Set(state.codexAutoTitleDone);
+      next.add(tabId);
+      return { codexAutoTitleDone: next };
     }),
 }));
