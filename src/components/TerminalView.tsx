@@ -54,20 +54,10 @@ function logPtyLifecycle(message: string, details?: Record<string, unknown>) {
   console.debug("[TerminalView]", message, details ?? {});
 }
 
-function fitTerminalPreservingViewport(terminal: Terminal, fitAddon: FitAddon) {
-  const activeBuffer = terminal.buffer.active;
-  const viewportYBeforeFit = activeBuffer.viewportY;
-  const wasAtBottom = activeBuffer.baseY - viewportYBeforeFit <= 1;
-
+function fitTerminalAndScrollToBottom(terminal: Terminal, fitAddon: FitAddon) {
   fitAddon.fit();
-
-  if (wasAtBottom) {
-    terminal.scrollToBottom();
-    return;
-  }
-
-  const maxScrollableLine = terminal.buffer.active.baseY;
-  terminal.scrollToLine(Math.min(viewportYBeforeFit, maxScrollableLine));
+  terminal.scrollToBottom();
+  requestAnimationFrame(() => terminal.scrollToBottom());
 }
 
 export function TerminalView({ tabId, projectPath, projectName, sessionType, hideTitleBar, onClose }: TerminalViewProps) {
@@ -175,7 +165,7 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
     terminalRef.current = terminal;
     fitAddonRef.current = fitAddon;
     requestAnimationFrame(() => {
-      fitTerminalPreservingViewport(terminal, fitAddon);
+      fitTerminalAndScrollToBottom(terminal, fitAddon);
       const channel = new Channel<PtyOutputEvent>();
       channel.onmessage = (event: PtyOutputEvent) => {
         if (cleanedUp || spawnGenerationRef.current !== spawnGeneration) return;
@@ -386,7 +376,7 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
       const entry = entries[0];
       if (!entry || entry.contentRect.width === 0 || entry.contentRect.height === 0) return;
       requestAnimationFrame(() => {
-        fitTerminalPreservingViewport(terminal, fitAddon);
+        fitTerminalAndScrollToBottom(terminal, fitAddon);
       });
     });
     resizeObserver.observe(containerRef.current);
@@ -429,7 +419,7 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
       const terminal = terminalRef.current;
       const fitAddon = fitAddonRef.current;
       if (!terminal) return;
-      if (fitAddon) fitTerminalPreservingViewport(terminal, fitAddon);
+      if (fitAddon) fitTerminalAndScrollToBottom(terminal, fitAddon);
       terminal.focus();
     });
     return () => cancelAnimationFrame(raf);
@@ -443,7 +433,7 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
     terminal.options.fontFamily = settings.terminalFontFamily;
     terminal.options.theme = THEMES[projectTheme].xterm;
     const fitAddon = fitAddonRef.current;
-    if (fitAddon) fitTerminalPreservingViewport(terminal, fitAddon);
+    if (fitAddon) fitTerminalAndScrollToBottom(terminal, fitAddon);
   }, [settings.terminalFontSize, settings.terminalFontFamily, projectTheme]);
 
   return (
