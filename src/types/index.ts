@@ -167,6 +167,7 @@ export interface Settings {
   notesPanelOpen: boolean;
   notesPanelWidth: number;
   voiceMicDeviceId: string;
+  soundEnabled: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -179,4 +180,5 @@ export const DEFAULT_SETTINGS: Settings = {
   notesPanelOpen: false,
   notesPanelWidth: 350,
   voiceMicDeviceId: "default",
+  soundEnabled: true,
 };

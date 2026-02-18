@@ -20,6 +20,7 @@ import { useVoiceStore } from "../stores/voiceStore";
 import { THEMES } from "../lib/themes";
 import { regenerateCodexTitle } from "../lib/codexTitles";
 import { PtyOutputEvent, SessionType } from "../types";
+import { playWaitingSound } from "../lib/sounds";
 import "@xterm/xterm/css/xterm.css";
 
 /** Check if any of the last N lines near the cursor contain an interactive prompt indicator */
@@ -179,6 +180,9 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
             activityTimer = setTimeout(() => {
               if (hasQuestionPrompt(terminal)) {
                 setTabStatus(tabId, "waiting");
+                if (useSettingsStore.getState().settings.soundEnabled) {
+                  playWaitingSound();
+                }
               } else {
                 setTabStatus(tabId, null);
               }

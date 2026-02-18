@@ -327,6 +327,21 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
           </div>
 
           <div className="settings-section">
+            <div className="settings-section-title">~sound</div>
+            <div className="settings-row">
+              <div className="settings-row-label">
+                <span className="settings-row-name">waiting notification</span>
+              </div>
+              <button
+                className={`settings-toggle ${settings.soundEnabled ? "settings-toggle--on" : ""}`}
+                onClick={() => update({ soundEnabled: !settings.soundEnabled })}
+              >
+                {settings.soundEnabled ? "[on]" : "[off]"}
+              </button>
+            </div>
+          </div>
+
+          <div className="settings-section">
             <div className="settings-section-title">~hotkeys</div>
             <div className="settings-row">
               <div className="settings-row-label">
