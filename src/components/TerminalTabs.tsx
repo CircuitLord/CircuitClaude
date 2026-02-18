@@ -83,7 +83,7 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
             return (
               <div
                 key={s.id}
-                className={`terminal-tab ${isActive ? "terminal-tab--active" : ""}`}
+                className={`terminal-tab ${isActive ? "terminal-tab--active" : ""}${tabStatus === "thinking" ? " terminal-tab--thinking" : ""}`}
                 role="tab"
                 aria-selected={isActive}
                 tabIndex={0}

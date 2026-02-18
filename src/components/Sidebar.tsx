@@ -273,13 +273,14 @@ export function Sidebar() {
             (s) => s.projectPath === p.path
           );
           const sessionCount = projectSessions.length;
-          const isThinkingAny = projectSessions.some((s) => tabStatuses.get(s.id) === "thinking");
-          const isWaitingAny = !isThinkingAny && projectSessions.some((s) => tabStatuses.get(s.id) === "waiting");
+          const isWaitingAny = projectSessions.some((s) => tabStatuses.get(s.id) === "waiting");
+          const isThinkingAny = !isWaitingAny && projectSessions.some((s) => tabStatuses.get(s.id) === "thinking");
           const isActive = p.path === activeProjectPath;
 
           const entryClasses = [
             "sidebar-entry",
             isActive && "active",
+            isThinkingAny && "thinking",
           ].filter(Boolean).join(" ");
 
           return (
@@ -294,10 +295,10 @@ export function Sidebar() {
                 <span className="sidebar-entry-name">{p.name}</span>
               </div>
               <div className="sidebar-entry-status">
-                {isThinkingAny ? (
-                  <span className="sidebar-entry-status-text alive"><span className="sidebar-entry-status-symbol">*</span> thinking</span>
-                ) : isWaitingAny ? (
+                {isWaitingAny ? (
                   <span className="sidebar-entry-status-text waiting"><span className="sidebar-entry-status-symbol">?</span> waiting</span>
+                ) : isThinkingAny ? (
+                  <span className="sidebar-entry-status-text alive"><span className="sidebar-entry-status-symbol">*</span> thinking</span>
                 ) : (
                   <span className="sidebar-entry-status-text idle">idle</span>
                 )}
