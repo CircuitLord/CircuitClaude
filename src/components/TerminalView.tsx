@@ -16,7 +16,7 @@ import {
 import { useSessionStore } from "../stores/sessionStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useProjectStore } from "../stores/projectStore";
-import { useVoiceStore } from "../stores/voiceStore";
+import { VoiceTranscriptBox } from "./VoiceTranscriptBox";
 import { THEMES } from "../lib/themes";
 import { regenerateCodexTitle } from "../lib/codexTitles";
 import { PtyOutputEvent, SessionType } from "../types";
@@ -80,13 +80,10 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
   const projectTheme = useProjectStore(
     (s) => s.projects.find((p) => p.path === projectPath)?.theme ?? "midnight"
   );
-  const voiceStatusMessage = useVoiceStore((s) => s.statusMessage);
-  const voiceTargetTabId = useVoiceStore((s) => s.targetTabId);
   const [showCopied, setShowCopied] = useState(false);
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [screenshotStatus, setScreenshotStatus] = useState<string | null>(null);
   const screenshotTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const statusLineMessage = voiceTargetTabId === tabId ? voiceStatusMessage : null;
 
   useEffect(() => {
     setTitle(persistedTitle);
@@ -449,9 +446,18 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
         </div>
       )}
       <div className="terminal-container" ref={containerRef} />
-      {statusLineMessage ? (
-        <div className="terminal-status-line">{statusLineMessage}</div>
-      ) : screenshotStatus ? (
+      <VoiceTranscriptBox tabId={tabId} onSubmit={(text) => {
+        const sid = sessionIdRef.current;
+        if (!sid) return;
+        const encoder = new TextEncoder();
+        writePtySession(sid, encoder.encode(text)).catch(() => {});
+        // After voice box unmounts, refocus terminal and press Enter
+        setTimeout(() => {
+          terminalRef.current?.focus();
+          writePtySession(sid, encoder.encode("\r")).catch(() => {});
+        }, 0);
+      }} />
+      {screenshotStatus ? (
         <div className="terminal-status-line">{screenshotStatus}</div>
       ) : showCopied ? (
         <div className="terminal-status-line">copied to clipboard</div>

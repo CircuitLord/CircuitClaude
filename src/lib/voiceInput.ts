@@ -149,7 +149,7 @@ export class VoiceInputController {
     const supportsTrackInput = recognition.start.length > 0;
     if (this.selectedDeviceId !== "default") {
       if (!supportsTrackInput) {
-        this.handlers.onInfo?.("selected mic unsupported here; using system default");
+        // Silently fall back to system default mic
       } else {
         try {
           preferredTrack = await this.getPreferredAudioTrack();

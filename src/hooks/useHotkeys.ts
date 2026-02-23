@@ -4,11 +4,9 @@ import { useProjectStore } from "../stores/projectStore";
 import { useNotesStore } from "../stores/notesStore";
 import { spawnNewSession } from "../lib/sessions";
 import { regenerateCodexTitle } from "../lib/codexTitles";
-import { writePtySession } from "../lib/pty";
 import { voiceInputController, type VoiceInputState } from "../lib/voiceInput";
 import { useVoiceStore } from "../stores/voiceStore";
 import { useSettingsStore } from "../stores/settingsStore";
-import type { SessionType } from "../types";
 
 function isCtrlSpaceHotkey(e: KeyboardEvent): boolean {
   return (
@@ -31,63 +29,36 @@ export function useHotkeys() {
   const voiceMicDeviceId = useSettingsStore((s) => s.settings.voiceMicDeviceId);
   const voiceTargetTabIdRef = useRef<string | null>(null);
   const voiceTargetSessionIdRef = useRef<string | null>(null);
-  const voiceTargetSessionTypeRef = useRef<SessionType | null>(null);
   const voiceStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastInterimRef = useRef("");
-  const voicePreviewRef = useRef("");
-  const stopBySubmitRef = useRef(false);
-  const stopEditingAfterStopRef = useRef(false);
-  const previewWriteTokenRef = useRef(0);
-  const voiceWriteQueueRef = useRef(Promise.resolve());
-  const textEncoderRef = useRef<TextEncoder>(new TextEncoder());
+  const voiceTranscriptBaseRef = useRef("");
 
   function clearVoiceStatusAfter(delayMs = 1800) {
     if (voiceStatusTimerRef.current) {
       clearTimeout(voiceStatusTimerRef.current);
     }
     voiceStatusTimerRef.current = setTimeout(() => {
-      useVoiceStore.getState().setIdle();
+      const vs = useVoiceStore.getState();
+      if (vs.transcriptText.trim()) {
+        // Don't auto-dismiss if there's text to review — just clear the status message
+        vs.clearStatus();
+      } else {
+        vs.setIdle();
+      }
       voiceStatusTimerRef.current = null;
     }, delayMs);
-  }
-
-  function invalidatePendingPreviewWrites() {
-    previewWriteTokenRef.current += 1;
-  }
-
-  function queueWrite(sessionId: string, data: string, token: number) {
-    if (!data) return;
-    const bytes = textEncoderRef.current.encode(data);
-    voiceWriteQueueRef.current = voiceWriteQueueRef.current
-      .then(() => {
-        if (token !== previewWriteTokenRef.current) return;
-        return writePtySession(sessionId, bytes);
-      })
-      .catch(() => {});
-  }
-
-  function queuePreviewUpdate(sessionId: string, nextPreview: string) {
-
-    const prev = voicePreviewRef.current;
-    if (nextPreview.length <= prev.length) return;
-    // Append-only mode: never rewrite previously inserted preview text.
-    const patchText = nextPreview.slice(prev.length);
-    const token = previewWriteTokenRef.current;
-    if (!patchText) return;
-    voicePreviewRef.current = prev + patchText;
-    queueWrite(sessionId, patchText, token);
   }
 
   useEffect(() => {
     voiceInputController.configureHandlers({
       onStateChange: (state: VoiceInputState) => {
+        // Don't re-populate the store if already dismissed (Escape/Enter)
+        if (!useVoiceStore.getState().targetTabId && state !== "listening") return;
         const targetTabId = voiceTargetTabIdRef.current;
-        if (state === "listening" && targetTabId) {
-          lastInterimRef.current = "";
-          voicePreviewRef.current = "";
-          stopBySubmitRef.current = false;
-          stopEditingAfterStopRef.current = false;
-          useVoiceStore.getState().setListening(targetTabId);
+        const targetSessionId = voiceTargetSessionIdRef.current;
+        if (state === "listening" && targetTabId && targetSessionId) {
+          // Capture existing text as the base so new speech appends after it
+          voiceTranscriptBaseRef.current = useVoiceStore.getState().transcriptText;
+          useVoiceStore.getState().setListening(targetTabId, targetSessionId);
           return;
         }
         if (state === "processing") {
@@ -95,92 +66,46 @@ export function useHotkeys() {
         }
       },
       onInterimTranscript: (transcript: string) => {
-        const targetTabId = voiceTargetTabIdRef.current;
-        const targetSessionId = voiceTargetSessionIdRef.current;
-        if (!targetTabId) return;
-        if (stopEditingAfterStopRef.current) return;
+        if (!useVoiceStore.getState().targetTabId) return;
         const normalized = transcript.trim();
-        if (!normalized) {
-          if (lastInterimRef.current !== "") {
-            useVoiceStore.getState().setListening(targetTabId);
-            lastInterimRef.current = "";
-          }
-          // Ignore transient empty interim packets. Some recognizers emit
-          // empty frames during rescoring/restarts; clearing here can wipe
-          // the full draft before the next non-empty interim arrives.
-          return;
-        }
-        if (normalized === lastInterimRef.current) return;
-        lastInterimRef.current = normalized;
-        if (targetSessionId) {
-          queuePreviewUpdate(targetSessionId, normalized);
-        }
+        if (!normalized) return;
+        const base = voiceTranscriptBaseRef.current;
+        useVoiceStore.getState().setTranscriptText(
+          base ? base + " " + normalized : normalized
+        );
       },
       onFinalTranscript: (transcript: string) => {
-        const targetTabId = voiceTargetTabIdRef.current;
-        const targetSessionId = voiceTargetSessionIdRef.current;
-        const stoppedBySubmit = stopBySubmitRef.current;
-        const stopEditingAfterStop = stopEditingAfterStopRef.current;
-        stopBySubmitRef.current = false;
-        stopEditingAfterStopRef.current = false;
-        lastInterimRef.current = "";
+        // Save the pre-listening base before clearing refs
+        const savedBase = voiceTranscriptBaseRef.current;
         voiceTargetTabIdRef.current = null;
         voiceTargetSessionIdRef.current = null;
-        voiceTargetSessionTypeRef.current = null;
+        voiceTranscriptBaseRef.current = "";
+
+        // If the box was already dismissed (Escape/Enter), don't re-populate
+        const storeTabId = useVoiceStore.getState().targetTabId;
+        if (!storeTabId) return;
 
         const normalized = transcript.trim();
-        if (!normalized) {
-          if (targetSessionId && !stopEditingAfterStop) {
-            queuePreviewUpdate(targetSessionId, "");
-          } else {
-            voicePreviewRef.current = "";
-          }
-          useVoiceStore.getState().setStatus("no speech detected", targetTabId);
-          clearVoiceStatusAfter();
-          return;
-        }
-        if (!targetSessionId) {
-          voicePreviewRef.current = "";
-          useVoiceStore.getState().setError("no active terminal session", targetTabId);
-          clearVoiceStatusAfter();
-          return;
-        }
-        if (stopEditingAfterStop) {
-          voicePreviewRef.current = "";
-          useVoiceStore.getState().setStatus(
-            stoppedBySubmit ? "submitted and stopped listening" : "stopped listening",
-            targetTabId
+        if (normalized) {
+          // Replace (not append) — interim handler already set base+interim,
+          // so use the original base + finalized transcript to avoid duplication
+          useVoiceStore.getState().setTranscriptText(
+            savedBase ? savedBase + " " + normalized : normalized
           );
-        } else if (!stoppedBySubmit) {
-          queuePreviewUpdate(targetSessionId, normalized);
-          useVoiceStore.getState().setStatus("inserted transcript", targetTabId);
-        } else {
-          voicePreviewRef.current = "";
-          useVoiceStore.getState().setStatus("submitted and stopped listening", targetTabId);
         }
-        clearVoiceStatusAfter();
+        if (!normalized) {
+          useVoiceStore.getState().setIdle();
+        }
       },
       onError: (message: string) => {
         const targetTabId = voiceTargetTabIdRef.current;
-        const targetSessionId = voiceTargetSessionIdRef.current;
-        stopBySubmitRef.current = false;
-        const stopEditingAfterStop = stopEditingAfterStopRef.current;
-        stopEditingAfterStopRef.current = false;
-        lastInterimRef.current = "";
-        if (targetSessionId && !stopEditingAfterStop) {
-          queuePreviewUpdate(targetSessionId, "");
-        } else {
-          voicePreviewRef.current = "";
-        }
         voiceTargetTabIdRef.current = null;
         voiceTargetSessionIdRef.current = null;
-        voiceTargetSessionTypeRef.current = null;
         useVoiceStore.getState().setError(message, targetTabId);
         clearVoiceStatusAfter();
       },
       onInfo: (message: string) => {
-        const targetTabId = voiceTargetTabIdRef.current;
-        useVoiceStore.getState().setStatus(message, targetTabId);
+        useVoiceStore.getState().setStatus(message, useVoiceStore.getState().targetTabId);
       },
     });
 
@@ -190,11 +115,6 @@ export function useHotkeys() {
         clearTimeout(voiceStatusTimerRef.current);
         voiceStatusTimerRef.current = null;
       }
-      voicePreviewRef.current = "";
-      voiceTargetSessionTypeRef.current = null;
-      stopBySubmitRef.current = false;
-      stopEditingAfterStopRef.current = false;
-      invalidatePendingPreviewWrites();
       useVoiceStore.getState().setIdle();
     };
   }, []);
@@ -212,32 +132,11 @@ export function useHotkeys() {
         return;
       }
 
-      // Enter — when voice capture is active, stop listening but let Enter submit normally
-      if (
-        voiceInputController.isListening() &&
-        e.key === "Enter" &&
-        !e.ctrlKey &&
-        !e.shiftKey &&
-        !e.altKey &&
-        !e.metaKey
-      ) {
-        stopBySubmitRef.current = true;
-        stopEditingAfterStopRef.current = true;
-        invalidatePendingPreviewWrites();
-        useVoiceStore.getState().setProcessing(voiceTargetTabIdRef.current, "submitting and stopping voice...");
-        voiceInputController.stop();
-        // Do not preventDefault: Enter should still submit in terminal/input
-        return;
-      }
-
       // Ctrl+Space — toggle voice-to-text capture for active terminal session
       if (isCtrlSpaceHotkey(e)) {
         e.preventDefault();
 
         if (voiceInputController.isListening()) {
-          stopBySubmitRef.current = false;
-          stopEditingAfterStopRef.current = true;
-          invalidatePendingPreviewWrites();
           useVoiceStore.getState().setProcessing(voiceTargetTabIdRef.current);
           voiceInputController.stop();
           return;
@@ -260,12 +159,8 @@ export function useHotkeys() {
           clearTimeout(voiceStatusTimerRef.current);
           voiceStatusTimerRef.current = null;
         }
-        invalidatePendingPreviewWrites();
         voiceTargetTabIdRef.current = active.id;
         voiceTargetSessionIdRef.current = active.sessionId;
-        voiceTargetSessionTypeRef.current = active.sessionType;
-        stopBySubmitRef.current = false;
-        stopEditingAfterStopRef.current = false;
         useVoiceStore.getState().setStatus("starting microphone...", active.id);
         voiceInputController.setDeviceId(voiceMicDeviceId);
         voiceInputController.start().catch(() => {
@@ -275,11 +170,11 @@ export function useHotkeys() {
         return;
       }
 
-      // Skip if focus is in an input/textarea (but not xterm's internal textarea)
+      // Skip if focus is in an input/textarea (but not xterm's internal textarea or voice transcript box)
       const target = e.target as HTMLElement;
       const tag = target?.tagName;
       if (tag === "INPUT" || tag === "SELECT") return;
-      if (tag === "TEXTAREA" && !target.closest(".xterm") && !target.closest(".conversation-input-area")) return;
+      if (tag === "TEXTAREA" && !target.closest(".xterm") && !target.closest(".conversation-input-area") && !target.closest(".voice-transcript-box")) return;
       if (target.closest(".prompt-input")) return;
 
       // Ctrl+T — new session
