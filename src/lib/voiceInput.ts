@@ -283,7 +283,9 @@ export class VoiceInputController {
   }
 
   private updateState(state: VoiceInputState): void {
+    const prev = this.state;
     this.state = state;
+    console.log(`[voice] ${prev} → ${state}`);
     this.handlers.onStateChange?.(state);
   }
 
