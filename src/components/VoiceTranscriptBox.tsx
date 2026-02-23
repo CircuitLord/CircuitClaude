@@ -58,12 +58,15 @@ export function VoiceTranscriptBox({ tabId, onSubmit }: VoiceTranscriptBoxProps)
 
   return (
     <div className="voice-transcript-box">
-      {statusMessage && (
+      <div className="voice-transcript-top-row">
         <div className="voice-transcript-status">
           {isListening && <span className="voice-transcript-indicator">*</span>}
-          <span className="voice-transcript-message">{statusMessage}</span>
+          <span className="voice-transcript-message">{statusMessage || "voice"}</span>
         </div>
-      )}
+        <button className="voice-transcript-dismiss" onClick={dismiss}>
+          :esc
+        </button>
+      </div>
       <div className="voice-transcript-input-row">
         <span className="voice-transcript-prefix">{">"}</span>
         <textarea

@@ -56,7 +56,13 @@ function logPtyLifecycle(message: string, details?: Record<string, unknown>) {
 }
 
 function fitTerminalAndScrollToBottom(terminal: Terminal, fitAddon: FitAddon) {
-  fitAddon.fit();
+  try {
+    fitAddon.fit();
+  } catch {
+    // FitAddon throws if the terminal renderer hasn't initialized dimensions yet.
+    // Safe to ignore — a subsequent resize/fit will succeed once rendering completes.
+    return;
+  }
   terminal.scrollToBottom();
   requestAnimationFrame(() => terminal.scrollToBottom());
 }

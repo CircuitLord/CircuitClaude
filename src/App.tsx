@@ -79,10 +79,13 @@ function App() {
       if (closing) return;
       event.preventDefault();
       closing = true;
-      await useNotesStore.getState().flush();
-      await window.close().catch(() => {
-        closing = false;
-      });
+      // Give flush up to 2s, then force-close regardless
+      await Promise.race([
+        useNotesStore.getState().flush(),
+        new Promise((r) => setTimeout(r, 2000)),
+      ]);
+      // destroy() bypasses onCloseRequested, avoiding re-entry
+      await window.destroy();
     });
 
     return () => {
