@@ -461,7 +461,7 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
         setTimeout(() => {
           terminalRef.current?.focus();
           writePtySession(sid, encoder.encode("\r")).catch(() => {});
-        }, 0);
+        }, 100);
       }} />
       {screenshotStatus ? (
         <div className="terminal-status-line">{screenshotStatus}</div>
