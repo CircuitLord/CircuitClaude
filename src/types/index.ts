@@ -58,6 +58,8 @@ export type ThemeName = "midnight" | "ember" | "arctic" | "forest" | "crimson" |
 
 export type SyntaxThemeName = "github-dark" | "monokai" | "tokyo-night";
 
+export type VoiceEngine = "whisper" | "edge";
+
 // --- Claude Event types (from Rust claude_manager) ---
 
 export interface ModelUsage {
@@ -166,6 +168,7 @@ export interface Settings {
   sidebarPanelMode: "source" | "files";
   notesPanelOpen: boolean;
   notesPanelWidth: number;
+  voiceEngine: VoiceEngine;
   voiceMicDeviceId: string;
   whisperModel: string;
   soundEnabled: boolean;
@@ -180,7 +183,8 @@ export const DEFAULT_SETTINGS: Settings = {
   sidebarPanelMode: "source",
   notesPanelOpen: false,
   notesPanelWidth: 350,
+  voiceEngine: "edge",
   voiceMicDeviceId: "default",
-  whisperModel: "base.en",
+  whisperModel: "medium.en",
   soundEnabled: true,
 };

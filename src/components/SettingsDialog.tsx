@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useSettingsStore } from "../stores/settingsStore";
-import { DEFAULT_SETTINGS, ThemeName, SyntaxThemeName } from "../types";
+import { DEFAULT_SETTINGS, ThemeName, SyntaxThemeName, type VoiceEngine } from "../types";
 import { THEME_OPTIONS, SYNTAX_THEME_OPTIONS } from "../lib/themes";
 import { whisperGetAvailableModels, whisperDownloadModel, type ModelInfo, type DownloadProgress } from "../lib/whisper";
 import { Channel } from "@tauri-apps/api/core";
@@ -112,8 +112,18 @@ function CustomSelect<T extends string>({
         setOpen(false);
       }
     }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        setOpen(false);
+      }
+    }
     document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+    window.addEventListener("keydown", handleKey, true);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      window.removeEventListener("keydown", handleKey, true);
+    };
   }, [open]);
 
   return (
@@ -180,8 +190,11 @@ function TerminalPreview() {
 /* ------------------------------------------------------------------ */
 /*  Settings Dialog                                                   */
 /* ------------------------------------------------------------------ */
+type SettingsPage = "main" | "hotkeys";
+
 export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
   const { settings, update } = useSettingsStore();
+  const [page, setPage] = useState<SettingsPage>("main");
   const [micOptions, setMicOptions] = useState(DEFAULT_MIC_OPTIONS);
   const [micStatus, setMicStatus] = useState<string | null>(null);
   const [modelStatuses, setModelStatuses] = useState<Record<string, ModelInfo>>({});
@@ -260,7 +273,9 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
   useEffect(() => {
     if (!isOpen) return;
     void refreshMicrophones();
-    void refreshModels();
+    if (settings.voiceEngine === "whisper") {
+      void refreshModels();
+    }
 
     if (!navigator.mediaDevices?.addEventListener) return;
     const onDeviceChange = () => {
@@ -268,7 +283,23 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
     };
     navigator.mediaDevices.addEventListener("devicechange", onDeviceChange);
     return () => navigator.mediaDevices.removeEventListener("devicechange", onDeviceChange);
-  }, [isOpen, refreshMicrophones]);
+  }, [isOpen, refreshMicrophones, settings.voiceEngine]);
+
+  useEffect(() => {
+    if (!isOpen) setPage("main");
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        (document.activeElement as HTMLElement)?.blur?.();
+        onClose();
+      }
+    }
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -276,215 +307,288 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
     <div className="dialog-overlay" onMouseDown={onClose}>
       <div className="settings-dialog" onMouseDown={(e) => e.stopPropagation()}>
         <div className="settings-dialog-header">
-          <span className="settings-dialog-header-title">settings</span>
+          {page === "main" ? (
+            <span className="settings-dialog-header-title">settings</span>
+          ) : (
+            <button className="settings-dialog-back" onClick={() => setPage("main")}>
+              :back
+            </button>
+          )}
           <button className="settings-dialog-close" onClick={onClose} aria-label="Close">
             :esc
           </button>
         </div>
 
-        <div className="settings-dialog-body">
-          <TerminalPreview />
+        {page === "main" ? (
+          <div className="settings-dialog-body">
+            <TerminalPreview />
 
-          <div className="settings-section">
-            <div className="settings-section-title">~theme</div>
-            <div className="settings-row">
-              <div className="settings-row-label">
-                <span className="settings-row-name">default-theme</span>
-              </div>
-              <CustomSelect
-                value={settings.theme}
-                options={THEME_OPTIONS}
-                renderOption={(opt) => {
-                  const accent = THEME_OPTIONS.find((t) => t.value === opt.value)?.accent;
-                  return (
-                    <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ color: accent, fontFamily: "var(--font-mono)" }}>#</span>
-                      {opt.label}
-                    </span>
-                  );
-                }}
-                onChange={(v) => update({ theme: v as ThemeName })}
-              />
-            </div>
-          </div>
-
-          <div className="settings-section">
-            <div className="settings-section-title">~syntax</div>
-            <div className="settings-row">
-              <div className="settings-row-label">
-                <span className="settings-row-name">syntax-theme</span>
-              </div>
-              <CustomSelect
-                value={settings.syntaxTheme}
-                options={SYNTAX_THEME_OPTIONS}
-                onChange={(v) => update({ syntaxTheme: v as SyntaxThemeName })}
-              />
-            </div>
-          </div>
-
-          <div className="settings-section">
-            <div className="settings-section-title">~font</div>
-            <div className="settings-row">
-              <div className="settings-row-label">
-                <span className="settings-row-name">font-family</span>
-              </div>
-              <CustomSelect
-                value={settings.terminalFontFamily}
-                options={FONT_OPTIONS}
-                renderOption={(opt) => (
-                  <span style={{ fontFamily: opt.value }}>{opt.label}</span>
-                )}
-                onChange={(v) => update({ terminalFontFamily: v })}
-              />
-            </div>
-
-            <div className="settings-row">
-              <div className="settings-row-label">
-                <span className="settings-row-name">font-size</span>
-              </div>
-              <Stepper
-                value={settings.terminalFontSize}
-                min={10}
-                max={24}
-                suffix="px"
-                onChange={(v) => update({ terminalFontSize: v })}
-              />
-            </div>
-          </div>
-
-          <div className="settings-section">
-            <div className="settings-section-title">~voice</div>
-            <div className="settings-row">
-              <div className="settings-row-label">
-                <span className="settings-row-name">microphone</span>
-              </div>
-              <CustomSelect
-                className="settings-select--mic"
-                value={settings.voiceMicDeviceId}
-                options={micOptions}
-                onChange={(v) => update({ voiceMicDeviceId: v })}
-              />
-            </div>
-            {micStatus && (
+            <div className="settings-section">
+              <div className="settings-section-title">~theme</div>
               <div className="settings-row">
                 <div className="settings-row-label">
-                  <span className="settings-row-name">{micStatus}</span>
+                  <span className="settings-row-name">default-theme</span>
                 </div>
+                <CustomSelect
+                  value={settings.theme}
+                  options={THEME_OPTIONS}
+                  renderOption={(opt) => {
+                    const accent = THEME_OPTIONS.find((t) => t.value === opt.value)?.accent;
+                    return (
+                      <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ color: accent, fontFamily: "var(--font-mono)" }}>#</span>
+                        {opt.label}
+                      </span>
+                    );
+                  }}
+                  onChange={(v) => update({ theme: v as ThemeName })}
+                />
               </div>
-            )}
-
-            <div className="settings-row">
-              <div className="settings-row-label">
-                <span className="settings-row-name">whisper model</span>
-              </div>
-              <CustomSelect
-                value={settings.whisperModel}
-                options={WHISPER_MODEL_OPTIONS.map((m) => {
-                  const status = modelStatuses[m.value];
-                  const downloaded = status?.downloaded;
-                  return {
-                    label: `${m.label} (${m.size})${downloaded ? " *" : ""}`,
-                    value: m.value,
-                  };
-                })}
-                onChange={(v) => update({ whisperModel: v })}
-              />
             </div>
-            {(() => {
-              const status = modelStatuses[settings.whisperModel];
-              if (downloadingModel === settings.whisperModel) {
-                return (
-                  <div className="settings-row">
-                    <div className="settings-row-label">
-                      <span className="settings-row-name">downloading... {downloadPercent}%</span>
-                    </div>
-                  </div>
-                );
-              }
-              if (status && !status.downloaded) {
-                return (
-                  <div className="settings-row">
-                    <div className="settings-row-label">
-                      <span className="settings-row-name">model not downloaded</span>
-                    </div>
-                    <button
-                      className="settings-toggle"
-                      onClick={() => handleDownloadModel(settings.whisperModel)}
-                    >
-                      [download]
-                    </button>
-                  </div>
-                );
-              }
-              if (status?.downloaded) {
-                return (
-                  <div className="settings-row">
-                    <div className="settings-row-label">
-                      <span className="settings-row-name">downloaded</span>
-                    </div>
-                  </div>
-                );
-              }
-              return null;
-            })()}
-          </div>
 
-          <div className="settings-section">
-            <div className="settings-section-title">~sound</div>
-            <div className="settings-row">
-              <div className="settings-row-label">
-                <span className="settings-row-name">waiting notification</span>
+            <div className="settings-section">
+              <div className="settings-section-title">~syntax</div>
+              <div className="settings-row">
+                <div className="settings-row-label">
+                  <span className="settings-row-name">syntax-theme</span>
+                </div>
+                <CustomSelect
+                  value={settings.syntaxTheme}
+                  options={SYNTAX_THEME_OPTIONS}
+                  onChange={(v) => update({ syntaxTheme: v as SyntaxThemeName })}
+                />
               </div>
+            </div>
+
+            <div className="settings-section">
+              <div className="settings-section-title">~font</div>
+              <div className="settings-row">
+                <div className="settings-row-label">
+                  <span className="settings-row-name">font-family</span>
+                </div>
+                <CustomSelect
+                  value={settings.terminalFontFamily}
+                  options={FONT_OPTIONS}
+                  renderOption={(opt) => (
+                    <span style={{ fontFamily: opt.value }}>{opt.label}</span>
+                  )}
+                  onChange={(v) => update({ terminalFontFamily: v })}
+                />
+              </div>
+
+              <div className="settings-row">
+                <div className="settings-row-label">
+                  <span className="settings-row-name">font-size</span>
+                </div>
+                <Stepper
+                  value={settings.terminalFontSize}
+                  min={10}
+                  max={24}
+                  suffix="px"
+                  onChange={(v) => update({ terminalFontSize: v })}
+                />
+              </div>
+            </div>
+
+            <div className="settings-section">
+              <div className="settings-section-title">~voice</div>
+              <div className="settings-row">
+                <div className="settings-row-label">
+                  <span className="settings-row-name">engine</span>
+                </div>
+                <CustomSelect
+                  value={settings.voiceEngine}
+                  options={[
+                    { label: "whisper (local)", value: "whisper" as VoiceEngine },
+                    { label: "edge (browser)", value: "edge" as VoiceEngine },
+                  ]}
+                  onChange={(v) => update({ voiceEngine: v as VoiceEngine })}
+                />
+              </div>
+              <div className="settings-row">
+                <div className="settings-row-label">
+                  <span className="settings-row-name">microphone</span>
+                </div>
+                <CustomSelect
+                  className="settings-select--mic"
+                  value={settings.voiceMicDeviceId}
+                  options={micOptions}
+                  onChange={(v) => update({ voiceMicDeviceId: v })}
+                />
+              </div>
+              {micStatus && (
+                <div className="settings-row">
+                  <div className="settings-row-label">
+                    <span className="settings-row-name">{micStatus}</span>
+                  </div>
+                </div>
+              )}
+
+              {settings.voiceEngine === "whisper" && (
+                <>
+                  <div className="settings-row">
+                    <div className="settings-row-label">
+                      <span className="settings-row-name">whisper model</span>
+                    </div>
+                    <CustomSelect
+                      value={settings.whisperModel}
+                      options={WHISPER_MODEL_OPTIONS.map((m) => {
+                        const status = modelStatuses[m.value];
+                        const downloaded = status?.downloaded;
+                        return {
+                          label: `${m.label} (${m.size})${downloaded ? " *" : ""}`,
+                          value: m.value,
+                        };
+                      })}
+                      onChange={(v) => update({ whisperModel: v })}
+                    />
+                  </div>
+                  {(() => {
+                    const status = modelStatuses[settings.whisperModel];
+                    if (downloadingModel === settings.whisperModel) {
+                      return (
+                        <div className="settings-row">
+                          <div className="settings-row-label">
+                            <span className="settings-row-name">downloading... {downloadPercent}%</span>
+                          </div>
+                        </div>
+                      );
+                    }
+                    if (status && !status.downloaded) {
+                      return (
+                        <div className="settings-row">
+                          <div className="settings-row-label">
+                            <span className="settings-row-name">model not downloaded</span>
+                          </div>
+                          <button
+                            className="settings-toggle"
+                            onClick={() => handleDownloadModel(settings.whisperModel)}
+                          >
+                            [download]
+                          </button>
+                        </div>
+                      );
+                    }
+                    if (status?.downloaded) {
+                      return (
+                        <div className="settings-row">
+                          <div className="settings-row-label">
+                            <span className="settings-row-name">downloaded</span>
+                          </div>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="settings-row">
+                        <div className="settings-row-label">
+                          <span className="settings-row-name" style={{ opacity: 0.4 }}>checking...</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </>
+              )}
+            </div>
+
+            <div className="settings-section">
+              <div className="settings-section-title">~sound</div>
+              <div className="settings-row">
+                <div className="settings-row-label">
+                  <span className="settings-row-name">waiting notification</span>
+                </div>
+                <button
+                  className={`settings-toggle ${settings.soundEnabled ? "settings-toggle--on" : ""}`}
+                  onClick={() => update({ soundEnabled: !settings.soundEnabled })}
+                >
+                  {settings.soundEnabled ? "[on]" : "[off]"}
+                </button>
+              </div>
+            </div>
+
+            <div className="settings-section">
               <button
-                className={`settings-toggle ${settings.soundEnabled ? "settings-toggle--on" : ""}`}
-                onClick={() => update({ soundEnabled: !settings.soundEnabled })}
+                className="settings-section-link"
+                onClick={() => setPage("hotkeys")}
               >
-                {settings.soundEnabled ? "[on]" : "[off]"}
+                <span className="settings-section-link-label">~hotkeys</span>
+                <span className="settings-section-link-chevron">{">"}</span>
               </button>
             </div>
-          </div>
 
-          <div className="settings-section">
-            <div className="settings-section-title">~hotkeys</div>
-            <div className="settings-row">
-              <div className="settings-row-label">
-                <span className="settings-row-name">new session</span>
+            <button
+              className="settings-reset-link"
+              onClick={() => update(DEFAULT_SETTINGS)}
+            >
+              :reset defaults
+            </button>
+          </div>
+        ) : (
+          <div className="settings-dialog-body">
+            <div className="settings-section">
+              <div className="settings-section-title">~hotkeys</div>
+              <div className="settings-row">
+                <div className="settings-row-label">
+                  <span className="settings-row-name">new session</span>
+                </div>
+                <kbd className="settings-hotkey-kbd">ctrl+t</kbd>
               </div>
-              <kbd className="settings-hotkey-kbd">ctrl+t</kbd>
+              <div className="settings-row">
+                <div className="settings-row-label">
+                  <span className="settings-row-name">switch to tab n</span>
+                </div>
+                <kbd className="settings-hotkey-kbd">ctrl+1-9</kbd>
+              </div>
+              <div className="settings-row">
+                <div className="settings-row-label">
+                  <span className="settings-row-name">next / prev tab</span>
+                </div>
+                <kbd className="settings-hotkey-kbd">ctrl+left/right</kbd>
+              </div>
+              <div className="settings-row">
+                <div className="settings-row-label">
+                  <span className="settings-row-name">next / prev project</span>
+                </div>
+                <kbd className="settings-hotkey-kbd">ctrl+up/down</kbd>
+              </div>
             </div>
-            <div className="settings-row">
-              <div className="settings-row-label">
-                <span className="settings-row-name">switch to tab n</span>
+            <div className="settings-section">
+              <div className="settings-section-title">~actions</div>
+              <div className="settings-row">
+                <div className="settings-row-label">
+                  <span className="settings-row-name">commit message</span>
+                </div>
+                <kbd className="settings-hotkey-kbd">ctrl+enter</kbd>
               </div>
-              <kbd className="settings-hotkey-kbd">ctrl+1-9</kbd>
+              <div className="settings-row">
+                <div className="settings-row-label">
+                  <span className="settings-row-name">voice-to-text</span>
+                </div>
+                <kbd className="settings-hotkey-kbd">ctrl+space</kbd>
+              </div>
+              <div className="settings-row">
+                <div className="settings-row-label">
+                  <span className="settings-row-name">toggle notes</span>
+                </div>
+                <kbd className="settings-hotkey-kbd">ctrl+n</kbd>
+              </div>
+              <div className="settings-row">
+                <div className="settings-row-label">
+                  <span className="settings-row-name">regenerate title</span>
+                </div>
+                <kbd className="settings-hotkey-kbd">ctrl+r</kbd>
+              </div>
             </div>
-            <div className="settings-row">
-              <div className="settings-row-label">
-                <span className="settings-row-name">close dialog</span>
+            <div className="settings-section">
+              <div className="settings-section-title">~general</div>
+              <div className="settings-row">
+                <div className="settings-row-label">
+                  <span className="settings-row-name">close dialog</span>
+                </div>
+                <kbd className="settings-hotkey-kbd">esc</kbd>
               </div>
-              <kbd className="settings-hotkey-kbd">esc</kbd>
-            </div>
-            <div className="settings-row">
-              <div className="settings-row-label">
-                <span className="settings-row-name">commit</span>
-              </div>
-              <kbd className="settings-hotkey-kbd">ctrl+enter</kbd>
-            </div>
-            <div className="settings-row">
-              <div className="settings-row-label">
-                <span className="settings-row-name">voice-to-text</span>
-              </div>
-              <kbd className="settings-hotkey-kbd">ctrl+space</kbd>
             </div>
           </div>
-
-          <button
-            className="settings-reset-link"
-            onClick={() => update(DEFAULT_SETTINGS)}
-          >
-            :reset defaults
-          </button>
-        </div>
+        )}
       </div>
     </div>
   );

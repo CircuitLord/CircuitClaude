@@ -28,6 +28,7 @@ export function useHotkeys() {
   const setActiveProject = useSessionStore((s) => s.setActiveProject);
   const setSessionTitle = useSessionStore((s) => s.setSessionTitle);
   const projects = useProjectStore((s) => s.projects);
+  const voiceEngine = useSettingsStore((s) => s.settings.voiceEngine);
   const voiceMicDeviceId = useSettingsStore((s) => s.settings.voiceMicDeviceId);
   const whisperModel = useSettingsStore((s) => s.settings.whisperModel);
   const voiceTargetTabIdRef = useRef<string | null>(null);
@@ -175,6 +176,10 @@ export function useHotkeys() {
   }, []);
 
   useEffect(() => {
+    voiceInputController.setEngine(voiceEngine);
+  }, [voiceEngine]);
+
+  useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       // Skip when dialog/overlay is open
       if (document.querySelector(".dialog-overlay") || document.querySelector(".diff-overlay")) return;
@@ -218,11 +223,13 @@ export function useHotkeys() {
         voiceTargetSessionIdRef.current = active.sessionId;
         useVoiceStore.getState().setStatus("starting microphone...", active.id);
         voiceInputController.setDeviceId(voiceMicDeviceId);
-        voiceInputController.setModelName(whisperModel);
+        if (voiceEngine === "whisper") {
+          voiceInputController.setModelName(whisperModel);
+        }
 
         const capturedSessionId = active.sessionId;
         voiceInputController.start().then((ok) => {
-          if (!ok && capturedSessionId) {
+          if (!ok && voiceEngine === "whisper" && capturedSessionId) {
             // Check if it's a model-not-found error — trigger auto-download
             const lastErr = useVoiceStore.getState().lastError;
             if (lastErr && (lastErr.includes("Model not found") || lastErr.includes("not found"))) {
@@ -310,5 +317,5 @@ export function useHotkeys() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown, { capture: true });
     };
-  }, [sessions, activeSessionId, activeProjectPath, setActiveSession, setActiveProject, setSessionTitle, projects, voiceMicDeviceId, whisperModel]);
+  }, [sessions, activeSessionId, activeProjectPath, setActiveSession, setActiveProject, setSessionTitle, projects, voiceEngine, voiceMicDeviceId, whisperModel]);
 }

@@ -88,6 +88,10 @@ fn default_sidebar_panel_mode() -> String {
     "source".to_string()
 }
 
+fn default_voice_engine() -> String {
+    "whisper".to_string()
+}
+
 fn default_voice_mic_device_id() -> String {
     "default".to_string()
 }
@@ -113,6 +117,8 @@ pub struct SettingsConfig {
     pub sidebar_panel_mode: String,
     #[serde(default)]
     pub notes_panel_open: bool,
+    #[serde(default = "default_voice_engine")]
+    pub voice_engine: String,
     #[serde(default = "default_voice_mic_device_id")]
     pub voice_mic_device_id: String,
     #[serde(default = "default_whisper_model")]

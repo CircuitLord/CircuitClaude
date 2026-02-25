@@ -23,8 +23,18 @@ export function NewSessionMenu({ variant }: NewSessionMenuProps) {
         setOpen(false);
       }
     }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        (document.activeElement as HTMLElement)?.blur?.();
+        setOpen(false);
+      }
+    }
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    window.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("keydown", handleKey);
+    };
   }, [open]);
 
   function handleSelect(type: "claude" | "codex" | "opencode" | "terminal") {

@@ -1713,6 +1713,22 @@ body,
   color: var(--text-primary);
 }
 
+.settings-dialog-back {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  font-weight: 400;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: color 0.1s;
+}
+
+.settings-dialog-back:hover {
+  color: var(--accent-text);
+}
+
 .settings-dialog-body {
   padding: 0;
 }
@@ -1776,6 +1792,10 @@ body,
   padding-top: 4px;
 }
 
+.settings-section:has(> .settings-section-link) {
+  padding-top: 0;
+}
+
 .settings-section-title {
   font-size: 13px;
   font-weight: 400;
@@ -1785,6 +1805,43 @@ body,
   height: 36px;
   display: flex;
   align-items: center;
+}
+
+/* --- Section Link (drill-down navigation) --- */
+
+.settings-section-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.settings-section-link:hover {
+  background: var(--bg-elevated);
+}
+
+.settings-section-link-label {
+  font-size: 13px;
+  font-weight: 400;
+  font-family: var(--font-mono);
+  color: var(--accent-text);
+}
+
+.settings-section-link-chevron {
+  font-size: 13px;
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+  transition: color 0.1s;
+}
+
+.settings-section-link:hover .settings-section-link-chevron {
+  color: var(--accent-text);
 }
 
 /* --- Row (label + control) --- */
