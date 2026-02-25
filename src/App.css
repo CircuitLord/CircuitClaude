@@ -1129,13 +1129,16 @@ body,
 .project-header-text-btn {
   background: none;
   border: none;
-  padding: 0 2px;
+  padding: 0 8px;
   color: var(--text-tertiary);
   cursor: pointer;
   font-size: 13px;
   font-family: var(--font-mono);
   transition: color 0.1s;
   -webkit-app-region: no-drag;
+  height: 100%;
+  display: flex;
+  align-items: center;
 }
 
 .project-header-text-btn:hover {

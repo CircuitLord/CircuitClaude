@@ -201,11 +201,15 @@ pub fn git_push(project_path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn generate_commit_message(
+pub async fn generate_commit_message(
     project_path: String,
     files: Vec<git::GitFileEntry>,
 ) -> Result<git::GenerateResult, String> {
-    git::generate_commit_message(&project_path, &files)
+    tauri::async_runtime::spawn_blocking(move || {
+        git::generate_commit_message(&project_path, &files)
+    })
+    .await
+    .map_err(|e| format!("Task join failed: {}", e))?
 }
 
 #[tauri::command]
@@ -256,14 +260,7 @@ pub fn load_note(project_path: String) -> String {
 #[tauri::command]
 pub fn save_note(project_path: String, content: String) -> Result<(), String> {
     let path = std::path::Path::new(&project_path).join("notes.md");
-    if content.is_empty() {
-        if path.exists() {
-            std::fs::remove_file(&path).map_err(|e| e.to_string())?;
-        }
-        Ok(())
-    } else {
-        std::fs::write(&path, &content).map_err(|e| e.to_string())
-    }
+    std::fs::write(&path, &content).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

@@ -1,1 +1,0 @@
-when pressing enter to submit, delay it by a second or so to give the VC time to catch up

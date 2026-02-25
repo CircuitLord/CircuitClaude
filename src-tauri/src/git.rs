@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::Write;
 use std::os::windows::process::CommandExt;
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
 const CREATE_NO_WINDOW: u32 = 0x08000000;
@@ -11,6 +12,49 @@ fn git_cmd() -> Command {
     let mut cmd = Command::new("git");
     cmd.creation_flags(CREATE_NO_WINDOW);
     cmd
+}
+
+/// Resolves the full path to the `claude` executable.
+/// Checks known install locations since the Tauri process may not inherit
+/// the same PATH as the user's shell (where PTY sessions work fine).
+fn find_claude_exe() -> Result<PathBuf, String> {
+    // Check PATH first via `where`
+    if let Ok(output) = Command::new("cmd.exe")
+        .args(["/c", "where", "claude"])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+    {
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            if let Some(first_line) = stdout.lines().next() {
+                let p = PathBuf::from(first_line.trim());
+                if p.exists() {
+                    return Ok(p);
+                }
+            }
+        }
+    }
+
+    // Check known install locations
+    if let Some(home) = std::env::var_os("USERPROFILE") {
+        let candidates = [
+            PathBuf::from(&home).join(".local/bin/claude.exe"),
+            PathBuf::from(&home).join(".local/bin/claude.cmd"),
+        ];
+        for c in &candidates {
+            if c.exists() {
+                return Ok(c.clone());
+            }
+        }
+    }
+    if let Some(appdata) = std::env::var_os("APPDATA") {
+        let c = PathBuf::from(appdata).join("npm/claude.cmd");
+        if c.exists() {
+            return Ok(c);
+        }
+    }
+
+    Err("Could not find claude CLI. Ensure it is installed and in PATH.".to_string())
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -307,32 +351,22 @@ pub fn generate_commit_message(
         return Err("No diff content to generate a message from".to_string());
     }
 
-    let file_count = files.len();
-    let brevity_hint = if file_count <= 3 {
-        "This is a small change — use a SINGLE line only. No body, no bullets."
-    } else {
-        "Only add bullet points if the changes span many unrelated concerns. Prefer a single line."
-    };
-
     let prompt = format!(
-        "Generate a brief git commit message for this diff. \
+        "Generate a git commit message for this diff. \
          Rules: output ONLY the message, no quotes, no prefixes, no explanation. \
          Imperative mood (\"Add\" not \"Added\"). First line under 72 chars. \
-         {}\n\n{}",
-        brevity_hint, combined_diff
+         After the first line, add a blank line then a few bullet points (using \"-\") \
+         covering only the important changes. Skip trivial stuff like whitespace, \
+         imports, or minor rewording. Keep each bullet to one short line.\n\n{}",
+        combined_diff
     );
 
     let model = "claude-haiku-4-5-20251001";
 
-    let mut child = Command::new("cmd.exe")
-        .args([
-            "/c",
-            "claude",
-            "-p",
-            "--no-session-persistence",
-            "--model",
-            model,
-        ])
+    let claude_path = find_claude_exe()?;
+
+    let mut child = Command::new(&claude_path)
+        .args(["-p", "--no-session-persistence", "--model", model])
         .current_dir(project_path)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
