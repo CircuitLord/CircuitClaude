@@ -4,6 +4,7 @@ use crate::config::{self, ProjectConfig, SettingsConfig};
 use crate::conversation;
 use crate::git;
 use crate::pty_manager::{AttachStreamResult, PtyManager, PtyOutputEvent, PtySessionInfo};
+use crate::whisper_manager::{DownloadProgress, ModelInfo, WhisperEvent, WhisperManager};
 use tauri::ipc::Channel;
 use tauri::State;
 
@@ -551,4 +552,91 @@ pub fn save_clipboard_image(
 #[tauri::command]
 pub fn exit_app(app_handle: tauri::AppHandle) {
     app_handle.exit(0);
+}
+
+// --- Whisper STT commands ---
+// start_session, stop_session, load_model, and download_model are async because
+// they can block for seconds (model loading, inference, HTTP download).
+// push_audio stays synchronous — it just appends to a buffer and is called ~4x/sec.
+
+#[tauri::command]
+pub async fn whisper_start_session(
+    whisper_manager: State<'_, WhisperManager>,
+    session_id: String,
+    model_name: String,
+    on_event: Channel<WhisperEvent>,
+) -> Result<(), String> {
+    let wm = whisper_manager.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        wm.start_session(&session_id, &model_name, on_event)
+    })
+    .await
+    .map_err(|e| format!("Task join failed: {}", e))?
+}
+
+#[tauri::command]
+pub fn whisper_push_audio(
+    whisper_manager: State<'_, WhisperManager>,
+    session_id: String,
+    samples: Vec<f32>,
+) -> Result<(), String> {
+    whisper_manager.push_audio(&session_id, samples)
+}
+
+#[tauri::command]
+pub async fn whisper_stop_session(
+    whisper_manager: State<'_, WhisperManager>,
+    session_id: String,
+) -> Result<String, String> {
+    let wm = whisper_manager.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || wm.stop_session(&session_id))
+        .await
+        .map_err(|e| format!("Task join failed: {}", e))?
+}
+
+#[tauri::command]
+pub fn whisper_cancel_session(
+    whisper_manager: State<'_, WhisperManager>,
+    session_id: String,
+) -> Result<(), String> {
+    whisper_manager.cancel_session(&session_id);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn whisper_load_model(
+    whisper_manager: State<'_, WhisperManager>,
+    model_name: String,
+) -> Result<(), String> {
+    let wm = whisper_manager.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || wm.load_model(&model_name))
+        .await
+        .map_err(|e| format!("Task join failed: {}", e))?
+}
+
+#[tauri::command]
+pub fn whisper_get_available_models(
+    whisper_manager: State<'_, WhisperManager>,
+) -> Vec<ModelInfo> {
+    whisper_manager.get_available_models()
+}
+
+#[tauri::command]
+pub async fn whisper_download_model(
+    whisper_manager: State<'_, WhisperManager>,
+    model_name: String,
+    on_progress: Channel<DownloadProgress>,
+) -> Result<(), String> {
+    let wm = whisper_manager.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || wm.download_model(&model_name, on_progress))
+        .await
+        .map_err(|e| format!("Task join failed: {}", e))?
+}
+
+#[tauri::command]
+pub fn whisper_get_model_status(
+    whisper_manager: State<'_, WhisperManager>,
+    model_name: String,
+) -> ModelInfo {
+    whisper_manager.get_model_status(&model_name)
 }

@@ -15,7 +15,7 @@ pub struct ProjectConfig {
     pub theme: String,
 }
 
-pub(crate) fn config_dir(app_handle: &tauri::AppHandle) -> PathBuf {
+pub fn config_dir(app_handle: &tauri::AppHandle) -> PathBuf {
     let dir = app_handle.path().app_config_dir().unwrap_or_else(|_| {
         dirs::config_dir()
             .unwrap_or_else(|| PathBuf::from("."))
@@ -92,6 +92,10 @@ fn default_voice_mic_device_id() -> String {
     "default".to_string()
 }
 
+fn default_whisper_model() -> String {
+    "base.en".to_string()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SettingsConfig {
@@ -111,6 +115,8 @@ pub struct SettingsConfig {
     pub notes_panel_open: bool,
     #[serde(default = "default_voice_mic_device_id")]
     pub voice_mic_device_id: String,
+    #[serde(default = "default_whisper_model")]
+    pub whisper_model: String,
 }
 
 fn settings_path(app_handle: &tauri::AppHandle) -> PathBuf {

@@ -7,6 +7,7 @@ mod config;
 mod conversation;
 mod git;
 mod pty_manager;
+mod whisper_manager;
 
 fn resolve_bridge_path(app: &tauri::App) -> String {
     // In dev: use CARGO_MANIFEST_DIR/sidecar/claude-bridge.mjs
@@ -39,6 +40,13 @@ pub fn run() {
         .setup(|app| {
             let bridge_path = resolve_bridge_path(app);
             app.manage(claude_manager::ClaudeManager::new(bridge_path));
+
+            // Set up whisper models directory
+            let config_dir = config::config_dir(&app.handle());
+            let models_dir = config_dir.join("models").join("whisper");
+            std::fs::create_dir_all(&models_dir).ok();
+            app.manage(whisper_manager::WhisperManager::new(models_dir));
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -79,6 +87,14 @@ pub fn run() {
             commands::read_directory,
             commands::save_clipboard_image,
             commands::exit_app,
+            commands::whisper_start_session,
+            commands::whisper_push_audio,
+            commands::whisper_stop_session,
+            commands::whisper_cancel_session,
+            commands::whisper_load_model,
+            commands::whisper_get_available_models,
+            commands::whisper_download_model,
+            commands::whisper_get_model_status,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
@@ -88,6 +104,8 @@ pub fn run() {
                 pty_manager.close_all("app_exit");
                 let claude_manager = app.state::<claude_manager::ClaudeManager>();
                 claude_manager.destroy_all();
+                let whisper_manager = app.state::<whisper_manager::WhisperManager>();
+                whisper_manager.cancel_all();
                 config::cleanup_old_screenshots(&app.app_handle());
             }
         });

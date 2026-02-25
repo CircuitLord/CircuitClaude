@@ -5,8 +5,10 @@ import { useNotesStore } from "../stores/notesStore";
 import { spawnNewSession } from "../lib/sessions";
 import { regenerateCodexTitle } from "../lib/codexTitles";
 import { voiceInputController, type VoiceInputState } from "../lib/voiceInput";
+import { whisperDownloadModel, whisperGetModelStatus, type DownloadProgress } from "../lib/whisper";
 import { useVoiceStore } from "../stores/voiceStore";
 import { useSettingsStore } from "../stores/settingsStore";
+import { Channel } from "@tauri-apps/api/core";
 
 function isCtrlSpaceHotkey(e: KeyboardEvent): boolean {
   return (
@@ -27,6 +29,7 @@ export function useHotkeys() {
   const setSessionTitle = useSessionStore((s) => s.setSessionTitle);
   const projects = useProjectStore((s) => s.projects);
   const voiceMicDeviceId = useSettingsStore((s) => s.settings.voiceMicDeviceId);
+  const whisperModel = useSettingsStore((s) => s.settings.whisperModel);
   const voiceTargetTabIdRef = useRef<string | null>(null);
   const voiceTargetSessionIdRef = useRef<string | null>(null);
   const voiceStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -48,13 +51,65 @@ export function useHotkeys() {
     }, delayMs);
   }
 
+  async function autoDownloadAndRetry(tabId: string, sessionId: string) {
+    const model = useSettingsStore.getState().settings.whisperModel;
+
+    // Check if already downloaded
+    try {
+      const status = await whisperGetModelStatus(model);
+      if (status.downloaded) {
+        // Model exists but failed to load for another reason
+        useVoiceStore.getState().setError("failed to load whisper model", tabId);
+        clearVoiceStatusAfter();
+        return;
+      }
+    } catch {
+      // Proceed with download attempt
+    }
+
+    useVoiceStore.getState().setStatus(`downloading ${model} model...`, tabId);
+
+    const progressChannel = new Channel<DownloadProgress>();
+    progressChannel.onmessage = (event: DownloadProgress) => {
+      if (event.type === "Progress") {
+        useVoiceStore.getState().setStatus(
+          `downloading ${model} (${Math.round(event.data.percent)}%)...`,
+          tabId,
+        );
+      }
+    };
+
+    try {
+      await whisperDownloadModel(model, progressChannel);
+      useVoiceStore.getState().setStatus("model downloaded, starting...", tabId);
+
+      // Retry voice start
+      voiceTargetTabIdRef.current = tabId;
+      voiceTargetSessionIdRef.current = sessionId;
+      voiceInputController.setModelName(model);
+      const ok = await voiceInputController.start();
+      if (!ok) {
+        useVoiceStore.getState().setError("failed to start after download", tabId);
+        clearVoiceStatusAfter();
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      useVoiceStore.getState().setError(`download failed: ${message}`, tabId);
+      clearVoiceStatusAfter();
+    }
+  }
+
   useEffect(() => {
     voiceInputController.configureHandlers({
       onStateChange: (state: VoiceInputState) => {
         // Don't re-populate the store if already dismissed (Escape/Enter)
-        if (!useVoiceStore.getState().targetTabId && state !== "listening") return;
+        if (!useVoiceStore.getState().targetTabId && state !== "listening" && state !== "loading") return;
         const targetTabId = voiceTargetTabIdRef.current;
         const targetSessionId = voiceTargetSessionIdRef.current;
+        if (state === "loading" && targetTabId) {
+          useVoiceStore.getState().setStatus("loading model...", targetTabId);
+          return;
+        }
         if (state === "listening" && targetTabId && targetSessionId) {
           // Capture existing text as the base so new speech appends after it
           voiceTranscriptBaseRef.current = useVoiceStore.getState().transcriptText;
@@ -163,7 +218,18 @@ export function useHotkeys() {
         voiceTargetSessionIdRef.current = active.sessionId;
         useVoiceStore.getState().setStatus("starting microphone...", active.id);
         voiceInputController.setDeviceId(voiceMicDeviceId);
-        voiceInputController.start().catch(() => {
+        voiceInputController.setModelName(whisperModel);
+
+        const capturedSessionId = active.sessionId;
+        voiceInputController.start().then((ok) => {
+          if (!ok && capturedSessionId) {
+            // Check if it's a model-not-found error — trigger auto-download
+            const lastErr = useVoiceStore.getState().lastError;
+            if (lastErr && (lastErr.includes("Model not found") || lastErr.includes("not found"))) {
+              void autoDownloadAndRetry(active.id, capturedSessionId);
+            }
+          }
+        }).catch(() => {
           useVoiceStore.getState().setError("unable to start voice capture", active.id);
           clearVoiceStatusAfter();
         });
@@ -244,5 +310,5 @@ export function useHotkeys() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown, { capture: true });
     };
-  }, [sessions, activeSessionId, activeProjectPath, setActiveSession, setActiveProject, setSessionTitle, projects, voiceMicDeviceId]);
+  }, [sessions, activeSessionId, activeProjectPath, setActiveSession, setActiveProject, setSessionTitle, projects, voiceMicDeviceId, whisperModel]);
 }

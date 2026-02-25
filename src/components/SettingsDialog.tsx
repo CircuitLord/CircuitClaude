@@ -2,6 +2,8 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useSettingsStore } from "../stores/settingsStore";
 import { DEFAULT_SETTINGS, ThemeName, SyntaxThemeName } from "../types";
 import { THEME_OPTIONS, SYNTAX_THEME_OPTIONS } from "../lib/themes";
+import { whisperGetAvailableModels, whisperDownloadModel, type ModelInfo, type DownloadProgress } from "../lib/whisper";
+import { Channel } from "@tauri-apps/api/core";
 
 export function GearIcon() {
   return (
@@ -34,6 +36,13 @@ const FONT_OPTIONS = [
 ];
 
 const DEFAULT_MIC_OPTIONS = [{ label: "system default", value: "default" }];
+
+const WHISPER_MODEL_OPTIONS: Array<{ label: string; value: string; size: string }> = [
+  { label: "tiny.en", value: "tiny.en", size: "~75 MB" },
+  { label: "base.en", value: "base.en", size: "~142 MB" },
+  { label: "small.en", value: "small.en", size: "~466 MB" },
+  { label: "medium.en", value: "medium.en", size: "~1.5 GB" },
+];
 
 /* ------------------------------------------------------------------ */
 /*  Custom Stepper — text +/-                                         */
@@ -175,6 +184,9 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
   const { settings, update } = useSettingsStore();
   const [micOptions, setMicOptions] = useState(DEFAULT_MIC_OPTIONS);
   const [micStatus, setMicStatus] = useState<string | null>(null);
+  const [modelStatuses, setModelStatuses] = useState<Record<string, ModelInfo>>({});
+  const [downloadingModel, setDownloadingModel] = useState<string | null>(null);
+  const [downloadPercent, setDownloadPercent] = useState(0);
 
   const refreshMicrophones = useCallback(async () => {
     if (!navigator.mediaDevices?.enumerateDevices) {
@@ -210,9 +222,45 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
     }
   }, [settings.voiceMicDeviceId, update]);
 
+  const refreshModels = useCallback(async () => {
+    try {
+      const models = await whisperGetAvailableModels();
+      const statuses: Record<string, ModelInfo> = {};
+      for (const m of models) {
+        statuses[m.name] = m;
+      }
+      setModelStatuses(statuses);
+    } catch {
+      // Ignore — models just won't show status
+    }
+  }, []);
+
+  const handleDownloadModel = useCallback(async (modelName: string) => {
+    setDownloadingModel(modelName);
+    setDownloadPercent(0);
+
+    const progressChannel = new Channel<DownloadProgress>();
+    progressChannel.onmessage = (event: DownloadProgress) => {
+      if (event.type === "Progress") {
+        setDownloadPercent(Math.round(event.data.percent));
+      }
+    };
+
+    try {
+      await whisperDownloadModel(modelName, progressChannel);
+      await refreshModels();
+    } catch {
+      // Error handled by UI state
+    } finally {
+      setDownloadingModel(null);
+      setDownloadPercent(0);
+    }
+  }, [refreshModels]);
+
   useEffect(() => {
     if (!isOpen) return;
     void refreshMicrophones();
+    void refreshModels();
 
     if (!navigator.mediaDevices?.addEventListener) return;
     const onDeviceChange = () => {
@@ -324,6 +372,61 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                 </div>
               </div>
             )}
+
+            <div className="settings-row">
+              <div className="settings-row-label">
+                <span className="settings-row-name">whisper model</span>
+              </div>
+              <CustomSelect
+                value={settings.whisperModel}
+                options={WHISPER_MODEL_OPTIONS.map((m) => {
+                  const status = modelStatuses[m.value];
+                  const downloaded = status?.downloaded;
+                  return {
+                    label: `${m.label} (${m.size})${downloaded ? " *" : ""}`,
+                    value: m.value,
+                  };
+                })}
+                onChange={(v) => update({ whisperModel: v })}
+              />
+            </div>
+            {(() => {
+              const status = modelStatuses[settings.whisperModel];
+              if (downloadingModel === settings.whisperModel) {
+                return (
+                  <div className="settings-row">
+                    <div className="settings-row-label">
+                      <span className="settings-row-name">downloading... {downloadPercent}%</span>
+                    </div>
+                  </div>
+                );
+              }
+              if (status && !status.downloaded) {
+                return (
+                  <div className="settings-row">
+                    <div className="settings-row-label">
+                      <span className="settings-row-name">model not downloaded</span>
+                    </div>
+                    <button
+                      className="settings-toggle"
+                      onClick={() => handleDownloadModel(settings.whisperModel)}
+                    >
+                      [download]
+                    </button>
+                  </div>
+                );
+              }
+              if (status?.downloaded) {
+                return (
+                  <div className="settings-row">
+                    <div className="settings-row-label">
+                      <span className="settings-row-name">downloaded</span>
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })()}
           </div>
 
           <div className="settings-section">

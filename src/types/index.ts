@@ -167,6 +167,7 @@ export interface Settings {
   notesPanelOpen: boolean;
   notesPanelWidth: number;
   voiceMicDeviceId: string;
+  whisperModel: string;
   soundEnabled: boolean;
 }
 
@@ -180,5 +181,6 @@ export const DEFAULT_SETTINGS: Settings = {
   notesPanelOpen: false,
   notesPanelWidth: 350,
   voiceMicDeviceId: "default",
+  whisperModel: "base.en",
   soundEnabled: true,
 };
