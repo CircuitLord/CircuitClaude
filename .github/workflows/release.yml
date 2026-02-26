@@ -30,10 +30,20 @@ jobs:
           workspaces: "./src-tauri -> target"
 
       - name: Install CUDA Toolkit
+        id: cuda
         uses: Jimver/cuda-toolkit@master
         with:
           cuda: "13.1.0"
           method: network
+
+      - name: Add CUDA libs to linker path
+        shell: bash
+        run: |
+          echo "CUDA_PATH=$CUDA_PATH"
+          # Find where cublas.lib actually lives
+          find "$CUDA_PATH" -name "cublas.lib" 2>/dev/null || echo "cublas.lib not found!"
+          # Add all possible lib dirs to LIB env var
+          echo "LIB=$CUDA_PATH\\lib\\x64;$CUDA_PATH\\lib;$LIB" >> $GITHUB_ENV
 
       - name: Install frontend dependencies
         run: npm ci
