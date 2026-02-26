@@ -36,8 +36,13 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_process::init())
         .manage(pty_manager::PtyManager::new())
         .setup(|app| {
+            #[cfg(desktop)]
+            app.handle()
+                .plugin(tauri_plugin_updater::Builder::new().build())?;
+
             let bridge_path = resolve_bridge_path(app);
             app.manage(claude_manager::ClaudeManager::new(bridge_path));
 

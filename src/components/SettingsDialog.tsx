@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { getVersion } from "@tauri-apps/api/app";
 import { useSettingsStore } from "../stores/settingsStore";
 import { DEFAULT_SETTINGS, ThemeName, SyntaxThemeName, type VoiceEngine } from "../types";
 import { THEME_OPTIONS, SYNTAX_THEME_OPTIONS } from "../lib/themes";
 import { whisperGetAvailableModels, whisperDownloadModel, type ModelInfo, type DownloadProgress } from "../lib/whisper";
+import { checkForUpdate, downloadAndInstallUpdate } from "../lib/updater";
 import { Channel } from "@tauri-apps/api/core";
 
 export function GearIcon() {
@@ -200,6 +202,9 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
   const [modelStatuses, setModelStatuses] = useState<Record<string, ModelInfo>>({});
   const [downloadingModel, setDownloadingModel] = useState<string | null>(null);
   const [downloadPercent, setDownloadPercent] = useState(0);
+  const [appVersion, setAppVersion] = useState("");
+  const [updateCheckStatus, setUpdateCheckStatus] = useState<"idle" | "checking" | "available" | "installing" | "up-to-date" | "error">("idle");
+  const [availableVersion, setAvailableVersion] = useState<string | null>(null);
 
   const refreshMicrophones = useCallback(async () => {
     if (!navigator.mediaDevices?.enumerateDevices) {
@@ -270,8 +275,33 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
     }
   }, [refreshModels]);
 
+  const handleCheckUpdate = useCallback(async () => {
+    setUpdateCheckStatus("checking");
+    try {
+      const info = await checkForUpdate();
+      if (info) {
+        setAvailableVersion(info.version);
+        setUpdateCheckStatus("available");
+      } else {
+        setUpdateCheckStatus("up-to-date");
+      }
+    } catch {
+      setUpdateCheckStatus("error");
+    }
+  }, []);
+
+  const handleInstallUpdate = useCallback(async () => {
+    setUpdateCheckStatus("installing");
+    try {
+      await downloadAndInstallUpdate();
+    } catch {
+      setUpdateCheckStatus("error");
+    }
+  }, []);
+
   useEffect(() => {
     if (!isOpen) return;
+    getVersion().then(setAppVersion).catch(() => {});
     void refreshMicrophones();
     if (settings.voiceEngine === "whisper") {
       void refreshModels();
@@ -513,6 +543,37 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                 <span className="settings-section-link-label">~hotkeys</span>
                 <span className="settings-section-link-chevron">{">"}</span>
               </button>
+            </div>
+
+            <div className="settings-section">
+              <div className="settings-section-title">~about</div>
+              <div className="settings-row">
+                <div className="settings-row-label">
+                  <span className="settings-row-name">version</span>
+                </div>
+                <span className="settings-row-value">{appVersion || "..."}</span>
+              </div>
+              <div className="settings-row">
+                <div className="settings-row-label">
+                  <span className="settings-row-name">
+                    {updateCheckStatus === "checking" ? "checking..." :
+                     updateCheckStatus === "available" ? `${availableVersion} available` :
+                     updateCheckStatus === "installing" ? "installing..." :
+                     updateCheckStatus === "up-to-date" ? "up to date" :
+                     updateCheckStatus === "error" ? "check failed" :
+                     "updates"}
+                  </span>
+                </div>
+                {updateCheckStatus === "available" ? (
+                  <button className="settings-toggle" onClick={handleInstallUpdate}>
+                    :install
+                  </button>
+                ) : updateCheckStatus === "checking" || updateCheckStatus === "installing" ? null : (
+                  <button className="settings-toggle" onClick={handleCheckUpdate}>
+                    :check now
+                  </button>
+                )}
+              </div>
             </div>
 
             <button

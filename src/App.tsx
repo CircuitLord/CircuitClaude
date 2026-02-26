@@ -15,12 +15,14 @@ import { useProjectStore } from "./stores/projectStore";
 import { useGitStore } from "./stores/gitStore";
 import { applyThemeToDOM, applySyntaxThemeToDOM } from "./lib/themes";
 import { useHotkeys } from "./hooks/useHotkeys";
+import { useUpdateCheck } from "./hooks/useUpdateCheck";
 import "./App.css";
 
 function App() {
   const { sessions, activeProjectPath } = useSessionStore();
   const projects = useProjectStore((s) => s.projects);
   const initializedRef = useRef(false);
+  const { status: updateStatus, updateInfo, install: installUpdate, dismiss: dismissUpdate } = useUpdateCheck();
   useHotkeys();
 
   // Load settings and projects on startup
@@ -107,6 +109,26 @@ function App() {
       <div className="app">
         <Sidebar />
         <div className="main-panel">
+          {updateStatus === "available" && updateInfo && (
+            <div className="update-banner">
+              <span className="update-banner-text">
+                update available: {updateInfo.version}
+              </span>
+              <div className="update-banner-actions">
+                <button className="update-banner-action" onClick={dismissUpdate}>
+                  :dismiss
+                </button>
+                <button className="update-banner-action update-banner-action--primary" onClick={installUpdate}>
+                  :install
+                </button>
+              </div>
+            </div>
+          )}
+          {updateStatus === "downloading" && (
+            <div className="update-banner">
+              <span className="update-banner-text">installing update...</span>
+            </div>
+          )}
           {activeProjectPath ? (
             <ProjectHeader />
           ) : (
