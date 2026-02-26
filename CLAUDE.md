@@ -60,7 +60,7 @@ Rust Backend (Tauri commands → PtyManager → portable-pty)
 
 Tag-triggered CI via `.github/workflows/release.yml`. Push a `v*` tag to build and publish to GitHub Releases.
 
-- **CUDA version**: CI must match the local CUDA toolkit version (currently **13.1**). The binary links against a specific CUDA major version at compile time — a mismatch means missing DLLs at runtime. If the local CUDA version changes, update the `cuda:` field in the workflow.
+- **CUDA DLLs**: Bundled with the installer via `scripts/copy-cuda-dlls.cjs` (runs in `beforeBuildCommand`). DLLs are copied from the CUDA toolkit into `src-tauri/cuda-runtime/` (gitignored). CI must match the local CUDA toolkit version (currently **13.1**). If the CUDA version changes, update: the CI workflow `cuda:` field, DLL filenames in `tauri.conf.json` resources, and `scripts/copy-cuda-dlls.cjs`.
 - **Version bumps**: Must update all three: `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, `package.json`
 - **Tauri package versions**: Rust crate and npm package major.minor must match (e.g. `tauri v2.9` ↔ `@tauri-apps/api v2.9.x`). Mismatches cause build failures.
 

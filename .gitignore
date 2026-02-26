@@ -32,3 +32,6 @@ tasks/
 # Tauri signing keys
 *.key
 *.key.pub
+
+# Bundled CUDA runtime DLLs (copied from CUDA toolkit during build)
+src-tauri/cuda-runtime/
