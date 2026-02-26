@@ -56,6 +56,14 @@ Rust Backend (Tauri commands → PtyManager → portable-pty)
 - Enum variants sent over Channel require `#[serde(tag = "type", content = "data")]` for JS deserialization
 - Tauri Rust crate version (`~2.9` in Cargo.toml) must match `@tauri-apps/api` npm package major.minor version
 
+## Releases
+
+Tag-triggered CI via `.github/workflows/release.yml`. Push a `v*` tag to build and publish to GitHub Releases.
+
+- **CUDA version**: CI must match the local CUDA toolkit version (currently **13.1**). The binary links against a specific CUDA major version at compile time — a mismatch means missing DLLs at runtime. If the local CUDA version changes, update the `cuda:` field in the workflow.
+- **Version bumps**: Must update all three: `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, `package.json`
+- **Tauri package versions**: Rust crate and npm package major.minor must match (e.g. `tauri v2.9` ↔ `@tauri-apps/api v2.9.x`). Mismatches cause build failures.
+
 ## Platform Notes
 
 - Windows-only PTY invocation: `cmd.exe /c claude` (Claude CLI is an npm global `.cmd` shim)
