@@ -1,6 +1,6 @@
 [package]
 name = "circuitclaude"
-version = "0.2.1"
+version = "0.2.2"
 description = "Claude Code terminal session manager"
 authors = ["you"]
 edition = "2021"
