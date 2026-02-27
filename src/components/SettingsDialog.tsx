@@ -536,6 +536,21 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
             </div>
 
             <div className="settings-section">
+              <div className="settings-section-title">~tabs</div>
+              <div className="settings-row">
+                <div className="settings-row-label">
+                  <span className="settings-row-name">auto-generate titles</span>
+                </div>
+                <button
+                  className={`settings-toggle ${settings.useGeneratedTitles ? "settings-toggle--on" : ""}`}
+                  onClick={() => update({ useGeneratedTitles: !settings.useGeneratedTitles })}
+                >
+                  {settings.useGeneratedTitles ? "[on]" : "[off]"}
+                </button>
+              </div>
+            </div>
+
+            <div className="settings-section">
               <button
                 className="settings-section-link"
                 onClick={() => setPage("hotkeys")}

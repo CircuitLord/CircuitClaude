@@ -172,6 +172,7 @@ export interface Settings {
   voiceMicDeviceId: string;
   whisperModel: string;
   soundEnabled: boolean;
+  useGeneratedTitles: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -187,4 +188,5 @@ export const DEFAULT_SETTINGS: Settings = {
   voiceMicDeviceId: "default",
   whisperModel: "medium.en",
   soundEnabled: true,
+  useGeneratedTitles: true,
 };

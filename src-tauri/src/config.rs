@@ -123,6 +123,12 @@ pub struct SettingsConfig {
     pub voice_mic_device_id: String,
     #[serde(default = "default_whisper_model")]
     pub whisper_model: String,
+    #[serde(default = "default_use_generated_titles")]
+    pub use_generated_titles: bool,
+}
+
+fn default_use_generated_titles() -> bool {
+    true
 }
 
 fn settings_path(app_handle: &tauri::AppHandle) -> PathBuf {

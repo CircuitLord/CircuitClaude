@@ -8,7 +8,7 @@ interface TerminalTabsProps {
 }
 
 export function TerminalTabs({ projectPath }: TerminalTabsProps) {
-  const { sessions, activeSessionId, setActiveSession, removeSession, tabStatuses, sessionTitles } =
+  const { sessions, activeSessionId, setActiveSession, removeSession, tabStatuses, sessionTitles, requestTitleRegen } =
     useSessionStore();
 
   const projectSessions = sessions.filter((s) => s.projectPath === projectPath);
@@ -98,7 +98,13 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
                 <span className="terminal-tab-prefix">
                   {prefix}
                 </span>
-                <span className="terminal-tab-name">{label}</span>
+                <span
+                  className="terminal-tab-name"
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    if (s.sessionType !== "shell") requestTitleRegen(s.id);
+                  }}
+                >{label}</span>
                 <span className="terminal-tab-trailing">
                   {tabStatus === "thinking" ? (
                     <span className="terminal-tab-status terminal-tab-thinking">*</span>

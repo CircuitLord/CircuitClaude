@@ -22,7 +22,7 @@ pub struct ConversationMessage {
 
 /// Encode a project directory path the way Claude Code does:
 /// replace every non-alphanumeric character with `-`.
-fn encode_project_dir(path: &str) -> String {
+pub(crate) fn encode_project_dir(path: &str) -> String {
     path.chars()
         .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
         .collect()

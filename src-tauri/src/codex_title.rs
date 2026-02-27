@@ -270,7 +270,7 @@ fn extract_input_text_blocks(content: Option<&Value>) -> Vec<String> {
     blocks
 }
 
-fn run_haiku_title_generation(
+pub(crate) fn run_haiku_title_generation(
     project_path: &str,
     prompts_newest_first: &[String],
     max_chars: usize,
@@ -281,7 +281,7 @@ fn run_haiku_title_generation(
         TITLE_MODEL, max_chars, prompt
     );
 
-    let mut cmd = build_haiku_command(project_path);
+    let mut cmd = build_haiku_command(project_path)?;
     let mut child = cmd
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -337,30 +337,14 @@ fn run_haiku_title_generation(
     Ok(final_title)
 }
 
-fn build_haiku_command(project_path: &str) -> Command {
+fn build_haiku_command(project_path: &str) -> Result<Command, String> {
+    let claude_path = crate::git::find_claude_exe()?;
+    let mut cmd = Command::new(&claude_path);
+    cmd.args(["-p", "--no-session-persistence", "--model", TITLE_MODEL])
+        .current_dir(project_path);
     #[cfg(windows)]
-    {
-        let mut cmd = Command::new("cmd.exe");
-        cmd.args([
-            "/c",
-            "claude",
-            "-p",
-            "--no-session-persistence",
-            "--model",
-            TITLE_MODEL,
-        ])
-        .current_dir(project_path)
-        .creation_flags(CREATE_NO_WINDOW);
-        return cmd;
-    }
-
-    #[cfg(not(windows))]
-    {
-        let mut cmd = Command::new("claude");
-        cmd.args(["-p", "--no-session-persistence", "--model", TITLE_MODEL])
-            .current_dir(project_path);
-        cmd
-    }
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    Ok(cmd)
 }
 
 fn build_title_generation_prompt(prompts_newest_first: &[String], max_chars: usize) -> String {
@@ -376,7 +360,7 @@ Use 2-5 words. Maximum {} characters.\n\nRecent user prompts:\n",
     prompt
 }
 
-fn pack_prompt_context(prompts_newest_first: &[String], context_char_budget: usize) -> Vec<String> {
+pub(crate) fn pack_prompt_context(prompts_newest_first: &[String], context_char_budget: usize) -> Vec<String> {
     let mut packed = Vec::new();
     let mut remaining = context_char_budget;
 
@@ -402,7 +386,7 @@ fn pack_prompt_context(prompts_newest_first: &[String], context_char_budget: usi
     packed
 }
 
-fn sanitize_user_prompt_for_title(input: &str) -> Option<String> {
+pub(crate) fn sanitize_user_prompt_for_title(input: &str) -> Option<String> {
     let clean = collapse_whitespace(input);
     if clean.is_empty() {
         return None;
@@ -433,7 +417,7 @@ fn is_viable_title(input: &str) -> bool {
     s.chars().any(|c| c.is_ascii_alphanumeric())
 }
 
-fn deterministic_title_from_prompts(
+pub(crate) fn deterministic_title_from_prompts(
     prompts_newest_first: &[String],
     max_chars: usize,
 ) -> Option<String> {
@@ -502,7 +486,7 @@ fn strip_wrapping_quotes(input: &str) -> String {
     out
 }
 
-fn collapse_whitespace(input: &str) -> String {
+pub(crate) fn collapse_whitespace(input: &str) -> String {
     let mut out = String::with_capacity(input.len());
     let mut in_ws = false;
 
@@ -522,7 +506,7 @@ fn collapse_whitespace(input: &str) -> String {
     out.trim().to_string()
 }
 
-fn enforce_max_chars(input: &str, max_chars: usize) -> String {
+pub(crate) fn enforce_max_chars(input: &str, max_chars: usize) -> String {
     let clean = collapse_whitespace(input);
     let count = clean.chars().count();
     if count <= max_chars {

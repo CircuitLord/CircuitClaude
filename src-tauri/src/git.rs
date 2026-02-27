@@ -17,7 +17,7 @@ fn git_cmd() -> Command {
 /// Resolves the full path to the `claude` executable.
 /// Checks known install locations since the Tauri process may not inherit
 /// the same PATH as the user's shell (where PTY sessions work fine).
-fn find_claude_exe() -> Result<PathBuf, String> {
+pub(crate) fn find_claude_exe() -> Result<PathBuf, String> {
     // Check PATH first via `where`
     if let Ok(output) = Command::new("cmd.exe")
         .args(["/c", "where", "claude"])
