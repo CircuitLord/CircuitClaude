@@ -481,6 +481,18 @@ impl PtyManager {
                 Ok(child) => child,
                 Err(poisoned) => poisoned.into_inner(),
             };
+
+            // On Windows, child.kill() only kills the immediate process (cmd.exe),
+            // leaving the actual CLI process (claude/node.exe) running as an orphan.
+            // Use taskkill /F /T to kill the entire process tree first.
+            if let Some(pid) = child.process_id() {
+                let _ = std::process::Command::new("taskkill")
+                    .args(["/F", "/T", "/PID", &pid.to_string()])
+                    .stdout(std::process::Stdio::null())
+                    .stderr(std::process::Stdio::null())
+                    .status();
+            }
+
             let _ = child.kill();
         }
 
