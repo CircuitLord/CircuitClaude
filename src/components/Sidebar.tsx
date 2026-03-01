@@ -311,12 +311,15 @@ export function Sidebar() {
         })}
       </div>
       <GitSection />
-      <button className="sidebar-settings-btn" onClick={() => openClaudeMdEditor()}>
-        <span className="sidebar-settings-prefix">:</span>global claude.md
-      </button>
-      <button className="sidebar-settings-btn" onClick={() => setSettingsOpen(true)}>
-        <span className="sidebar-settings-prefix">:</span>settings
-      </button>
+      <div className="sidebar-footer">
+        <button className="sidebar-footer-btn" onClick={() => openClaudeMdEditor()}>
+          :claude.md
+        </button>
+        <span className="sidebar-footer-sep">·</span>
+        <button className="sidebar-footer-btn" onClick={() => setSettingsOpen(true)}>
+          :settings
+        </button>
+      </div>
       <SettingsDialog isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );

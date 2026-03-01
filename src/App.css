@@ -606,33 +606,48 @@ body,
 
 .git-section-header {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   height: 36px;
-  padding: 0 12px;
-  cursor: pointer;
+  padding: 0;
   user-select: none;
   flex-shrink: 0;
   border-top: 1px solid var(--border-subtle);
 }
 
-.git-section-chevron {
-  width: 14px;
-  flex-shrink: 0;
-  font-size: 13px;
-  color: var(--text-tertiary);
+.git-section-header .settings-segmented {
+  align-items: stretch;
+  gap: 0;
+}
+
+.git-section-header .settings-segmented-btn {
+  display: flex;
+  align-items: center;
+  padding: 0 2px;
+}
+
+.git-section-header .settings-segmented-btn:first-child {
+  padding-left: 12px;
 }
 
 .git-section-title {
+  display: flex;
+  align-items: stretch;
   font-size: 13px;
   font-weight: 400;
   color: var(--text-tertiary);
 }
 
 .git-section-badge {
+  display: flex;
+  align-items: center;
   font-size: 12px;
   font-weight: 400;
   color: var(--text-tertiary);
   margin-left: 4px;
+}
+
+.git-section-header .git-branch-label {
+  padding-right: 12px;
 }
 
 /* --- Section Body --- */
@@ -2116,34 +2131,36 @@ body,
   color: var(--accent-text);
 }
 
-/* --- Sidebar settings button --- */
+/* --- Sidebar footer --- */
 
-.sidebar-settings-btn {
+.sidebar-footer {
   display: flex;
   align-items: center;
-  gap: 0;
-  margin: 0;
+  gap: 6px;
   padding: 8px 12px;
-  background: transparent;
-  border: none;
   border-top: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.sidebar-footer-btn {
+  background: none;
+  border: none;
   color: var(--text-tertiary);
   cursor: pointer;
   font-size: 13px;
   font-family: var(--font-mono);
-  transition: color 0.15s;
+  padding: 0;
+  transition: color 0.1s;
 }
 
-.sidebar-settings-btn:hover {
+.sidebar-footer-btn:hover {
   color: var(--accent-text);
 }
 
-.sidebar-settings-btn svg {
-  display: none;
-}
-
-.sidebar-settings-prefix {
-  margin-right: 0;
+.sidebar-footer-sep {
+  color: var(--border-visible);
+  font-size: 13px;
+  user-select: none;
 }
 
 /* ========================================================================
@@ -2623,6 +2640,32 @@ body,
   white-space: nowrap;
   position: relative;
   transition: background 0.1s, color 0.1s;
+}
+
+.terminal-tab--dragging {
+  opacity: 0.4;
+}
+
+.terminal-tab--drop-before::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
+}
+
+.terminal-tab--drop-after::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
 }
 
 .terminal-tab:hover {

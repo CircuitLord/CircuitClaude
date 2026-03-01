@@ -10,7 +10,6 @@ export function fileKey(file: GitFileEntry): string {
 interface GitStore {
   statuses: Record<string, GitStatus>;
   loading: Record<string, boolean>;
-  sectionOpen: boolean;
   collapsedGroups: Record<string, boolean>;
   viewMode: "file" | "tree";
   diffFile: GitFileEntry | null;
@@ -27,7 +26,6 @@ interface GitStore {
   pushing: boolean;
   generatingMessage: boolean;
   fetchStatus: (projectPath: string) => Promise<void>;
-  toggleSection: () => void;
   toggleGroup: (group: string) => void;
   setViewMode: (mode: "file" | "tree") => void;
   openDiff: (projectPath: string, file: GitFileEntry) => Promise<void>;
@@ -57,7 +55,6 @@ function selectedCount(sel: Record<string, boolean>): number {
 export const useGitStore = create<GitStore>((set, get) => ({
   statuses: {},
   loading: {},
-  sectionOpen: true,
   collapsedGroups: {},
   viewMode: "file",
   diffFile: null,
@@ -101,8 +98,6 @@ export const useGitStore = create<GitStore>((set, get) => ({
       set((state) => ({ loading: { ...state.loading, [projectPath]: false } }));
     }
   },
-
-  toggleSection: () => set((state) => ({ sectionOpen: !state.sectionOpen })),
 
   toggleGroup: (group: string) =>
     set((state) => ({

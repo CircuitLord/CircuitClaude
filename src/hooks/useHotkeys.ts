@@ -3,6 +3,7 @@ import { useSessionStore } from "../stores/sessionStore";
 import { useProjectStore } from "../stores/projectStore";
 import { useNotesStore } from "../stores/notesStore";
 import { spawnNewSession } from "../lib/sessions";
+import { closePtySession } from "../lib/pty";
 import { regenerateCodexTitle } from "../lib/codexTitles";
 import { voiceInputController, type VoiceInputState } from "../lib/voiceInput";
 import { whisperDownloadModel, whisperGetModelStatus, type DownloadProgress } from "../lib/whisper";
@@ -254,6 +255,19 @@ export function useHotkeys() {
       if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key === "t") {
         e.preventDefault();
         spawnNewSession();
+        return;
+      }
+
+      // Ctrl+W — close active tab
+      if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key === "w") {
+        e.preventDefault();
+        const state = useSessionStore.getState();
+        if (!state.activeSessionId) return;
+        const active = state.sessions.find((s) => s.id === state.activeSessionId);
+        if (active?.sessionId) {
+          closePtySession(active.sessionId).catch(() => {});
+        }
+        state.removeSession(state.activeSessionId);
         return;
       }
 

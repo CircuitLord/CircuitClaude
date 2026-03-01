@@ -265,7 +265,10 @@ impl PtyManager {
             sessions.remove(session_id)
         };
         if let Some(session) = removed {
-            Self::close_session_handle(&session, reason);
+            let reason = reason.to_string();
+            std::thread::spawn(move || {
+                Self::close_session_handle(&session, &reason);
+            });
         }
         Ok(())
     }

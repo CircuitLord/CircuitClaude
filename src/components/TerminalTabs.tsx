@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSessionStore } from "../stores/sessionStore";
 import { TerminalView } from "./TerminalView";
 import { NewSessionMenu } from "./NewSessionMenu";
@@ -8,15 +8,18 @@ interface TerminalTabsProps {
 }
 
 export function TerminalTabs({ projectPath }: TerminalTabsProps) {
-  const { sessions, activeSessionId, setActiveSession, removeSession, tabStatuses, sessionTitles, requestTitleRegen } =
+  const { sessions, activeSessionId, setActiveSession, removeSession, tabStatuses, sessionTitles, requestTitleRegen, reorderSessions } =
     useSessionStore();
 
-  const projectSessions = sessions.filter((s) => s.projectPath === projectPath);
-  const shellSessions = projectSessions.filter((s) => s.sessionType === "shell");
-  const agentSessions = projectSessions.filter((s) => s.sessionType !== "shell");
+  const tabBarRef = useRef<HTMLDivElement>(null);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dropIndex, setDropIndex] = useState<number | null>(null);
+  const dropIndexRef = useRef<number | null>(null);
 
-  // All renderable sessions (shells + agent sessions)
-  const allVisible = useMemo(() => [...shellSessions, ...agentSessions], [shellSessions, agentSessions]);
+  const projectSessions = sessions.filter((s) => s.projectPath === projectPath);
+
+  // Keep tabs in creation order (same as store insertion order)
+  const allVisible = projectSessions;
   const visibleSessionIds = useMemo(() => allVisible.map((s) => s.id), [allVisible]);
   const [mountedSessionIds, setMountedSessionIds] = useState<string[]>(visibleSessionIds);
 
@@ -47,7 +50,7 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
 
   // If active session isn't in this project, fall back to first session
   const activeInProject = allVisible.find((s) => s.id === activeSessionId);
-  const visibleSessionId = activeInProject?.id ?? agentSessions[0]?.id ?? shellSessions[0]?.id ?? null;
+  const visibleSessionId = activeInProject?.id ?? allVisible[0]?.id ?? null;
   const sessionById = useMemo(
     () => new Map(allVisible.map((session) => [session.id, session])),
     [allVisible]
@@ -61,15 +64,68 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
     removeSession(id);
   }
 
+  const handleTabDragStart = useCallback((e: React.MouseEvent, index: number) => {
+    if (e.button !== 0) return;
+    // Don't start drag from the close button
+    if ((e.target as HTMLElement).closest(".terminal-tab-close")) return;
+    e.preventDefault();
+
+    setDragIndex(index);
+    document.body.style.cursor = "grabbing";
+
+    const currentSessions = useSessionStore.getState().sessions.filter((s) => s.projectPath === projectPath);
+
+    const onMove = (ev: MouseEvent) => {
+      if (!tabBarRef.current) return;
+      const tabs = tabBarRef.current.querySelectorAll<HTMLElement>(".terminal-tab");
+      let newDrop = tabs.length;
+
+      for (let i = 0; i < tabs.length; i++) {
+        const rect = tabs[i].getBoundingClientRect();
+        if (ev.clientX < rect.left + rect.width / 2) {
+          newDrop = i;
+          break;
+        }
+      }
+
+      dropIndexRef.current = newDrop;
+      setDropIndex(newDrop);
+    };
+
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+
+      const finalDrop = dropIndexRef.current;
+      if (finalDrop !== null) {
+        let targetIndex = finalDrop;
+        if (targetIndex > index) targetIndex--;
+
+        if (targetIndex !== index && targetIndex >= 0 && targetIndex < currentSessions.length) {
+          reorderSessions(projectPath, index, targetIndex);
+        }
+      }
+
+      setDragIndex(null);
+      setDropIndex(null);
+      dropIndexRef.current = null;
+    };
+
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }, [projectPath, reorderSessions]);
+
   if (projectSessions.length === 0) return null;
 
   return (
     <div className="terminal-tabs-container">
       <div className="terminal-tabs-bar-wrapper">
-        <div className="terminal-tabs-bar">
-          {allVisible.map((s) => {
+        <div className="terminal-tabs-bar" ref={tabBarRef}>
+          {allVisible.map((s, index) => {
             const isActive = s.id === visibleSessionId;
             const tabStatus = tabStatuses.get(s.id) ?? null;
+            const isDragging = dragIndex === index;
             const prefix =
               s.sessionType === "opencode"
                 ? "o>"
@@ -80,14 +136,21 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
                     : ">";
             const label = s.sessionType === "shell" ? "terminal" : (sessionTitles.get(s.id) ?? s.projectName);
 
+            let dropClass = "";
+            if (dragIndex !== null && dropIndex !== null && dropIndex !== dragIndex && dropIndex !== dragIndex + 1) {
+              if (dropIndex === index) dropClass = " terminal-tab--drop-before";
+              else if (dropIndex === allVisible.length && index === allVisible.length - 1) dropClass = " terminal-tab--drop-after";
+            }
+
             return (
               <div
                 key={s.id}
-                className={`terminal-tab ${isActive ? "terminal-tab--active" : ""}${tabStatus === "thinking" ? " terminal-tab--thinking" : ""}`}
+                className={`terminal-tab ${isActive ? "terminal-tab--active" : ""}${tabStatus === "thinking" ? " terminal-tab--thinking" : ""}${isDragging ? " terminal-tab--dragging" : ""}${dropClass}`}
                 role="tab"
                 aria-selected={isActive}
                 tabIndex={0}
                 onClick={() => setActiveSession(s.id)}
+                onMouseDown={(e) => handleTabDragStart(e, index)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();

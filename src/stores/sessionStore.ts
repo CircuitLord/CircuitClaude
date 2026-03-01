@@ -21,6 +21,7 @@ interface SessionStore {
   setSessionTitle: (tabId: string, title: string) => void;
   markAutoTitleDone: (tabId: string) => void;
   requestTitleRegen: (tabId: string) => void;
+  reorderSessions: (projectPath: string, fromIndex: number, toIndex: number) => void;
 }
 
 export function generateTabId(): string {
@@ -227,5 +228,28 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       const next = new Map(state.titleRegenCounter);
       next.set(tabId, (next.get(tabId) ?? 0) + 1);
       return { titleRegenCounter: next };
+    }),
+
+  reorderSessions: (projectPath, fromIndex, toIndex) =>
+    set((state) => {
+      if (fromIndex === toIndex) return {};
+      const projectSessions = state.sessions.filter((s) => s.projectPath === projectPath);
+      if (fromIndex < 0 || fromIndex >= projectSessions.length || toIndex < 0 || toIndex >= projectSessions.length) return {};
+
+      const [moved] = projectSessions.splice(fromIndex, 1);
+      projectSessions.splice(toIndex, 0, moved);
+
+      const reorderedIds = new Set(projectSessions.map((s) => s.id));
+      const otherSessions = state.sessions.filter((s) => !reorderedIds.has(s.id));
+
+      // Re-insert project sessions at the position of the first original occurrence
+      const firstOriginalIndex = state.sessions.findIndex((s) => s.projectPath === projectPath);
+      const sessions = [
+        ...otherSessions.slice(0, firstOriginalIndex),
+        ...projectSessions,
+        ...otherSessions.slice(firstOriginalIndex),
+      ];
+
+      return { sessions };
     }),
 }));
