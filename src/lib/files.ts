@@ -78,6 +78,14 @@ export function fileColorClass(filename: string): string {
   return EXT_COLORS[ext] ?? "";
 }
 
+export function readFile(filePath: string): Promise<string> {
+  return invoke<string>("read_file", { filePath });
+}
+
+export function writeFile(filePath: string, content: string): Promise<void> {
+  return invoke<void>("write_file", { filePath, content });
+}
+
 export function readDirectory(
   projectPath: string,
   dirPath?: string,

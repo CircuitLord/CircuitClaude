@@ -2,8 +2,7 @@ import { useEffect, useRef } from "react";
 import { useSessionStore } from "../stores/sessionStore";
 import { useProjectStore } from "../stores/projectStore";
 import { useNotesStore } from "../stores/notesStore";
-import { spawnNewSession } from "../lib/sessions";
-import { closePtySession } from "../lib/pty";
+import { spawnNewSession, closeTab } from "../lib/sessions";
 import { regenerateCodexTitle } from "../lib/codexTitles";
 import { voiceInputController, type VoiceInputState } from "../lib/voiceInput";
 import { whisperDownloadModel, whisperGetModelStatus, type DownloadProgress } from "../lib/whisper";
@@ -210,6 +209,7 @@ export function useHotkeys() {
           return;
         }
         const active = state.sessions.find((s) => s.id === state.activeSessionId);
+        if (active?.sessionType === "editor") return;
         if (!active?.sessionId) {
           useVoiceStore.getState().setStatus("terminal session not ready", state.activeSessionId);
           clearVoiceStatusAfter();
@@ -250,6 +250,8 @@ export function useHotkeys() {
       if (tag === "INPUT" || tag === "SELECT") return;
       if (tag === "TEXTAREA" && !target.closest(".xterm") && !target.closest(".conversation-input-area") && !target.closest(".voice-transcript-box")) return;
       if (target.closest(".prompt-input")) return;
+      // Skip most hotkeys when inside CodeMirror editor (let CM handle its own keybindings)
+      if (target.closest(".cm-editor")) return;
 
       // Ctrl+T — new session
       if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key === "t") {
@@ -263,11 +265,7 @@ export function useHotkeys() {
         e.preventDefault();
         const state = useSessionStore.getState();
         if (!state.activeSessionId) return;
-        const active = state.sessions.find((s) => s.id === state.activeSessionId);
-        if (active?.sessionId) {
-          closePtySession(active.sessionId).catch(() => {});
-        }
-        state.removeSession(state.activeSessionId);
+        closeTab(state.activeSessionId);
         return;
       }
 

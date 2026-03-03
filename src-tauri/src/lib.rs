@@ -92,6 +92,8 @@ pub fn run() {
             commands::read_agents_md,
             commands::save_agents_md,
             commands::read_directory,
+            commands::read_file,
+            commands::write_file,
             commands::save_clipboard_image,
             commands::exit_app,
             commands::whisper_start_session,

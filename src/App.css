@@ -904,6 +904,7 @@ body,
   min-width: 0;
   color: var(--text-secondary);
   transition: background 0.1s, color 0.1s;
+  cursor: pointer;
 }
 
 .filetree-file-item:hover {
@@ -4535,4 +4536,43 @@ body,
 
 .update-banner-action--primary {
   color: var(--accent-text);
+}
+
+/* ========================================================================
+   Editor View (CodeMirror 6)
+   ======================================================================== */
+
+.editor-view {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-base);
+}
+
+.editor-view .cm-editor {
+  flex: 1;
+  height: 100%;
+}
+
+.editor-view--loading,
+.editor-view--error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.editor-loading-text,
+.editor-error-text {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+.editor-error-text {
+  color: var(--git-deleted);
+}
+
+.terminal-tab-dirty {
+  color: var(--text-secondary);
 }

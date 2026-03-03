@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useFileTreeStore } from "../stores/fileTreeStore";
 import { FileTreeEntry } from "../types";
 import { fileColorClass } from "../lib/files";
+import { openFileTab } from "../lib/sessions";
 
 function FileTreeFileNode({
   entry,
@@ -12,8 +13,9 @@ function FileTreeFileNode({
 }) {
   return (
     <div
-      className="filetree-file-item"
+      className="filetree-file-item filetree-file-item--clickable"
       style={{ paddingLeft: 12 + depth * 12 }}
+      onClick={() => openFileTab(entry.fullPath, entry.name)}
     >
       <span className="filetree-spacer" />
       <span className={`filetree-file-name ${fileColorClass(entry.name)}`}>{entry.name}</span>

@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { TerminalSession, TabStatus, SplitState, PaneState } from "../types";
+import { useEditorStore } from "./editorStore";
 
 interface SessionStore {
   sessions: TerminalSession[];
@@ -97,6 +98,10 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   removeSession: (id) =>
     set((state) => {
       const removed = state.sessions.find((s) => s.id === id);
+      // Clean up editor store if this was an editor tab
+      if (removed?.sessionType === "editor") {
+        useEditorStore.getState().closeFile(id);
+      }
       const sessions = state.sessions.filter((s) => s.id !== id);
       let activeSessionId = state.activeSessionId;
 

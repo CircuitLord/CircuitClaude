@@ -539,6 +539,16 @@ pub fn read_directory(
 }
 
 #[tauri::command]
+pub fn read_file(file_path: String) -> Result<String, String> {
+    std::fs::read_to_string(&file_path).map_err(|e| format!("Failed to read file: {}", e))
+}
+
+#[tauri::command]
+pub fn write_file(file_path: String, content: String) -> Result<(), String> {
+    std::fs::write(&file_path, &content).map_err(|e| format!("Failed to write file: {}", e))
+}
+
+#[tauri::command]
 pub fn save_clipboard_image(
     app_handle: tauri::AppHandle,
     data: Vec<u8>,

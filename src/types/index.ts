@@ -1,4 +1,4 @@
-export type SessionType = "claude" | "codex" | "opencode" | "shell";
+export type SessionType = "claude" | "codex" | "opencode" | "shell" | "editor";
 
 export type TabStatus = "thinking" | "waiting";
 
@@ -16,6 +16,8 @@ export interface TerminalSession {
   claudeSessionId?: string; // Optional explicit Claude session ID for resume/attach workflows
   createdAt: number;
   sessionType: SessionType;
+  filePath?: string;
+  fileName?: string;
 }
 
 export type PtyOutputEvent =

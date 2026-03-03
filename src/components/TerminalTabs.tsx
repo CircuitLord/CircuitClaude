@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSessionStore } from "../stores/sessionStore";
+import { useEditorStore } from "../stores/editorStore";
 import { TerminalView } from "./TerminalView";
+import { EditorViewComponent } from "./EditorView";
 import { NewSessionMenu } from "./NewSessionMenu";
-import { closePtySession } from "../lib/pty";
+import { closeTab } from "../lib/sessions";
 import { SplitDirection, PaneState } from "../types";
 
 interface TerminalTabsProps {
@@ -16,7 +18,6 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
     sessions,
     activeSessionId,
     setActiveSession,
-    removeSession,
     tabStatuses,
     sessionTitles,
     requestTitleRegen,
@@ -135,12 +136,8 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
     [allVisible]
   );
 
-  async function handleCloseSession(id: string) {
-    const session = sessions.find((s) => s.id === id);
-    if (session?.sessionId) {
-      await closePtySession(session.sessionId).catch(() => {});
-    }
-    removeSession(id);
+  function handleCloseSession(id: string) {
+    closeTab(id);
   }
 
   // Compute drop zone from mouse position relative to panels area
@@ -464,16 +461,24 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
   ) {
     const s = sessionById.get(sessionId);
     if (!s) return null;
-    const tabStatus = tabStatuses.get(s.id) ?? null;
+    const isEditor = s.sessionType === "editor";
+    const tabStatus = isEditor ? null : (tabStatuses.get(s.id) ?? null);
+    const editorDirty = isEditor ? useEditorStore.getState().isDirty(s.id) : false;
     const prefix =
-      s.sessionType === "opencode"
-        ? "o>"
-        : s.sessionType === "codex"
-          ? "c>"
-          : s.sessionType === "shell"
-            ? ">_"
-            : ">";
-    const label = s.sessionType === "shell" ? "terminal" : (sessionTitles.get(s.id) ?? s.projectName);
+      s.sessionType === "editor"
+        ? "#"
+        : s.sessionType === "opencode"
+          ? "o>"
+          : s.sessionType === "codex"
+            ? "c>"
+            : s.sessionType === "shell"
+              ? ">_"
+              : ">";
+    const label = isEditor
+      ? (s.fileName ?? "file")
+      : s.sessionType === "shell"
+        ? "terminal"
+        : (sessionTitles.get(s.id) ?? s.projectName);
 
     return (
       <div
@@ -496,11 +501,13 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
           className="terminal-tab-name"
           onDoubleClick={(e) => {
             e.stopPropagation();
-            if (s.sessionType !== "shell") requestTitleRegen(s.id);
+            if (!isEditor && s.sessionType !== "shell") requestTitleRegen(s.id);
           }}
         >{label}</span>
         <span className="terminal-tab-trailing">
-          {tabStatus === "thinking" ? (
+          {isEditor && editorDirty ? (
+            <span className="terminal-tab-status terminal-tab-dirty">*</span>
+          ) : tabStatus === "thinking" ? (
             <span className="terminal-tab-status terminal-tab-thinking">*</span>
           ) : tabStatus === "waiting" ? (
             <span className="terminal-tab-status terminal-tab-attention">?</span>
@@ -538,16 +545,24 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
         style={{ display: visible ? "flex" : "none" }}
         onMouseDown={onPaneClick}
       >
-        <TerminalView
-          tabId={session.id}
-          projectPath={session.projectPath}
-          projectName={session.projectName}
-          sessionType={session.sessionType}
-          hideTitleBar
-          onClose={() => {
-            void handleCloseSession(session.id);
-          }}
-        />
+        {session.sessionType === "editor" && session.filePath ? (
+          <EditorViewComponent
+            tabId={session.id}
+            filePath={session.filePath}
+            fileName={session.fileName ?? "file"}
+          />
+        ) : (
+          <TerminalView
+            tabId={session.id}
+            projectPath={session.projectPath}
+            projectName={session.projectName}
+            sessionType={session.sessionType}
+            hideTitleBar
+            onClose={() => {
+              handleCloseSession(session.id);
+            }}
+          />
+        )}
       </div>
     );
   }
