@@ -3,6 +3,7 @@ import { spawnNewSession } from "../lib/sessions";
 
 interface NewSessionMenuProps {
   variant: "button" | "pill";
+  targetPane?: 1 | 2;
 }
 
 const OPTIONS = [
@@ -12,7 +13,7 @@ const OPTIONS = [
   { type: "terminal" as const, label: "terminal" },
 ] as const;
 
-export function NewSessionMenu({ variant }: NewSessionMenuProps) {
+export function NewSessionMenu({ variant, targetPane }: NewSessionMenuProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -39,7 +40,7 @@ export function NewSessionMenu({ variant }: NewSessionMenuProps) {
 
   function handleSelect(type: "claude" | "codex" | "opencode" | "terminal") {
     setOpen(false);
-    spawnNewSession(type === "terminal" ? "shell" : type);
+    spawnNewSession(type === "terminal" ? "shell" : type, targetPane);
   }
 
   if (variant === "button") {

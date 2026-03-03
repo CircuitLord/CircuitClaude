@@ -60,6 +60,20 @@ export type SyntaxThemeName = "github-dark" | "monokai" | "tokyo-night";
 
 export type VoiceEngine = "whisper" | "edge";
 
+export type SplitDirection = "horizontal" | "vertical";
+
+export interface PaneState {
+  sessionIds: string[];      // ordered list of tabs in this pane
+  activeSessionId: string;   // which tab is visible in this pane
+}
+
+export interface SplitState {
+  direction: SplitDirection;
+  pane1: PaneState;
+  pane2: PaneState;
+  focusedPane: 1 | 2;
+}
+
 // --- Claude Event types (from Rust claude_manager) ---
 
 export interface ModelUsage {

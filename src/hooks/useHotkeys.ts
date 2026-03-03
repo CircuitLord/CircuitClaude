@@ -286,32 +286,44 @@ export function useHotkeys() {
         return;
       }
 
-      // Ctrl+1-9 — switch tab by index
+      // Ctrl+1-9 — switch tab by index (within focused pane if split)
       if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key >= "1" && e.key <= "9") {
         e.preventDefault();
         if (!activeProjectPath) return;
-        const confirmed = sessions.filter(
-          (s) => s.projectPath === activeProjectPath
-        );
+        const state = useSessionStore.getState();
+        const split = state.projectSplits.get(activeProjectPath);
+        let tabIds: string[];
+        if (split) {
+          const pane = split.focusedPane === 1 ? split.pane1 : split.pane2;
+          tabIds = pane.sessionIds;
+        } else {
+          tabIds = sessions.filter((s) => s.projectPath === activeProjectPath).map((s) => s.id);
+        }
         const index = parseInt(e.key, 10) - 1;
-        if (index < confirmed.length) {
-          setActiveSession(confirmed[index].id);
+        if (index < tabIds.length) {
+          setActiveSession(tabIds[index]);
         }
         return;
       }
 
-      // Ctrl+Left/Right — cycle tabs within current project
+      // Ctrl+Left/Right — cycle tabs within focused pane (or all project tabs if unsplit)
       if (e.ctrlKey && !e.shiftKey && !e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
         e.preventDefault();
         if (!activeProjectPath) return;
-        const projectSessions = sessions.filter(
-          (s) => s.projectPath === activeProjectPath
-        );
-        if (projectSessions.length <= 1) return;
-        const currentIndex = projectSessions.findIndex((s) => s.id === activeSessionId);
+        const state = useSessionStore.getState();
+        const split = state.projectSplits.get(activeProjectPath);
+        let tabIds: string[];
+        if (split) {
+          const pane = split.focusedPane === 1 ? split.pane1 : split.pane2;
+          tabIds = pane.sessionIds;
+        } else {
+          tabIds = sessions.filter((s) => s.projectPath === activeProjectPath).map((s) => s.id);
+        }
+        if (tabIds.length <= 1) return;
+        const currentIndex = tabIds.indexOf(activeSessionId ?? "");
         const delta = e.key === "ArrowRight" ? 1 : -1;
-        const nextIndex = (currentIndex + delta + projectSessions.length) % projectSessions.length;
-        setActiveSession(projectSessions[nextIndex].id);
+        const nextIndex = (currentIndex + delta + tabIds.length) % tabIds.length;
+        setActiveSession(tabIds[nextIndex]);
         return;
       }
 

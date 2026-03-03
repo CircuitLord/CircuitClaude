@@ -417,9 +417,13 @@ impl WhisperManager {
                             session.last_transcript = full.clone();
                             session.last_transcript_at_samples = buffer_len;
 
-                            // Commit text if buffer has grown beyond threshold
+                            // Commit text if buffer has grown beyond threshold,
+                            // and drain the transcribed audio to prevent re-transcription.
                             if session.buffer.len() > COMMIT_THRESHOLD_SAMPLES {
                                 session.committed_text = full.clone();
+                                let drain_count = buffer_len.min(session.buffer.len());
+                                session.buffer.drain(..drain_count);
+                                session.last_transcript_at_samples = 0;
                             }
                         }
                     }
