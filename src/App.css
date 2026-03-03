@@ -2871,8 +2871,7 @@ body,
 }
 
 .terminal-tabs-pane--focused .terminal-tabs-bar-wrapper {
-  border-bottom-color: var(--accent);
-  box-shadow: 0 1px 0 var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, var(--bg-surface));
 }
 
 .terminal-tabs-pane--drop-target {
@@ -2885,11 +2884,13 @@ body,
 }
 
 .terminal-tabs-panel--focused .terminal-view {
-  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent),
+              0 0 12px -2px color-mix(in srgb, var(--accent) 25%, transparent);
 }
 
 .terminal-tabs-panel--focused .terminal-view::before {
-  opacity: 0.8;
+  opacity: 1;
+  box-shadow: 0 0 10px var(--accent);
 }
 
 /* Resize handles for split panes */
