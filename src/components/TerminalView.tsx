@@ -374,6 +374,16 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
       if (text) terminal.paste(text);
     };
 
+    // Intercept Ctrl+V so plain paste works (xterm.js defaults to Ctrl+Shift+V)
+    terminal.attachCustomKeyEventHandler((ev) => {
+      if (ev.type === "keydown" && ev.key === "v" && ev.ctrlKey && !ev.shiftKey) {
+        ev.preventDefault();
+        void handleClipboardPaste();
+        return false;
+      }
+      return true;
+    });
+
     const onPasteCapture = (ev: ClipboardEvent) => {
       ev.preventDefault();
       ev.stopPropagation();

@@ -1,8 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { EditorState } from "@codemirror/state";
 import { EditorView, keymap, lineNumbers, highlightActiveLine, drawSelection } from "@codemirror/view";
 import { markdown } from "@codemirror/lang-markdown";
-import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
+import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { bracketMatching } from "@codemirror/language";
 import { useEditorStore } from "../stores/editorStore";
 import { pinTab } from "../lib/sessions";
@@ -45,6 +45,9 @@ const circuitTheme = EditorView.theme({
   ".cm-activeLine": {
     backgroundColor: "var(--bg-elevated)",
   },
+  "& .cm-selectionLayer": {
+    zIndex: "1 !important",
+  },
   ".cm-scroller": {
     overflow: "auto",
   },
@@ -60,8 +63,26 @@ export function EditorViewComponent({ tabId, filePath, fileName: _fileName }: Ed
   const containerRef = useRef<HTMLDivElement>(null);
   const editorViewRef = useRef<EditorView | null>(null);
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showCopied, setShowCopied] = useState(false);
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { files, loadFile, updateContent, saveFile } = useEditorStore();
   const fileState = files.get(tabId);
+
+  // Listen for path-copied events targeting this tab
+  useEffect(() => {
+    const handler = (e: Event) => {
+      if ((e as CustomEvent).detail === tabId) {
+        if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+        setShowCopied(true);
+        copiedTimerRef.current = setTimeout(() => setShowCopied(false), 1500);
+      }
+    };
+    window.addEventListener("editor-path-copied", handler);
+    return () => {
+      window.removeEventListener("editor-path-copied", handler);
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+    };
+  }, [tabId]);
 
   // Load file on mount
   useEffect(() => {
@@ -90,7 +111,7 @@ export function EditorViewComponent({ tabId, filePath, fileName: _fileName }: Ed
       extensions: [
         saveKeymap,
         history(),
-        keymap.of([...defaultKeymap, ...historyKeymap]),
+        keymap.of([indentWithTab, ...defaultKeymap, ...historyKeymap]),
         lineNumbers(),
         highlightActiveLine(),
         drawSelection(),
@@ -142,5 +163,9 @@ export function EditorViewComponent({ tabId, filePath, fileName: _fileName }: Ed
     );
   }
 
-  return <div ref={containerRef} className="editor-view" />;
+  return (
+    <div ref={containerRef} className="editor-view">
+      {showCopied && <div className="terminal-status-line">path copied to clipboard</div>}
+    </div>
+  );
 }

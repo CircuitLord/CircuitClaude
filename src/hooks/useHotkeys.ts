@@ -320,6 +320,18 @@ export function useHotkeys() {
         return;
       }
 
+      // Ctrl+Shift+C — copy current editor file path to clipboard
+      if (e.ctrlKey && e.shiftKey && !e.altKey && e.key.toLowerCase() === "c") {
+        const active = sessions.find((s) => s.id === activeSessionId);
+        if (active?.sessionType === "editor" && active.filePath) {
+          e.preventDefault();
+          navigator.clipboard.writeText(active.filePath).then(() => {
+            window.dispatchEvent(new CustomEvent("editor-path-copied", { detail: active.id }));
+          }).catch(() => {});
+          return;
+        }
+      }
+
       // Skip if focus is in an input/textarea (but not xterm's internal textarea or voice transcript box)
       const target = e.target as HTMLElement;
       const tag = target?.tagName;
