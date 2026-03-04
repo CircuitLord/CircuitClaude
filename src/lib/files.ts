@@ -90,6 +90,14 @@ export function scanProjectFiles(projectPath: string): Promise<string[]> {
   return invoke<string[]>("scan_project_files", { projectPath });
 }
 
+export function watchFile(tabId: string, filePath: string): Promise<void> {
+  return invoke<void>("watch_file", { tabId, filePath });
+}
+
+export function unwatchFile(tabId: string, filePath: string): Promise<void> {
+  return invoke<void>("unwatch_file", { tabId, filePath });
+}
+
 export function readDirectory(
   projectPath: string,
   dirPath?: string,

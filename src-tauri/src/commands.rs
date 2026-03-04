@@ -5,6 +5,7 @@ use crate::config::{self, ProjectConfig, SettingsConfig};
 use crate::conversation;
 use crate::git;
 use crate::pty_manager::{AttachStreamResult, PtyManager, PtyOutputEvent, PtySessionInfo};
+use crate::file_watcher::FileWatcherManager;
 use crate::whisper_manager::{DownloadProgress, ModelInfo, WhisperEvent, WhisperManager};
 use tauri::ipc::Channel;
 use tauri::State;
@@ -626,6 +627,26 @@ pub fn save_clipboard_image(
 #[tauri::command]
 pub fn exit_app(app_handle: tauri::AppHandle) {
     app_handle.exit(0);
+}
+
+// --- File watcher commands ---
+
+#[tauri::command]
+pub fn watch_file(
+    file_watcher: State<'_, FileWatcherManager>,
+    tab_id: String,
+    file_path: String,
+) -> Result<(), String> {
+    file_watcher.watch_file(&tab_id, &file_path)
+}
+
+#[tauri::command]
+pub fn unwatch_file(
+    file_watcher: State<'_, FileWatcherManager>,
+    tab_id: String,
+    file_path: String,
+) -> Result<(), String> {
+    file_watcher.unwatch_file(&tab_id, &file_path)
 }
 
 // --- Whisper STT commands ---

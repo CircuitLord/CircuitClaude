@@ -4,6 +4,7 @@ import { EditorView, keymap, lineNumbers, highlightActiveLine, drawSelection } f
 import { markdown } from "@codemirror/lang-markdown";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { bracketMatching } from "@codemirror/language";
+import { listen } from "@tauri-apps/api/event";
 import { useEditorStore } from "../stores/editorStore";
 import { pinTab } from "../lib/sessions";
 import { markdownLivePreview } from "./editorLivePreview";
@@ -65,7 +66,7 @@ export function EditorViewComponent({ tabId, filePath, fileName: _fileName }: Ed
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showCopied, setShowCopied] = useState(false);
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const { files, loadFile, updateContent, saveFile } = useEditorStore();
+  const { files, loadFile, updateContent, saveFile, checkExternalChange } = useEditorStore();
   const fileState = files.get(tabId);
 
   // Listen for path-copied events targeting this tab
@@ -88,6 +89,21 @@ export function EditorViewComponent({ tabId, filePath, fileName: _fileName }: Ed
   useEffect(() => {
     loadFile(tabId, filePath);
   }, [tabId, filePath, loadFile]);
+
+  // Re-read file from disk when native file watcher detects a change
+  useEffect(() => {
+    const unlisten = listen<{ filePath: string }>("file-changed", async (event) => {
+      if (event.payload.filePath !== filePath) return;
+      const newContent = await checkExternalChange(tabId, filePath);
+      if (newContent != null && editorViewRef.current) {
+        const view = editorViewRef.current;
+        view.dispatch({
+          changes: { from: 0, to: view.state.doc.length, insert: newContent },
+        });
+      }
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, [tabId, filePath, checkExternalChange]);
 
   // Initialize/update CodeMirror
   useEffect(() => {

@@ -6,6 +6,7 @@ mod codex_title;
 mod commands;
 mod config;
 mod conversation;
+mod file_watcher;
 mod git;
 mod pty_manager;
 mod whisper_manager;
@@ -52,6 +53,7 @@ pub fn run() {
             let models_dir = config_dir.join("models").join("whisper");
             std::fs::create_dir_all(&models_dir).ok();
             app.manage(whisper_manager::WhisperManager::new(models_dir));
+            app.manage(file_watcher::FileWatcherManager::new(app.handle().clone()));
 
             Ok(())
         })
@@ -103,6 +105,8 @@ pub fn run() {
             commands::whisper_get_available_models,
             commands::whisper_download_model,
             commands::whisper_get_model_status,
+            commands::watch_file,
+            commands::unwatch_file,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
@@ -114,6 +118,8 @@ pub fn run() {
                 claude_manager.destroy_all();
                 let whisper_manager = app.state::<whisper_manager::WhisperManager>();
                 whisper_manager.cancel_all();
+                let file_watcher = app.state::<file_watcher::FileWatcherManager>();
+                file_watcher.cleanup();
                 config::cleanup_old_screenshots(&app.app_handle());
             }
         });
