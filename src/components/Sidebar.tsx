@@ -5,13 +5,16 @@ import { useAddProject } from "./AddProjectDialog";
 import { GitSection } from "./GitSection";
 import { SettingsDialog } from "./SettingsDialog";
 import { useClaudeMdStore } from "../stores/claudeMdStore";
+import { useSettingsStore } from "../stores/settingsStore";
 import { THEMES, THEME_OPTIONS } from "../lib/themes";
 import type { ThemeName } from "../types";
 
 export function Sidebar() {
   const { projects, loaded, load, removeProject, reorderProjects, updateProjectTheme } = useProjectStore();
   const { sessions, activeProjectPath, setActiveProject, tabStatuses } = useSessionStore();
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsOpen = useSettingsStore((s) => s.settingsDialogOpen);
+  const openSettingsDialog = useSettingsStore((s) => s.openSettingsDialog);
+  const closeSettingsDialog = useSettingsStore((s) => s.closeSettingsDialog);
   const [editMode, setEditMode] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
@@ -316,11 +319,11 @@ export function Sidebar() {
           :claude.md
         </button>
         <span className="sidebar-footer-sep">·</span>
-        <button className="sidebar-footer-btn" onClick={() => setSettingsOpen(true)}>
+        <button className="sidebar-footer-btn" onClick={openSettingsDialog}>
           :settings
         </button>
       </div>
-      <SettingsDialog isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <SettingsDialog isOpen={settingsOpen} onClose={closeSettingsDialog} />
     </div>
   );
 }

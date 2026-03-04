@@ -86,6 +86,10 @@ export function writeFile(filePath: string, content: string): Promise<void> {
   return invoke<void>("write_file", { filePath, content });
 }
 
+export function scanProjectFiles(projectPath: string): Promise<string[]> {
+  return invoke<string[]>("scan_project_files", { projectPath });
+}
+
 export function readDirectory(
   projectPath: string,
   dirPath?: string,

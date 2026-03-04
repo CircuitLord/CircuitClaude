@@ -539,6 +539,59 @@ pub fn read_directory(
 }
 
 #[tauri::command]
+pub fn scan_project_files(project_path: String) -> Result<Vec<String>, String> {
+    use ignore::WalkBuilder;
+
+    let base = std::path::Path::new(&project_path);
+    if !base.is_dir() {
+        return Err(format!("Not a directory: {}", project_path));
+    }
+
+    let walker = WalkBuilder::new(base)
+        .hidden(true) // skip hidden files/dirs
+        .git_ignore(true) // respect .gitignore
+        .git_global(true)
+        .git_exclude(true)
+        .build();
+
+    let mut files: Vec<String> = Vec::new();
+    let cap = 10_000usize;
+
+    for entry in walker {
+        if files.len() >= cap {
+            break;
+        }
+        let entry = match entry {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+
+        // Skip directories
+        if entry.file_type().map(|ft| ft.is_dir()).unwrap_or(true) {
+            continue;
+        }
+
+        let path = entry.path();
+
+        // Hardcoded skip for dirs that might not be in .gitignore
+        if path.ancestors().any(|a| {
+            a.file_name()
+                .map(|n| HARDCODED_SKIP.contains(&n.to_string_lossy().as_ref()))
+                .unwrap_or(false)
+        }) {
+            continue;
+        }
+
+        if let Ok(rel) = path.strip_prefix(base) {
+            files.push(rel.to_string_lossy().replace('\\', "/"));
+        }
+    }
+
+    files.sort_unstable();
+    Ok(files)
+}
+
+#[tauri::command]
 pub fn read_file(file_path: String) -> Result<String, String> {
     std::fs::read_to_string(&file_path).map_err(|e| format!("Failed to read file: {}", e))
 }

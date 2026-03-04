@@ -8,6 +8,7 @@ import { voiceInputController, type VoiceInputState } from "../lib/voiceInput";
 import { whisperDownloadModel, whisperGetModelStatus, type DownloadProgress } from "../lib/whisper";
 import { useVoiceStore } from "../stores/voiceStore";
 import { useSettingsStore } from "../stores/settingsStore";
+import { useCommandPaletteStore } from "../stores/commandPaletteStore";
 import { Channel } from "@tauri-apps/api/core";
 
 function isCtrlSpaceHotkey(e: KeyboardEvent): boolean {
@@ -181,6 +182,18 @@ export function useHotkeys() {
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
+      // Ctrl+P / Ctrl+Shift+P — command palette (works even over dialogs/inputs)
+      if (e.ctrlKey && !e.altKey && !e.metaKey && e.key.toLowerCase() === "p") {
+        e.preventDefault();
+        const palette = useCommandPaletteStore.getState();
+        if (palette.isOpen) {
+          palette.close();
+        } else {
+          palette.open(e.shiftKey ? "commands" : "files");
+        }
+        return;
+      }
+
       // Skip when dialog/overlay is open
       if (document.querySelector(".dialog-overlay") || document.querySelector(".diff-overlay")) return;
 
