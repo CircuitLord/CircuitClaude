@@ -4466,7 +4466,7 @@ body,
 .cm-md-emphasis { font-style: italic; color: #c4b5fd; }
 .cm-md-strong { font-weight: bold; }
 .cm-md-code { background: var(--bg-elevated); border-radius: 3px; padding: 1px 4px; color: #3fb950; font-family: var(--font-mono); }
-.cm-md-link { color: #58a6ff; text-decoration: underline; }
+.cm-md-link { color: #58a6ff; text-decoration: underline; cursor: pointer; }
 .cm-md-blockquote { border-left: 2px solid var(--border-visible); padding-left: 8px; color: var(--text-secondary); }
 .cm-md-hr { border-top: 1px solid var(--border-visible); display: block; }
 

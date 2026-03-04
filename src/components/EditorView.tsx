@@ -7,7 +7,7 @@ import { bracketMatching } from "@codemirror/language";
 import { listen } from "@tauri-apps/api/event";
 import { useEditorStore } from "../stores/editorStore";
 import { pinTab } from "../lib/sessions";
-import { markdownLivePreview } from "./editorLivePreview";
+import { markdownLivePreview, markdownLinkClick } from "./editorLivePreview";
 
 const circuitTheme = EditorView.theme({
   "&": {
@@ -134,6 +134,7 @@ export function EditorViewComponent({ tabId, filePath, fileName: _fileName }: Ed
         bracketMatching(),
         markdown(),
         markdownLivePreview,
+        markdownLinkClick(filePath),
         circuitTheme,
         EditorView.lineWrapping,
         EditorView.updateListener.of((update) => {

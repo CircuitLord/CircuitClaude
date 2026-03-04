@@ -15,6 +15,7 @@ interface FileItem {
   path: string;
   filename: string;
   dir: string;
+  isAbsolute?: boolean;
 }
 
 interface CommandItem {
@@ -74,6 +75,8 @@ export function CommandPalette() {
   // Build filtered results
   const results: PaletteItem[] = useMemo(() => {
     if (mode === "files") {
+      const absItem = isAbsolutePath(searchQuery) ? absolutePathItem(searchQuery) : null;
+
       if (!searchQuery) {
         // Show first N files when query is empty
         return files.slice(0, MAX_RESULTS).map(pathToFileItem);
@@ -88,7 +91,9 @@ export function CommandPalette() {
         .filter((s) => s.score >= 0)
         .sort((a, b) => b.score - a.score)
         .slice(0, MAX_RESULTS);
-      return scored.map((s) => pathToFileItem(s.path));
+      const items = scored.map((s) => pathToFileItem(s.path));
+      if (absItem) items.unshift(absItem);
+      return items;
     }
 
     if (mode === "commands") {
@@ -115,10 +120,14 @@ export function CommandPalette() {
       close();
       switch (item.type) {
         case "file": {
-          const projectPath = useSessionStore.getState().activeProjectPath;
-          if (projectPath) {
-            const fullPath = projectPath.replace(/\\/g, "/") + "/" + item.path;
-            openFileTab(fullPath, item.filename, false);
+          if (item.isAbsolute) {
+            openFileTab(item.path, item.filename, false);
+          } else {
+            const projectPath = useSessionStore.getState().activeProjectPath;
+            if (projectPath) {
+              const fullPath = projectPath.replace(/\\/g, "/") + "/" + item.path;
+              openFileTab(fullPath, item.filename, false);
+            }
           }
           break;
         }
@@ -235,6 +244,18 @@ export function CommandPalette() {
   );
 }
 
+function isAbsolutePath(q: string): boolean {
+  return /^[A-Za-z]:[/\\]/.test(q) || q.startsWith("/");
+}
+
+function absolutePathItem(q: string): FileItem {
+  const normalized = q.replace(/\\/g, "/");
+  const parts = normalized.split("/");
+  const filename = parts.pop() ?? normalized;
+  const dir = parts.join("/");
+  return { type: "file", path: normalized, filename, dir, isAbsolute: true };
+}
+
 function pathToFileItem(path: string): FileItem {
   const parts = path.split("/");
   const filename = parts.pop() ?? path;
@@ -264,7 +285,9 @@ function renderItem(item: PaletteItem) {
             {item.filename}
           </span>
           {item.dir && (
-            <span className="command-palette-item-detail">{item.dir}</span>
+            <span className="command-palette-item-detail">
+              {item.isAbsolute ? `open ${item.dir}` : item.dir}
+            </span>
           )}
         </>
       );

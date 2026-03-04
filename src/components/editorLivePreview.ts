@@ -1,6 +1,7 @@
 import { EditorView, ViewPlugin, ViewUpdate, Decoration, DecorationSet } from "@codemirror/view";
 import { syntaxTree } from "@codemirror/language";
 import { RangeSetBuilder } from "@codemirror/state";
+import { openFileTab } from "../lib/sessions";
 
 /** Heading node names that get both a mark decoration (text styling) and a line decoration (full-width border) */
 const headingClasses: Record<string, string> = {
@@ -28,6 +29,7 @@ const hiddenMarkers = new Set([
   "EmphasisMark",
   "CodeMark",
   "LinkMark",
+  "URL",
   "QuoteMark",
 ]);
 
@@ -131,5 +133,51 @@ const livePreviewPlugin = ViewPlugin.fromClass(
     decorations: (v) => v.decorations,
   }
 );
+
+/** Creates a click handler that opens markdown links as editor tabs.
+ *  Requires the current file's path to resolve relative links. */
+export function markdownLinkClick(currentFilePath: string) {
+  const dir = currentFilePath.replace(/[\\/][^\\/]*$/, "");
+
+  return EditorView.domEventHandlers({
+    click(event, view) {
+      // Only handle ctrl/cmd+click
+      if (!event.ctrlKey && !event.metaKey) return false;
+
+      const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+      if (pos == null) return false;
+
+      const tree = syntaxTree(view.state);
+      let url: string | null = null;
+
+      // Walk up from click position to find a Link node, then extract its URL child
+      let node = tree.resolveInner(pos, 1);
+      while (node) {
+        if (node.name === "Link") {
+          const urlNode = node.getChild("URL");
+          if (urlNode) {
+            url = view.state.doc.sliceString(urlNode.from, urlNode.to);
+          }
+          break;
+        }
+        if (!node.parent) break;
+        node = node.parent;
+      }
+
+      if (!url) return false;
+
+      // Skip external URLs
+      if (/^https?:\/\//.test(url)) return false;
+
+      // Resolve relative path against current file's directory
+      const resolved = dir + "/" + url.replace(/^\.\//, "");
+      const fileName = url.split(/[\\/]/).pop() ?? url;
+
+      event.preventDefault();
+      openFileTab(resolved, fileName, true);
+      return true;
+    },
+  });
+}
 
 export const markdownLivePreview = livePreviewPlugin;
