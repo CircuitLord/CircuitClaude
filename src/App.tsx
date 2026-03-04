@@ -6,7 +6,6 @@ import { TerminalTabs } from "./components/TerminalTabs";
 import { EmptyState } from "./components/EmptyState";
 import { WindowControls } from "./components/WindowControls";
 import { DiffViewer } from "./components/DiffViewer";
-import { ClaudeMdEditor } from "./components/ClaudeMdEditor";
 import { CommandPalette } from "./components/CommandPalette";
 import { NotesPanel } from "./components/NotesPanel";
 import { useSessionStore } from "./stores/sessionStore";
@@ -168,7 +167,6 @@ function App() {
         </div>
       </div>
       <DiffViewer />
-      <ClaudeMdEditor />
       <CommandPalette />
     </>
   );

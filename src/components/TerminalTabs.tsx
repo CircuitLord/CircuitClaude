@@ -7,6 +7,15 @@ import { NewSessionMenu } from "./NewSessionMenu";
 import { closeTab, pinTab } from "../lib/sessions";
 import { SplitDirection, PaneState } from "../types";
 
+function checkTabBarOverflow(tabBar: HTMLDivElement | null) {
+  if (!tabBar) return;
+  const wrapper = tabBar.parentElement;
+  if (!wrapper) return;
+  const { scrollLeft, scrollWidth, clientWidth } = tabBar;
+  wrapper.classList.toggle("terminal-tabs-bar-wrapper--overflow-left", scrollLeft > 1);
+  wrapper.classList.toggle("terminal-tabs-bar-wrapper--overflow-right", scrollLeft < scrollWidth - clientWidth - 1);
+}
+
 interface TerminalTabsProps {
   projectPath: string;
 }
@@ -131,6 +140,43 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
 
   const activeInProject = allVisible.find((s) => s.id === activeSessionId);
   const visibleSessionId = activeInProject?.id ?? allVisible[0]?.id ?? null;
+
+  // --- Breadcrumb helpers ---
+  function computeBreadcrumb(filePath: string): string[] {
+    const norm = filePath.replace(/\\/g, "/");
+    const normProject = projectPath.replace(/\\/g, "/");
+
+    // File inside project → relative path
+    if (norm.startsWith(normProject + "/")) {
+      return norm.slice(normProject.length + 1).split("/");
+    }
+
+    // File in user home → abbreviate with ~
+    const homeMatch = norm.match(/^[A-Za-z]:\/Users\/[^/]+(\/.*)/);
+    if (homeMatch) {
+      return ["~", ...homeMatch[1].slice(1).split("/")];
+    }
+
+    // Fallback: full path segments
+    return norm.split("/").filter(Boolean);
+  }
+
+  function renderBreadcrumb(activeSessionId: string | null) {
+    if (!activeSessionId) return null;
+    const session = sessionById.get(activeSessionId);
+    if (!session || session.sessionType !== "editor" || !session.filePath) return null;
+    const segments = computeBreadcrumb(session.filePath);
+    return (
+      <div className="editor-breadcrumb">
+        {segments.map((seg, i) => (
+          <span key={i}>
+            {i > 0 && <span className="editor-breadcrumb-sep">&gt;</span>}
+            <span className="editor-breadcrumb-segment">{seg}</span>
+          </span>
+        ))}
+      </div>
+    );
+  }
   const sessionById = useMemo(
     () => new Map(allVisible.map((session) => [session.id, session])),
     [allVisible]
@@ -204,6 +250,34 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
   }, [split, projectPath, clearSplit]);
+
+  const handleTabBarWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.currentTarget.scrollLeft += e.deltaY;
+  }, []);
+
+  const handleTabBarScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    checkTabBarOverflow(e.currentTarget);
+  }, []);
+
+  // Track tab bar overflow for fade indicators
+  useEffect(() => {
+    checkTabBarOverflow(tabBarRef.current);
+    checkTabBarOverflow(pane1TabBarRef.current);
+    checkTabBarOverflow(pane2TabBarRef.current);
+
+    const observer = new ResizeObserver(() => {
+      checkTabBarOverflow(tabBarRef.current);
+      checkTabBarOverflow(pane1TabBarRef.current);
+      checkTabBarOverflow(pane2TabBarRef.current);
+    });
+
+    if (tabBarRef.current) observer.observe(tabBarRef.current);
+    if (pane1TabBarRef.current) observer.observe(pane1TabBarRef.current);
+    if (pane2TabBarRef.current) observer.observe(pane2TabBarRef.current);
+
+    return () => observer.disconnect();
+  }, [allVisible, split]);
 
   const handleResizeDoubleClick = useCallback(() => {
     clearSplit(projectPath);
@@ -592,7 +666,7 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
             onMouseDown={() => setFocusedPane(projectPath, 1)}
           >
             <div className="terminal-tabs-bar-wrapper">
-              <div className="terminal-tabs-bar" ref={pane1TabBarRef}>
+              <div className="terminal-tabs-bar" ref={pane1TabBarRef} onWheel={handleTabBarWheel} onScroll={handleTabBarScroll}>
                 {pane1.sessionIds.map((sid, index) => {
                   const isActive = sid === pane1.activeSessionId;
                   const isDragging = dragPane === 1 && dragIndex === index;
@@ -610,6 +684,7 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
               </div>
               <NewSessionMenu variant="button" targetPane={1} />
             </div>
+            {renderBreadcrumb(pane1.activeSessionId)}
             <div className="terminal-tabs-panels">
               {pane1MountedIds.map((id) =>
                 renderPanel(
@@ -637,7 +712,7 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
             onMouseDown={() => setFocusedPane(projectPath, 2)}
           >
             <div className="terminal-tabs-bar-wrapper">
-              <div className="terminal-tabs-bar" ref={pane2TabBarRef}>
+              <div className="terminal-tabs-bar" ref={pane2TabBarRef} onWheel={handleTabBarWheel} onScroll={handleTabBarScroll}>
                 {pane2.sessionIds.map((sid, index) => {
                   const isActive = sid === pane2.activeSessionId;
                   const isDragging = dragPane === 2 && dragIndex === index;
@@ -655,6 +730,7 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
               </div>
               <NewSessionMenu variant="button" targetPane={2} />
             </div>
+            {renderBreadcrumb(pane2.activeSessionId)}
             <div className="terminal-tabs-panels">
               {pane2MountedIds.map((id) =>
                 renderPanel(
@@ -675,7 +751,7 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
   return (
     <div className="terminal-tabs-container">
       <div className="terminal-tabs-bar-wrapper">
-        <div className="terminal-tabs-bar" ref={tabBarRef}>
+        <div className="terminal-tabs-bar" ref={tabBarRef} onWheel={handleTabBarWheel} onScroll={handleTabBarScroll}>
           {allVisible.map((s, index) => {
             const isActive = s.id === visibleSessionId;
             const isDragging = dragPane === null && dragIndex === index;
@@ -693,6 +769,7 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
         </div>
         <NewSessionMenu variant="button" />
       </div>
+      {renderBreadcrumb(visibleSessionId)}
       <div className="terminal-tabs-panels" ref={panelsRef}>
         {/* Drop zone overlay during split drag */}
         {splitDragActive && (

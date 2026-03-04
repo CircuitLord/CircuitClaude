@@ -1,7 +1,7 @@
 import { useSessionStore } from "../stores/sessionStore";
-import { useClaudeMdStore } from "../stores/claudeMdStore";
 import { useSettingsStore } from "../stores/settingsStore";
-import { spawnNewSession, closeTab } from "./sessions";
+import { readClaudeMd, readAgentsMd } from "./config";
+import { spawnNewSession, closeTab, openFileTab } from "./sessions";
 
 export type PaletteMode = "files" | "commands";
 
@@ -54,7 +54,7 @@ export function getPaletteCommands(): PaletteCommand[] {
     category: "config",
     action: () => {
       const { activeProjectPath } = useSessionStore.getState();
-      useClaudeMdStore.getState().open(activeProjectPath ?? undefined);
+      readClaudeMd(activeProjectPath ?? undefined).then((r) => openFileTab(r.path, "CLAUDE.md", false));
     },
   });
   commands.push({
@@ -63,7 +63,7 @@ export function getPaletteCommands(): PaletteCommand[] {
     category: "config",
     action: () => {
       const { activeProjectPath } = useSessionStore.getState();
-      useClaudeMdStore.getState().openAgents(activeProjectPath ?? undefined);
+      readAgentsMd(activeProjectPath ?? undefined).then((r) => openFileTab(r.path, "agents.md", false));
     },
   });
   commands.push({

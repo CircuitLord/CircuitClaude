@@ -4,7 +4,8 @@ import { useSessionStore } from "../stores/sessionStore";
 import { useAddProject } from "./AddProjectDialog";
 import { GitSection } from "./GitSection";
 import { SettingsDialog } from "./SettingsDialog";
-import { useClaudeMdStore } from "../stores/claudeMdStore";
+import { readClaudeMd } from "../lib/config";
+import { openFileTab } from "../lib/sessions";
 import { useSettingsStore } from "../stores/settingsStore";
 import { THEMES, THEME_OPTIONS } from "../lib/themes";
 import type { ThemeName } from "../types";
@@ -23,7 +24,6 @@ export function Sidebar() {
   const listRef = useRef<HTMLDivElement>(null);
   const dropIndexRef = useRef<number | null>(null);
   const handleAdd = useAddProject();
-  const openClaudeMdEditor = useClaudeMdStore((s) => s.open);
 
   useEffect(() => {
     if (!loaded) load();
@@ -315,7 +315,7 @@ export function Sidebar() {
       </div>
       <GitSection />
       <div className="sidebar-footer">
-        <button className="sidebar-footer-btn" onClick={() => openClaudeMdEditor()}>
+        <button className="sidebar-footer-btn" onClick={() => readClaudeMd().then((r) => openFileTab(r.path, "CLAUDE.md", false))}>
           :claude.md
         </button>
         <span className="sidebar-footer-sep">·</span>

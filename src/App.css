@@ -2605,10 +2605,58 @@ body,
   align-items: stretch;
   height: 40px;
   min-height: 40px;
-  background: var(--bg-surface);
+  background: var(--tab-bar-bg, var(--bg-surface));
   border-bottom: 1px solid var(--border-subtle);
   user-select: none;
   font-family: var(--font-mono);
+  position: relative;
+}
+
+.terminal-tabs-bar-wrapper--overflow-left::before,
+.terminal-tabs-bar-wrapper--overflow-right::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 24px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.terminal-tabs-bar-wrapper--overflow-left::before {
+  left: 0;
+  background: linear-gradient(to right, var(--tab-bar-bg, var(--bg-surface)), transparent);
+}
+
+.terminal-tabs-bar-wrapper--overflow-right::after {
+  right: 36px;
+  background: linear-gradient(to left, var(--tab-bar-bg, var(--bg-surface)), transparent);
+}
+
+/* --- Editor Breadcrumb --- */
+
+.editor-breadcrumb {
+  display: flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 14px;
+  background: var(--bg-surface);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.editor-breadcrumb-sep {
+  margin: 0 6px;
+  color: var(--accent-text);
+}
+
+.editor-breadcrumb-segment:last-child {
+  color: var(--text-primary);
 }
 
 .terminal-tabs-bar {
@@ -2891,7 +2939,8 @@ body,
 }
 
 .terminal-tabs-pane--focused .terminal-tabs-bar-wrapper {
-  background: color-mix(in srgb, var(--accent) 6%, var(--bg-surface));
+  --tab-bar-bg: color-mix(in srgb, var(--accent) 6%, var(--bg-surface));
+  background: var(--tab-bar-bg);
 }
 
 .terminal-tabs-pane--drop-target {
@@ -3828,176 +3877,6 @@ body,
 }
 
 
-/* ========================================================================
-   CLAUDE.md Editor — TUI Style
-   ======================================================================== */
-
-.claude-md-editor {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-visible);
-  border-radius: 2px;
-  width: 1000px;
-  max-width: calc(100vw - 32px);
-  height: 80vh;
-  max-height: 80vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.claude-md-editor-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 36px;
-  padding: 0 12px;
-  border-bottom: 1px solid var(--border-subtle);
-  flex-shrink: 0;
-}
-
-.claude-md-editor-path {
-  font-size: 13px;
-  font-weight: 400;
-  font-family: var(--font-mono);
-  color: var(--text-tertiary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.claude-md-editor-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.claude-md-editor-status {
-  font-size: 13px;
-  font-family: var(--font-mono);
-  color: var(--accent-text);
-  animation: tui-waiting-pulse 1.5s step-end infinite;
-}
-
-.claude-md-editor-save-btn {
-  background: transparent;
-  border: none;
-  padding: 0;
-  font-size: 13px;
-  font-family: var(--font-mono);
-  font-weight: 400;
-  color: var(--text-tertiary);
-  cursor: pointer;
-  transition: color 0.1s;
-}
-
-.claude-md-editor-save-btn:hover:not(:disabled) {
-  color: var(--accent-text);
-}
-
-.claude-md-editor-save-btn:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-.claude-md-editor-close {
-  background: transparent;
-  border: none;
-  padding: 0;
-  font-size: 13px;
-  font-family: var(--font-mono);
-  font-weight: 400;
-  color: var(--text-tertiary);
-  cursor: pointer;
-  transition: color 0.1s;
-}
-
-.claude-md-editor-close:hover {
-  color: var(--text-primary);
-}
-
-.claude-md-editor-body {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.claude-md-editor-code {
-  flex: 1;
-  min-height: 0;
-  position: relative;
-  overflow: hidden;
-}
-
-.claude-md-editor-highlight {
-  position: absolute;
-  inset: 0;
-  margin: 0;
-  padding: 12px;
-  background: var(--bg-base);
-  border: none;
-  color: var(--text-primary);
-  font-size: 13px;
-  font-family: var(--font-mono);
-  line-height: 1.6;
-  tab-size: 2;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  overflow: auto;
-  pointer-events: none;
-}
-
-.claude-md-editor-highlight::-webkit-scrollbar {
-  width: 4px;
-}
-
-.claude-md-editor-highlight::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.claude-md-editor-highlight::-webkit-scrollbar-thumb {
-  background: transparent;
-}
-
-.claude-md-editor-textarea {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  padding: 12px;
-  background: transparent;
-  border: none;
-  color: transparent;
-  caret-color: var(--text-primary);
-  font-size: 13px;
-  font-family: var(--font-mono);
-  line-height: 1.6;
-  resize: none;
-  outline: none;
-  tab-size: 2;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  overflow: auto;
-}
-
-.claude-md-editor-textarea::selection {
-  background: rgba(124, 58, 237, 0.35);
-  color: transparent;
-}
-
-.claude-md-editor-textarea::-webkit-scrollbar {
-  width: 4px;
-}
-
-.claude-md-editor-textarea::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.claude-md-editor-textarea::-webkit-scrollbar-thumb {
-  background: var(--border-visible);
-  border-radius: 2px;
-}
-
 /* --- Markdown syntax highlighting colors (shared) --- */
 
 .md-highlight .hljs-section {
@@ -4044,35 +3923,6 @@ body,
 .md-highlight .hljs-comment {
   color: var(--hljs-comment, #8b949e);
   font-style: italic;
-}
-
-.claude-md-editor-loading,
-.claude-md-editor-error {
-  padding: 32px 12px;
-  font-size: 13px;
-  font-family: var(--font-mono);
-  color: var(--text-tertiary);
-  font-style: italic;
-}
-
-.claude-md-editor-error {
-  color: var(--git-deleted);
-}
-
-.claude-md-editor-footer {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  height: 28px;
-  padding: 0 12px;
-  border-top: 1px solid var(--border-subtle);
-  flex-shrink: 0;
-}
-
-.claude-md-editor-hint {
-  font-size: 12px;
-  font-family: var(--font-mono);
-  color: var(--text-tertiary);
 }
 
 /* ========================================================================

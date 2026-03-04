@@ -308,12 +308,6 @@ pub fn read_claude_md(project_path: Option<String>) -> Result<ClaudeMdFile, Stri
     })
 }
 
-#[tauri::command]
-pub fn save_claude_md(project_path: Option<String>, content: String) -> Result<(), String> {
-    let path = resolve_claude_md_path(project_path)?;
-    std::fs::write(&path, content).map_err(|e| e.to_string())
-}
-
 fn resolve_claude_md_path(project_path: Option<String>) -> Result<std::path::PathBuf, String> {
     if let Some(pp) = project_path {
         Ok(std::path::PathBuf::from(pp).join("CLAUDE.md"))
@@ -340,12 +334,6 @@ pub fn read_agents_md(project_path: Option<String>) -> Result<ClaudeMdFile, Stri
         path: path.to_string_lossy().to_string(),
         content,
     })
-}
-
-#[tauri::command]
-pub fn save_agents_md(project_path: Option<String>, content: String) -> Result<(), String> {
-    let path = resolve_agents_md_path(project_path)?;
-    std::fs::write(&path, content).map_err(|e| e.to_string())
 }
 
 fn resolve_agents_md_path(project_path: Option<String>) -> Result<std::path::PathBuf, String> {

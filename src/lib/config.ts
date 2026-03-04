@@ -21,16 +21,8 @@ export function readClaudeMd(projectPath?: string): Promise<{ path: string; cont
   return invoke<{ path: string; content: string }>("read_claude_md", { projectPath: projectPath ?? null });
 }
 
-export function saveClaudeMd(projectPath: string | undefined, content: string): Promise<void> {
-  return invoke("save_claude_md", { projectPath: projectPath ?? null, content });
-}
-
 export function readAgentsMd(projectPath?: string): Promise<{ path: string; content: string }> {
   return invoke<{ path: string; content: string }>("read_agents_md", { projectPath: projectPath ?? null });
-}
-
-export function saveAgentsMd(projectPath: string | undefined, content: string): Promise<void> {
-  return invoke("save_agents_md", { projectPath: projectPath ?? null, content });
 }
 
 export function loadNote(projectPath: string): Promise<string> {
