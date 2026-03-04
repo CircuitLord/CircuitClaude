@@ -2627,11 +2627,11 @@ body,
 .terminal-tab {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   width: fit-content;
   max-width: 270px;
   height: 100%;
-  padding: 0 16px;
+  padding: 0 8px;
   background: transparent;
   border: none;
   color: var(--text-secondary);
@@ -2688,8 +2688,8 @@ body,
   content: "";
   position: absolute;
   bottom: 0;
-  left: 12px;
-  right: 12px;
+  left: 8px;
+  right: 8px;
   height: 1px;
   background: var(--accent);
   box-shadow: 0 0 6px var(--accent);
@@ -2711,6 +2711,8 @@ body,
 
 .terminal-tab-prefix {
   flex-shrink: 0;
+  width: 18px;
+  text-align: center;
   color: var(--text-tertiary);
   font-size: 13px;
 }
@@ -2723,7 +2725,7 @@ body,
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  text-overflow: clip;
+  text-overflow: ellipsis;
   text-align: left;
 }
 
