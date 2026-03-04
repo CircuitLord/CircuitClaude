@@ -75,6 +75,13 @@ The `:` prefix is a clickable affordance — it always means the element is acti
 - Use `.sidebar-divider` (standalone 1px line) between header and list content
 - No decorative borders on entries themselves
 
+## Scrollbars
+
+- Width: `4px`
+- Track: `transparent`
+- Thumb: `var(--border-visible)`, `border-radius: 2px`
+- Use `-webkit-scrollbar`, `-webkit-scrollbar-track`, `-webkit-scrollbar-thumb` pseudo-elements
+
 ## Animations
 
 - `tui-blink`: `step-end` timing, 1.2s cycle — hard on/off for waiting indicators

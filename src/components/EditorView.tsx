@@ -3,32 +3,9 @@ import { EditorState } from "@codemirror/state";
 import { EditorView, keymap, lineNumbers, highlightActiveLine, drawSelection } from "@codemirror/view";
 import { markdown } from "@codemirror/lang-markdown";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
-import { HighlightStyle, syntaxHighlighting, bracketMatching } from "@codemirror/language";
-import { tags } from "@lezer/highlight";
+import { bracketMatching } from "@codemirror/language";
 import { useEditorStore } from "../stores/editorStore";
-
-const circuitHighlight = HighlightStyle.define([
-  { tag: tags.heading1, color: "#a78bfa", fontWeight: "bold" },
-  { tag: tags.heading2, color: "#a78bfa", fontWeight: "bold" },
-  { tag: tags.heading3, color: "#a78bfa", fontWeight: "bold" },
-  { tag: tags.heading4, color: "#a78bfa" },
-  { tag: tags.heading5, color: "#a78bfa" },
-  { tag: tags.heading6, color: "#a78bfa" },
-  { tag: tags.emphasis, fontStyle: "italic", color: "#c4b5fd" },
-  { tag: tags.strong, fontWeight: "bold", color: "#ededf0" },
-  { tag: tags.strikethrough, textDecoration: "line-through", color: "#7e7e8e" },
-  { tag: tags.link, color: "#58a6ff", textDecoration: "underline" },
-  { tag: tags.url, color: "#58a6ff" },
-  { tag: tags.monospace, color: "#3fb950" },
-  { tag: tags.quote, color: "#9898a6", fontStyle: "italic" },
-  { tag: tags.keyword, color: "#c4b5fd" },
-  { tag: tags.string, color: "#3fb950" },
-  { tag: tags.number, color: "#e5a50a" },
-  { tag: tags.comment, color: "#7e7e8e", fontStyle: "italic" },
-  { tag: tags.meta, color: "#7e7e8e" },
-  { tag: tags.processingInstruction, color: "#9898a6" },
-  { tag: tags.contentSeparator, color: "#7e7e8e" },
-]);
+import { markdownLivePreview } from "./editorLivePreview";
 
 const circuitTheme = EditorView.theme({
   "&": {
@@ -40,7 +17,7 @@ const circuitTheme = EditorView.theme({
   },
   ".cm-content": {
     caretColor: "var(--accent-text)",
-    padding: "8px 0",
+    padding: "8px 0 8px 12px",
   },
   ".cm-cursor, .cm-dropCursor": {
     borderLeftColor: "var(--accent-text)",
@@ -81,6 +58,7 @@ interface EditorViewProps {
 export function EditorViewComponent({ tabId, filePath, fileName: _fileName }: EditorViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const editorViewRef = useRef<EditorView | null>(null);
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { files, loadFile, updateContent, saveFile } = useEditorStore();
   const fileState = files.get(tabId);
 
@@ -117,12 +95,14 @@ export function EditorViewComponent({ tabId, filePath, fileName: _fileName }: Ed
         drawSelection(),
         bracketMatching(),
         markdown(),
-        syntaxHighlighting(circuitHighlight),
+        markdownLivePreview,
         circuitTheme,
         EditorView.lineWrapping,
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
             updateContent(tabId, update.state.doc.toString());
+            if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+            autosaveTimer.current = setTimeout(() => saveFile(tabId, filePath), 1500);
           }
         }),
       ],
@@ -136,6 +116,7 @@ export function EditorViewComponent({ tabId, filePath, fileName: _fileName }: Ed
     editorViewRef.current = view;
 
     return () => {
+      if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
       view.destroy();
       editorViewRef.current = null;
     };

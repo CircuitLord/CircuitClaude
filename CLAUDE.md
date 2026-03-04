@@ -1,71 +1,65 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 ## Project Overview
 
-CircuitClaude is a desktop terminal session manager for running multiple Claude Code CLI sessions across different projects. Built with a React/TypeScript frontend and a Rust/Tauri v2 backend, it provides a tabbed terminal UI powered by xterm.js with PTY management via `portable-pty`.
+CircuitClaude is a desktop IDE-like terminal manager for running multiple Claude Code CLI sessions across projects. React/TypeScript frontend + Rust/Tauri v2 backend. Tabbed terminal UI via xterm.js, PTY management via `portable-pty`, with conversation views, git integration, voice input (Whisper), notes, and a markdown editor.
 
 ## Notes
 
-This project should follow the UI style guide in system.md. Make sure you check this anytime you're changing anything UI related.
+This project should follow the UI style guide in `system.md`. Check it anytime you change anything UI-related.
 
 ## Commands
 
 ```bash
-# Development (starts Vite dev server + Tauri window)
-npm run dev
-
-# Type-check TypeScript
-tsc --noEmit
-
-# Build frontend only
-npm run build
-
-# Build production desktop app (Windows MSI/NSIS installer)
-npm run tauri build
-
-# Check Rust backend compiles
-cd src-tauri && cargo check
+npm run dev              # Vite dev server + Tauri window
+tsc --noEmit             # Type-check TypeScript
+npm run build            # Build frontend only
+npm run tauri build      # Production desktop app (Windows installer)
+cd src-tauri && cargo check  # Check Rust compiles
 ```
 
-There are no test suites configured. No linter beyond TypeScript strict mode (`noUnusedLocals`, `noUnusedParameters`, `noFallthroughCasesInSwitch`).
+No test suites. No linter beyond TypeScript strict mode (`noUnusedLocals`, `noUnusedParameters`, `noFallthroughCasesInSwitch`).
 
 ## Architecture
 
 ```
-React UI (xterm.js terminals, Zustand stores)
+React UI (xterm.js, CodeMirror, Zustand stores)
     ↕  Tauri invoke() / Channel<T>
-Rust Backend (Tauri commands → PtyManager → portable-pty)
+Rust Backend (Tauri commands → managers → portable-pty / whisper-rs)
 ```
 
-**Frontend** (`src/`): React 19 + Zustand for state. Two stores: `sessionStore` (terminal session CRUD) and `projectStore` (project list persistence). IPC wrappers live in `src/lib/pty.ts` and `src/lib/config.ts`.
+**Frontend** (`src/`): React 19 + Zustand. Stores in `src/stores/` (sessionStore, projectStore, conversationStore, settingsStore, fileTreeStore, notesStore, voiceStore, gitStore, editorStore, claudeMdStore). IPC wrappers in `src/lib/`. Components in `src/components/`.
 
-**Backend** (`src-tauri/src/`): Four Rust modules:
-- `lib.rs` - Tauri app setup, plugin registration, command handler registration
-- `commands.rs` - Tauri IPC command handlers (thin wrappers over managers)
-- `pty_manager.rs` - Core PTY lifecycle: spawn (`cmd.exe /c claude`), write, resize, kill. Uses a reader thread to stream output to the frontend via `tauri::ipc::Channel<PtyOutputEvent>`
-- `config.rs` - JSON persistence to `~/.config/CircuitClaude/projects.json`
+**Backend** (`src-tauri/src/`): Core modules:
+- `lib.rs` — App setup, plugin/command registration
+- `commands.rs` — Tauri IPC command handlers
+- `pty_manager.rs` — PTY lifecycle: spawn, write, resize, kill
+- `config.rs` — JSON persistence (`~/.config/CircuitClaude/`)
+- `claude_manager.rs` — Claude API integration
+- `conversation.rs` — Conversation state
+- `git.rs` — Git operations
+- `whisper_manager.rs` — Speech-to-text (CUDA-accelerated)
+- `claude_title.rs` / `codex_title.rs` — Title generation
 
-**Data flow for terminal I/O**: User types in xterm.js → `writeSession()` invoke → Rust writes to PTY stdin. PTY stdout → reader thread → `Channel.send()` → xterm.js `terminal.write()`.
+**Terminal I/O flow**: xterm.js → `writeSession()` invoke → Rust PTY stdin. PTY stdout → reader thread → `Channel.send()` → xterm.js `terminal.write()`.
 
 ## Key Conventions
 
-- Tauri IPC commands use `snake_case` in Rust, invoked as `snake_case` strings from TypeScript via `invoke()`
-- PTY output is streamed using Tauri's `Channel<T>` pattern (not events/listeners). The channel is passed as a parameter to `spawn_session`
-- Enum variants sent over Channel require `#[serde(tag = "type", content = "data")]` for JS deserialization
-- Tauri Rust crate version (`~2.9` in Cargo.toml) must match `@tauri-apps/api` npm package major.minor version
+- Tauri IPC commands: `snake_case` in Rust, invoked as `snake_case` from TypeScript
+- PTY output streamed via Tauri `Channel<T>` (not events/listeners), passed as param to `spawn_session`
+- Channel enum variants require `#[serde(tag = "type", content = "data")]`
+- Tauri crate version (`~2.9`) must match `@tauri-apps/api` npm package major.minor
 
 ## Releases
 
-Tag-triggered CI via `.github/workflows/release.yml`. Push a `v*` tag to build and publish to GitHub Releases.
+Tag-triggered CI via `.github/workflows/release.yml`. Push a `v*` tag to build and publish.
 
-- **CUDA DLLs**: Bundled with the installer via `scripts/copy-cuda-dlls.cjs` (runs in `beforeBuildCommand`). DLLs are copied from the CUDA toolkit into `src-tauri/cuda-runtime/` (gitignored). CI must match the local CUDA toolkit version (currently **13.1**). If the CUDA version changes, update: the CI workflow `cuda:` field, DLL filenames in `tauri.conf.json` resources, and `scripts/copy-cuda-dlls.cjs`.
-- **Version bumps**: Must update all three: `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, `package.json`
-- **Tauri package versions**: Rust crate and npm package major.minor must match (e.g. `tauri v2.9` ↔ `@tauri-apps/api v2.9.x`). Mismatches cause build failures.
+- **Version bumps**: Update all three: `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, `package.json`
+- **CUDA DLLs**: Bundled via `scripts/copy-cuda-dlls.cjs` (runs in `beforeBuildCommand`). Copies from local CUDA toolkit into `src-tauri/cuda-runtime/` (gitignored). CI must match local CUDA version (**13.1**). If version changes, update: CI workflow `cuda:` field, DLL filenames in `tauri.conf.json` resources, and the copy script.
+- **Tauri versions**: Rust crate and npm package major.minor must match (e.g. `tauri ~2.9` ↔ `@tauri-apps/api ^2.9.x`)
 
 ## Platform Notes
 
-- Windows-only PTY invocation: `cmd.exe /c claude` (Claude CLI is an npm global `.cmd` shim)
+- Windows-only: PTY spawns via `cmd.exe /c claude` (CLI is an npm global `.cmd` shim)
 - `portable-pty` uses ConPTY on Windows 10+
-- The `predev` script kills any existing process on port 1420 before starting Vite
+- `predev` script kills existing process on port 1420 before Vite starts

@@ -507,9 +507,9 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
         <span className="terminal-tab-trailing">
           {isEditor && editorDirty ? (
             <span className="terminal-tab-status terminal-tab-dirty">*</span>
-          ) : tabStatus === "thinking" ? (
+          ) : !isEditor && tabStatus === "thinking" ? (
             <span className="terminal-tab-status terminal-tab-thinking">*</span>
-          ) : tabStatus === "waiting" ? (
+          ) : !isEditor && tabStatus === "waiting" ? (
             <span className="terminal-tab-status terminal-tab-attention">?</span>
           ) : null}
           <button
