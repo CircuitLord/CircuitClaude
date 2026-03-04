@@ -80,7 +80,11 @@ export function CommandPalette() {
       }
       // Score and sort
       const scored = files
-        .map((f) => ({ path: f, score: fuzzyMatch(searchQuery, f) }))
+        .map((f) => {
+          let score = fuzzyMatch(searchQuery, f);
+          if (score >= 0 && f.endsWith(".md")) score += 50;
+          return { path: f, score };
+        })
         .filter((s) => s.score >= 0)
         .sort((a, b) => b.score - a.score)
         .slice(0, MAX_RESULTS);

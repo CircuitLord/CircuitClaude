@@ -29,7 +29,6 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
     setActiveSession,
     tabStatuses,
     sessionTitles,
-    requestTitleRegen,
     reorderSessions,
     projectSplits,
     setSplit,
@@ -577,8 +576,7 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
           className="terminal-tab-name"
           onDoubleClick={(e) => {
             e.stopPropagation();
-            if (isPreview) { pinTab(s.id); return; }
-            if (!isEditor && s.sessionType !== "shell") requestTitleRegen(s.id);
+            if (isPreview) { pinTab(s.id); }
           }}
         >{label}</span>
         <span className="terminal-tab-trailing">

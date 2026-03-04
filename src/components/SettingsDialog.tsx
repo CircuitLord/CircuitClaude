@@ -610,6 +610,12 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
               </div>
               <div className="settings-row">
                 <div className="settings-row-label">
+                  <span className="settings-row-name">close tab</span>
+                </div>
+                <kbd className="settings-hotkey-kbd">ctrl+w</kbd>
+              </div>
+              <div className="settings-row">
+                <div className="settings-row-label">
                   <span className="settings-row-name">next / prev tab</span>
                 </div>
                 <kbd className="settings-hotkey-kbd">ctrl+pgup/pgdn</kbd>
@@ -619,6 +625,18 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                   <span className="settings-row-name">next / prev project</span>
                 </div>
                 <kbd className="settings-hotkey-kbd">ctrl+shift+pgup/pgdn</kbd>
+              </div>
+              <div className="settings-row">
+                <div className="settings-row-label">
+                  <span className="settings-row-name">command palette</span>
+                </div>
+                <kbd className="settings-hotkey-kbd">ctrl+p</kbd>
+              </div>
+              <div className="settings-row">
+                <div className="settings-row-label">
+                  <span className="settings-row-name">command palette (commands)</span>
+                </div>
+                <kbd className="settings-hotkey-kbd">ctrl+shift+p</kbd>
               </div>
             </div>
             <div className="settings-section">
@@ -646,6 +664,12 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                   <span className="settings-row-name">regenerate title</span>
                 </div>
                 <kbd className="settings-hotkey-kbd">ctrl+r</kbd>
+              </div>
+              <div className="settings-row">
+                <div className="settings-row-label">
+                  <span className="settings-row-name">save file (editor)</span>
+                </div>
+                <kbd className="settings-hotkey-kbd">ctrl+s</kbd>
               </div>
             </div>
             <div className="settings-section">

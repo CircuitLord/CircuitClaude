@@ -289,23 +289,14 @@ export function useHotkeys() {
         return;
       }
 
-      // Skip if focus is in an input/textarea (but not xterm's internal textarea or voice transcript box)
-      const target = e.target as HTMLElement;
-      const tag = target?.tagName;
-      if (tag === "INPUT" || tag === "SELECT") return;
-      if (tag === "TEXTAREA" && !target.closest(".xterm") && !target.closest(".conversation-input-area") && !target.closest(".voice-transcript-box")) return;
-      if (target.closest(".prompt-input")) return;
-      // Skip most hotkeys when inside CodeMirror editor (let CM handle its own keybindings)
-      if (target.closest(".cm-editor")) return;
-
-      // Ctrl+T — new session
+      // Ctrl+T — new session (before input guards so it works from editor/inputs)
       if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key === "t") {
         e.preventDefault();
         spawnNewSession();
         return;
       }
 
-      // Ctrl+W — close active tab
+      // Ctrl+W — close active tab (before input guards so it works from editor/inputs)
       if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key === "w") {
         e.preventDefault();
         const state = useSessionStore.getState();
@@ -328,6 +319,15 @@ export function useHotkeys() {
           .catch(() => {});
         return;
       }
+
+      // Skip if focus is in an input/textarea (but not xterm's internal textarea or voice transcript box)
+      const target = e.target as HTMLElement;
+      const tag = target?.tagName;
+      if (tag === "INPUT" || tag === "SELECT") return;
+      if (tag === "TEXTAREA" && !target.closest(".xterm") && !target.closest(".conversation-input-area") && !target.closest(".voice-transcript-box")) return;
+      if (target.closest(".prompt-input")) return;
+      // Skip remaining hotkeys when inside CodeMirror editor (let CM handle its own keybindings)
+      if (target.closest(".cm-editor")) return;
 
 
     }
