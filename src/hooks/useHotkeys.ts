@@ -244,6 +244,38 @@ export function useHotkeys() {
         return;
       }
 
+      // Ctrl+PageUp/PageDown — cycle tabs within focused pane (or all project tabs if unsplit)
+      if (e.ctrlKey && !e.shiftKey && !e.altKey && (e.key === "PageUp" || e.key === "PageDown")) {
+        e.preventDefault();
+        if (!activeProjectPath) return;
+        const state = useSessionStore.getState();
+        const split = state.projectSplits.get(activeProjectPath);
+        let tabIds: string[];
+        if (split) {
+          const pane = split.focusedPane === 1 ? split.pane1 : split.pane2;
+          tabIds = pane.sessionIds;
+        } else {
+          tabIds = sessions.filter((s) => s.projectPath === activeProjectPath).map((s) => s.id);
+        }
+        if (tabIds.length <= 1) return;
+        const currentIndex = tabIds.indexOf(activeSessionId ?? "");
+        const delta = e.key === "PageDown" ? 1 : -1;
+        const nextIndex = (currentIndex + delta + tabIds.length) % tabIds.length;
+        setActiveSession(tabIds[nextIndex]);
+        return;
+      }
+
+      // Ctrl+Shift+PageUp/PageDown — cycle between projects
+      if (e.ctrlKey && e.shiftKey && !e.altKey && (e.key === "PageUp" || e.key === "PageDown")) {
+        e.preventDefault();
+        if (projects.length <= 1) return;
+        const currentIndex = projects.findIndex((p) => p.path === activeProjectPath);
+        const delta = e.key === "PageDown" ? 1 : -1;
+        const nextIndex = (currentIndex + delta + projects.length) % projects.length;
+        setActiveProject(projects[nextIndex].path);
+        return;
+      }
+
       // Skip if focus is in an input/textarea (but not xterm's internal textarea or voice transcript box)
       const target = e.target as HTMLElement;
       const tag = target?.tagName;
@@ -284,57 +316,7 @@ export function useHotkeys() {
         return;
       }
 
-      // Ctrl+1-9 — switch tab by index (within focused pane if split)
-      if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key >= "1" && e.key <= "9") {
-        e.preventDefault();
-        if (!activeProjectPath) return;
-        const state = useSessionStore.getState();
-        const split = state.projectSplits.get(activeProjectPath);
-        let tabIds: string[];
-        if (split) {
-          const pane = split.focusedPane === 1 ? split.pane1 : split.pane2;
-          tabIds = pane.sessionIds;
-        } else {
-          tabIds = sessions.filter((s) => s.projectPath === activeProjectPath).map((s) => s.id);
-        }
-        const index = parseInt(e.key, 10) - 1;
-        if (index < tabIds.length) {
-          setActiveSession(tabIds[index]);
-        }
-        return;
-      }
 
-      // Ctrl+Left/Right — cycle tabs within focused pane (or all project tabs if unsplit)
-      if (e.ctrlKey && !e.shiftKey && !e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
-        e.preventDefault();
-        if (!activeProjectPath) return;
-        const state = useSessionStore.getState();
-        const split = state.projectSplits.get(activeProjectPath);
-        let tabIds: string[];
-        if (split) {
-          const pane = split.focusedPane === 1 ? split.pane1 : split.pane2;
-          tabIds = pane.sessionIds;
-        } else {
-          tabIds = sessions.filter((s) => s.projectPath === activeProjectPath).map((s) => s.id);
-        }
-        if (tabIds.length <= 1) return;
-        const currentIndex = tabIds.indexOf(activeSessionId ?? "");
-        const delta = e.key === "ArrowRight" ? 1 : -1;
-        const nextIndex = (currentIndex + delta + tabIds.length) % tabIds.length;
-        setActiveSession(tabIds[nextIndex]);
-        return;
-      }
-
-      // Ctrl+Up/Down — cycle between projects
-      if (e.ctrlKey && !e.shiftKey && !e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
-        e.preventDefault();
-        if (projects.length <= 1) return;
-        const currentIndex = projects.findIndex((p) => p.path === activeProjectPath);
-        const delta = e.key === "ArrowDown" ? 1 : -1;
-        const nextIndex = (currentIndex + delta + projects.length) % projects.length;
-        setActiveProject(projects[nextIndex].path);
-        return;
-      }
     }
 
     window.addEventListener("keydown", handleKeyDown, { capture: true });

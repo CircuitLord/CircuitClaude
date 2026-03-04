@@ -610,21 +610,15 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
               </div>
               <div className="settings-row">
                 <div className="settings-row-label">
-                  <span className="settings-row-name">switch to tab n</span>
-                </div>
-                <kbd className="settings-hotkey-kbd">ctrl+1-9</kbd>
-              </div>
-              <div className="settings-row">
-                <div className="settings-row-label">
                   <span className="settings-row-name">next / prev tab</span>
                 </div>
-                <kbd className="settings-hotkey-kbd">ctrl+left/right</kbd>
+                <kbd className="settings-hotkey-kbd">ctrl+pgup/pgdn</kbd>
               </div>
               <div className="settings-row">
                 <div className="settings-row-label">
                   <span className="settings-row-name">next / prev project</span>
                 </div>
-                <kbd className="settings-hotkey-kbd">ctrl+up/down</kbd>
+                <kbd className="settings-hotkey-kbd">ctrl+shift+pgup/pgdn</kbd>
               </div>
             </div>
             <div className="settings-section">
