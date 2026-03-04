@@ -22,6 +22,7 @@ interface SessionStore {
   setSessionTitle: (tabId: string, title: string) => void;
   markAutoTitleDone: (tabId: string) => void;
   requestTitleRegen: (tabId: string) => void;
+  updateSession: (id: string, partial: Partial<Pick<TerminalSession, "isPreview">>) => void;
   reorderSessions: (projectPath: string, fromIndex: number, toIndex: number) => void;
   projectSplits: Map<string, SplitState>;
   setSplit: (projectPath: string, split: SplitState) => void;
@@ -308,6 +309,13 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     set((state) => ({
       sessions: state.sessions.map((s) =>
         s.id === id ? { ...s, sessionId } : s
+      ),
+    })),
+
+  updateSession: (id, partial) =>
+    set((state) => ({
+      sessions: state.sessions.map((s) =>
+        s.id === id ? { ...s, ...partial } : s
       ),
     })),
 

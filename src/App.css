@@ -2729,6 +2729,10 @@ body,
   text-align: left;
 }
 
+.terminal-tab--preview .terminal-tab-name {
+  font-style: italic;
+}
+
 /* Trailing slot: status indicator at rest, close button on hover */
 
 .terminal-tab-trailing {

@@ -5,6 +5,7 @@ import { markdown } from "@codemirror/lang-markdown";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { bracketMatching } from "@codemirror/language";
 import { useEditorStore } from "../stores/editorStore";
+import { pinTab } from "../lib/sessions";
 import { markdownLivePreview } from "./editorLivePreview";
 
 const circuitTheme = EditorView.theme({
@@ -101,6 +102,7 @@ export function EditorViewComponent({ tabId, filePath, fileName: _fileName }: Ed
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
             updateContent(tabId, update.state.doc.toString());
+            pinTab(tabId);
             if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
             autosaveTimer.current = setTimeout(() => saveFile(tabId, filePath), 1500);
           }

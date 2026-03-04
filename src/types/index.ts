@@ -18,6 +18,7 @@ export interface TerminalSession {
   sessionType: SessionType;
   filePath?: string;
   fileName?: string;
+  isPreview?: boolean;
 }
 
 export type PtyOutputEvent =

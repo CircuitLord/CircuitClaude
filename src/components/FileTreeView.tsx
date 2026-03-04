@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { useFileTreeStore } from "../stores/fileTreeStore";
 import { FileTreeEntry } from "../types";
 import { fileColorClass } from "../lib/files";
@@ -11,11 +11,30 @@ function FileTreeFileNode({
   entry: FileTreeEntry;
   depth: number;
 }) {
+  const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleClick = useCallback(() => {
+    if (clickTimer.current) return; // double-click pending, ignore
+    clickTimer.current = setTimeout(() => {
+      clickTimer.current = null;
+      openFileTab(entry.fullPath, entry.name, true); // preview
+    }, 200);
+  }, [entry.fullPath, entry.name]);
+
+  const handleDoubleClick = useCallback(() => {
+    if (clickTimer.current) {
+      clearTimeout(clickTimer.current);
+      clickTimer.current = null;
+    }
+    openFileTab(entry.fullPath, entry.name, false); // permanent
+  }, [entry.fullPath, entry.name]);
+
   return (
     <div
       className="filetree-file-item filetree-file-item--clickable"
       style={{ paddingLeft: 12 + depth * 12 }}
-      onClick={() => openFileTab(entry.fullPath, entry.name)}
+      onClick={handleClick}
+      onDoubleClick={handleDoubleClick}
     >
       <span className="filetree-spacer" />
       <span className={`filetree-file-name ${fileColorClass(entry.name)}`}>{entry.name}</span>

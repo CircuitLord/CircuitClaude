@@ -4,7 +4,7 @@ import { useEditorStore } from "../stores/editorStore";
 import { TerminalView } from "./TerminalView";
 import { EditorViewComponent } from "./EditorView";
 import { NewSessionMenu } from "./NewSessionMenu";
-import { closeTab } from "../lib/sessions";
+import { closeTab, pinTab } from "../lib/sessions";
 import { SplitDirection, PaneState } from "../types";
 
 interface TerminalTabsProps {
@@ -462,6 +462,7 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
     const s = sessionById.get(sessionId);
     if (!s) return null;
     const isEditor = s.sessionType === "editor";
+    const isPreview = s.isPreview === true;
     const tabStatus = isEditor ? null : (tabStatuses.get(s.id) ?? null);
     const editorDirty = isEditor ? useEditorStore.getState().isDirty(s.id) : false;
     const prefix =
@@ -483,11 +484,12 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
     return (
       <div
         key={s.id}
-        className={`terminal-tab${isActive ? " terminal-tab--active" : ""}${tabStatus === "thinking" ? " terminal-tab--thinking" : ""}${isDragging ? " terminal-tab--dragging" : ""}${showDropBefore ? " terminal-tab--drop-before" : ""}${showDropAfter ? " terminal-tab--drop-after" : ""}`}
+        className={`terminal-tab${isActive ? " terminal-tab--active" : ""}${isPreview ? " terminal-tab--preview" : ""}${tabStatus === "thinking" ? " terminal-tab--thinking" : ""}${isDragging ? " terminal-tab--dragging" : ""}${showDropBefore ? " terminal-tab--drop-before" : ""}${showDropAfter ? " terminal-tab--drop-after" : ""}`}
         role="tab"
         aria-selected={isActive}
         tabIndex={0}
         onClick={() => setActiveSession(s.id)}
+        onDoubleClick={() => { if (isPreview) pinTab(s.id); }}
         onMouseDown={onMouseDown}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
@@ -501,6 +503,7 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
           className="terminal-tab-name"
           onDoubleClick={(e) => {
             e.stopPropagation();
+            if (isPreview) { pinTab(s.id); return; }
             if (!isEditor && s.sessionType !== "shell") requestTitleRegen(s.id);
           }}
         >{label}</span>

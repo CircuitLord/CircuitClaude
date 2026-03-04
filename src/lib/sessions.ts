@@ -30,9 +30,10 @@ export function spawnNewSession(type: SessionType = "claude", targetPane?: 1 | 2
   });
 }
 
-/** Open a file as an editor tab. If already open for this project, focuses it instead. */
-export function openFileTab(filePath: string, fileName: string) {
-  const { sessions, activeProjectPath, addSession, setActiveSession } = useSessionStore.getState();
+/** Open a file as an editor tab. If already open for this project, focuses it instead.
+ *  @param preview - if true (default), opens as a preview tab that gets replaced by subsequent opens */
+export function openFileTab(filePath: string, fileName: string, preview = true) {
+  const { sessions, activeProjectPath, addSession, setActiveSession, updateSession, projectSplits } = useSessionStore.getState();
   if (!activeProjectPath) return;
 
   // Check if file is already open in a tab for this project
@@ -41,7 +42,33 @@ export function openFileTab(filePath: string, fileName: string) {
   );
   if (existing) {
     setActiveSession(existing.id);
+    // If opening permanently and existing is preview, promote it
+    if (!preview && existing.isPreview) {
+      updateSession(existing.id, { isPreview: false });
+    }
     return;
+  }
+
+  // If opening as preview, close any existing preview tab in the current pane
+  if (preview) {
+    const split = projectSplits.get(activeProjectPath);
+    let paneSessionIds: string[] | null = null;
+
+    if (split) {
+      // Find which pane is focused and get its session IDs
+      const focusedPane = split.focusedPane === 1 ? split.pane1 : split.pane2;
+      paneSessionIds = focusedPane.sessionIds;
+    }
+
+    const projectSessions = sessions.filter((s) => s.projectPath === activeProjectPath);
+    const candidateSessions = paneSessionIds
+      ? projectSessions.filter((s) => paneSessionIds!.includes(s.id))
+      : projectSessions;
+
+    const existingPreview = candidateSessions.find((s) => s.isPreview);
+    if (existingPreview) {
+      closeTab(existingPreview.id);
+    }
   }
 
   const { projects } = useProjectStore.getState();
@@ -57,7 +84,17 @@ export function openFileTab(filePath: string, fileName: string) {
     sessionType: "editor",
     filePath,
     fileName,
+    isPreview: preview,
   });
+}
+
+/** Promote a preview tab to a permanent tab. */
+export function pinTab(tabId: string) {
+  const { sessions, updateSession } = useSessionStore.getState();
+  const session = sessions.find((s) => s.id === tabId);
+  if (session?.isPreview) {
+    updateSession(tabId, { isPreview: false });
+  }
 }
 
 /** Close a tab — handles both editor and terminal sessions. */
