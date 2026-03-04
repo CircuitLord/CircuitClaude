@@ -1,6 +1,5 @@
 import { useSessionStore, generateTabId } from "../stores/sessionStore";
 import { useProjectStore } from "../stores/projectStore";
-import { useEditorStore } from "../stores/editorStore";
 import { closePtySession } from "./pty";
 import type { SessionType } from "../types";
 
@@ -103,9 +102,7 @@ export function closeTab(tabId: string) {
   const session = state.sessions.find((s) => s.id === tabId);
   if (!session) return;
 
-  if (session.sessionType === "editor") {
-    useEditorStore.getState().closeFile(tabId);
-  } else if (session.sessionId) {
+  if (session.sessionType !== "editor" && session.sessionId) {
     closePtySession(session.sessionId).catch(() => {});
   }
 

@@ -88,27 +88,7 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
   // Track mounted sessions for unsplit mode
   useEffect(() => {
     if (split) return; // Skip when split — pane-specific tracking handles it
-    setMountedSessionIds((prev) => {
-      const visibleSet = new Set(visibleSessionIds);
-      const next: string[] = [];
-
-      for (const id of prev) {
-        if (visibleSet.has(id)) next.push(id);
-      }
-
-      const nextSet = new Set(next);
-      for (const id of visibleSessionIds) {
-        if (!nextSet.has(id)) {
-          next.push(id);
-          nextSet.add(id);
-        }
-      }
-
-      if (next.length === prev.length && next.every((id, idx) => id === prev[idx])) {
-        return prev;
-      }
-      return next;
-    });
+    setMountedSessionIds((prev) => syncMounted(prev, visibleSessionIds));
   }, [visibleSessionIds, split]);
 
   // Track mounted sessions for split panes

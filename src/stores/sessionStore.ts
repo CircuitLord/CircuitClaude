@@ -47,6 +47,10 @@ function getPaneState(split: SplitState, pane: 1 | 2): PaneState {
   return pane === 1 ? split.pane1 : split.pane2;
 }
 
+function withUpdatedPane(split: SplitState, pane: 1 | 2, newPane: PaneState): SplitState {
+  return pane === 1 ? { ...split, pane1: newPane } : { ...split, pane2: newPane };
+}
+
 export const useSessionStore = create<SessionStore>((set, get) => ({
   sessions: [],
   activeSessionId: null,
@@ -76,13 +80,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           sessionIds: [...pane.sessionIds, session.id],
           activeSessionId: session.id,
         };
-        const newSplit = { ...split };
-        if (split.focusedPane === 1) {
-          newSplit.pane1 = newPane;
-        } else {
-          newSplit.pane2 = newPane;
-        }
-        projectSplits.set(session.projectPath, newSplit);
+        projectSplits.set(session.projectPath, withUpdatedPane(split, split.focusedPane, newPane));
       }
 
       // Set the new session as active for its project
@@ -129,12 +127,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
                 newActiveId = newSessionIds[Math.min(oldIdx, newSessionIds.length - 1)];
               }
               const newPane: PaneState = { sessionIds: newSessionIds, activeSessionId: newActiveId };
-              const newSplit = { ...split };
-              if (paneNum === 1) {
-                newSplit.pane1 = newPane;
-              } else {
-                newSplit.pane2 = newPane;
-              }
+              const newSplit = withUpdatedPane(split, paneNum, newPane);
               projectSplits.set(removed.projectPath, newSplit);
 
               // Update global active to the focused pane's active
@@ -234,8 +227,14 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           .map((s) => s.id)
       );
       const autoTitleDone = new Set(state.autoTitleDone);
+      const tabStatuses = new Map(state.tabStatuses);
+      const sessionTitles = new Map(state.sessionTitles);
+      const titleRegenCounter = new Map(state.titleRegenCounter);
       for (const id of removedIds) {
         autoTitleDone.delete(id);
+        tabStatuses.delete(id);
+        sessionTitles.delete(id);
+        titleRegenCounter.delete(id);
       }
       return {
         sessions,
@@ -244,6 +243,9 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         projectActiveSessionIds,
         projectSplits,
         autoTitleDone,
+        tabStatuses,
+        sessionTitles,
+        titleRegenCounter,
       };
     }),
 
@@ -264,12 +266,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           const nextSplits = new Map(state.projectSplits);
           const pane = getPaneState(split, paneNum);
           const newPane: PaneState = { ...pane, activeSessionId: id };
-          const newSplit = { ...split, focusedPane: paneNum as 1 | 2 };
-          if (paneNum === 1) {
-            newSplit.pane1 = newPane;
-          } else {
-            newSplit.pane2 = newPane;
-          }
+          const newSplit = withUpdatedPane({ ...split, focusedPane: paneNum as 1 | 2 }, paneNum, newPane);
           nextSplits.set(state.activeProjectPath, newSplit);
           const next = new Map(state.projectActiveSessionIds);
           next.set(state.activeProjectPath, id);
@@ -454,14 +451,10 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       const newSource: PaneState = { sessionIds: newSourceIds, activeSessionId: newSourceActive };
       const newTarget: PaneState = { sessionIds: newTargetIds, activeSessionId: sessionId };
 
-      const newSplit = { ...split, focusedPane: targetPane };
-      if (sourcePane === 1) {
-        newSplit.pane1 = newSource;
-        newSplit.pane2 = newTarget;
-      } else {
-        newSplit.pane1 = newTarget;
-        newSplit.pane2 = newSource;
-      }
+      const base = { ...split, focusedPane: targetPane };
+      const newSplit = sourcePane === 1
+        ? { ...base, pane1: newSource, pane2: newTarget }
+        : { ...base, pane1: newTarget, pane2: newSource };
 
       projectSplits.set(projectPath, newSplit);
       const projectActiveSessionIds = new Map(state.projectActiveSessionIds);
@@ -484,13 +477,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 
       const newPane: PaneState = { ...paneState, sessionIds: newIds };
       const projectSplits = new Map(state.projectSplits);
-      const newSplit = { ...split };
-      if (pane === 1) {
-        newSplit.pane1 = newPane;
-      } else {
-        newSplit.pane2 = newPane;
-      }
-      projectSplits.set(projectPath, newSplit);
+      projectSplits.set(projectPath, withUpdatedPane(split, pane, newPane));
       return { projectSplits };
     }),
 }));

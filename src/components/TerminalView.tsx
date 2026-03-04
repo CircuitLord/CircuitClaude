@@ -56,6 +56,8 @@ function logPtyLifecycle(message: string, details?: Record<string, unknown>) {
   console.debug("[TerminalView]", message, details ?? {});
 }
 
+const textEncoder = new TextEncoder();
+
 function fitTerminalAndScrollToBottom(terminal: Terminal, fitAddon: FitAddon) {
   try {
     fitAddon.fit();
@@ -71,8 +73,7 @@ function fitTerminalAndScrollToBottom(terminal: Terminal, fitAddon: FitAddon) {
 export function TerminalView({ tabId, projectPath, projectName, sessionType, hideTitleBar, onClose }: TerminalViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
-  const persistedTitle = useSessionStore((s) => s.sessionTitles.get(tabId) ?? projectName);
-  const [title, setTitle] = useState(persistedTitle);
+  const title = useSessionStore((s) => s.sessionTitles.get(tabId) ?? projectName);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const subscriberIdRef = useRef<string | null>(null);
@@ -93,10 +94,6 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [screenshotStatus, setScreenshotStatus] = useState<string | null>(null);
   const screenshotTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    setTitle(persistedTitle);
-  }, [persistedTitle]);
 
   useEffect(() => {
     if (!containerRef.current || initializedRef.current) return;
@@ -122,7 +119,6 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
           : await regenerateClaudeTitle(projectPath, autoTitleSpawnedAtMs);
         if (!generatedTitle) return false;
         if (cleanedUp || spawnGenerationRef.current !== spawnGeneration) return false;
-        setTitle(generatedTitle);
         setSessionTitle(tabId, generatedTitle);
         return true;
       } catch {
@@ -183,13 +179,6 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
         if (cleanedUp || spawnGenerationRef.current !== spawnGeneration) return;
         if (event.type === "Data") {
           const bytes = new Uint8Array(event.data.bytes);
-          // Debug: scan for OSC sequences (ESC ] = 0x1b 0x5d)
-          for (let i = 0; i < bytes.length - 1; i++) {
-            if (bytes[i] === 0x1b && bytes[i + 1] === 0x5d) {
-              const snippet = new TextDecoder().decode(bytes.slice(i, Math.min(i + 80, bytes.length)));
-              console.log("[TerminalView] OSC sequence found in PTY data:", tabId, JSON.stringify(snippet));
-            }
-          }
           terminal.write(bytes);
           const timeSinceInput = Date.now() - lastUserInputTime;
           if (timeSinceInput > 150) {
@@ -278,8 +267,7 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
         setTabStatus(tabId, null);
       }
       if (sessionIdRef.current) {
-        const encoder = new TextEncoder();
-        writePtySession(sessionIdRef.current, encoder.encode(data)).catch(() => {});
+        writePtySession(sessionIdRef.current, textEncoder.encode(data)).catch(() => {});
       }
       if ((sessionType === "codex" || sessionType === "claude") && (data.includes("\r") || data.includes("\n"))) {
         if (autoTitleTimer) return;
@@ -297,10 +285,8 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
     });
 
     const onTitleDisposable = terminal.onTitleChange((nextTitle) => {
-      console.log("[TerminalView] onTitleChange fired:", tabId, JSON.stringify(nextTitle));
       if (useSettingsStore.getState().settings.useGeneratedTitles) return;
       const clean = nextTitle.replace(/^[^\x20-\x7E]+\s*/, "").trim() || nextTitle;
-      setTitle(clean);
       setSessionTitle(tabId, clean);
     });
 
@@ -332,8 +318,7 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
       const buffer = await imageBlob.arrayBuffer();
       const data = Array.from(new Uint8Array(buffer));
       const filePath = await saveClipboardImage(data, mimeType);
-      const encoder = new TextEncoder();
-      await writePtySession(sid, encoder.encode(filePath));
+      await writePtySession(sid, textEncoder.encode(filePath));
       showScreenshotStatus("screenshot pasted");
     };
 
@@ -477,12 +462,11 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
       <VoiceTranscriptBox tabId={tabId} onSubmit={(text) => {
         const sid = sessionIdRef.current;
         if (!sid) return;
-        const encoder = new TextEncoder();
-        writePtySession(sid, encoder.encode(text)).catch(() => {});
+        writePtySession(sid, textEncoder.encode(text)).catch(() => {});
         // After voice box unmounts, refocus terminal and press Enter
         setTimeout(() => {
           terminalRef.current?.focus();
-          writePtySession(sid, encoder.encode("\r")).catch(() => {});
+          writePtySession(sid, textEncoder.encode("\r")).catch(() => {});
         }, 100);
       }} />
       {screenshotStatus ? (
