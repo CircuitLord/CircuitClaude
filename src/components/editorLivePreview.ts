@@ -1,6 +1,7 @@
 import { EditorView, ViewPlugin, ViewUpdate, Decoration, DecorationSet } from "@codemirror/view";
 import { syntaxTree } from "@codemirror/language";
 import { RangeSetBuilder } from "@codemirror/state";
+import { searchPanelOpen } from "@codemirror/search";
 import { openFileTab } from "../lib/sessions";
 
 /** Heading node names that get both a mark decoration (text styling) and a line decoration (full-width border) */
@@ -38,6 +39,7 @@ function buildDecorations(view: EditorView): DecorationSet {
   const tree = syntaxTree(state);
   const cursor = state.selection.main.head;
   const cursorLine = state.doc.lineAt(cursor).number;
+  const isSearching = searchPanelOpen(state);
 
   // Collect mark/replace decorations (inline, sorted by position)
   const decos: { from: number; to: number; deco: Decoration }[] = [];
@@ -71,7 +73,9 @@ function buildDecorations(view: EditorView): DecorationSet {
       }
 
       // Replace decorations — hide syntax markers when cursor is elsewhere
-      if (hiddenMarkers.has(name)) {
+      // Skip when search panel is open to prevent replace decorations from
+      // conflicting with search match highlights
+      if (hiddenMarkers.has(name) && !isSearching) {
         const markerLine = state.doc.lineAt(node.from).number;
         if (markerLine !== cursorLine && node.from < node.to) {
           let end = node.to;
@@ -124,7 +128,12 @@ const livePreviewPlugin = ViewPlugin.fromClass(
     }
 
     update(update: ViewUpdate) {
-      if (update.docChanged || update.selectionSet || update.viewportChanged) {
+      if (
+        update.docChanged ||
+        update.selectionSet ||
+        update.viewportChanged ||
+        searchPanelOpen(update.startState) !== searchPanelOpen(update.state)
+      ) {
         this.decorations = buildDecorations(update.view);
       }
     }

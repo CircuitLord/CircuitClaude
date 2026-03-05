@@ -1262,25 +1262,35 @@ body,
 
 .terminal-status-line {
   position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 2px 8px;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 16px;
   font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--text-tertiary);
-  background: var(--bg-elevated);
-  border-top: 1px solid var(--border-subtle);
+  font-size: 13px;
+  color: var(--accent-text);
+  background: var(--bg-overlay);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
   pointer-events: none;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  animation: status-line-in 0s step-end forwards;
+  z-index: 5;
+  box-shadow: 0 0 12px var(--accent-muted), 0 0 4px var(--accent), 0 2px 8px rgba(0, 0, 0, 0.5);
+  animation: status-pill-in 0.15s ease-out forwards;
 }
 
-@keyframes status-line-in {
-  from { opacity: 1; }
-  to   { opacity: 1; }
+.terminal-status-line.status-pill-out {
+  animation: status-pill-out 0.2s ease-in forwards;
+}
+
+@keyframes status-pill-in {
+  0%   { opacity: 0; box-shadow: 0 0 0 var(--accent-muted), 0 0 0 var(--accent), 0 2px 8px rgba(0, 0, 0, 0.5); }
+  100% { opacity: 1; box-shadow: 0 0 24px var(--accent-muted), 0 0 8px var(--accent), 0 2px 8px rgba(0, 0, 0, 0.5); }
+}
+
+@keyframes status-pill-out {
+  0%   { opacity: 1; box-shadow: 0 0 24px var(--accent-muted), 0 0 8px var(--accent), 0 2px 8px rgba(0, 0, 0, 0.5); }
+  100% { opacity: 0; box-shadow: 0 0 0 var(--accent-muted), 0 0 0 var(--accent), 0 2px 8px rgba(0, 0, 0, 0.5); }
 }
 
 /* Voice Transcript Box — appears at bottom of terminal during voice capture */

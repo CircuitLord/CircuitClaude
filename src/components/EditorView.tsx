@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
+import StatusPill from "./StatusPill";
 import { EditorState } from "@codemirror/state";
-import { EditorView, keymap, lineNumbers, highlightActiveLine, drawSelection } from "@codemirror/view";
+import { EditorView, ViewPlugin, keymap, lineNumbers, highlightActiveLine, drawSelection } from "@codemirror/view";
 import { markdown } from "@codemirror/lang-markdown";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
+import { search, searchKeymap } from "@codemirror/search";
 import { bracketMatching } from "@codemirror/language";
 import { listen } from "@tauri-apps/api/event";
 import { useEditorStore } from "../stores/editorStore";
@@ -52,6 +54,151 @@ const circuitTheme = EditorView.theme({
   ".cm-scroller": {
     overflow: "auto",
   },
+  ".cm-panels": {
+    backgroundColor: "var(--bg-surface)",
+    borderBottom: "1px solid var(--border-subtle)",
+    fontFamily: "var(--font-mono)",
+    fontSize: "13px",
+    color: "var(--text-secondary)",
+  },
+  ".cm-search": {
+    padding: "4px 8px",
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    flexWrap: "wrap",
+  },
+  ".cm-textfield": {
+    backgroundColor: "var(--bg-base)",
+    color: "var(--text-primary)",
+    border: "1px solid var(--border-subtle)",
+    borderRadius: "2px",
+    fontFamily: "var(--font-mono)",
+    fontSize: "13px",
+    padding: "3px 6px",
+    outline: "none",
+  },
+  ".cm-textfield:focus": {
+    borderColor: "var(--accent)",
+  },
+  ".cm-button": {
+    backgroundImage: "none",
+    backgroundColor: "var(--accent-muted)",
+    color: "var(--accent-text)",
+    border: "1px solid transparent",
+    borderRadius: "4px",
+    fontFamily: "var(--font-mono)",
+    fontSize: "13px",
+    padding: "4px 10px",
+    cursor: "pointer",
+    transition: "background 0.1s, border-color 0.1s",
+  },
+  ".cm-button:hover": {
+    backgroundColor: "var(--accent-muted-hover)",
+    borderColor: "var(--accent)",
+    color: "var(--accent-text)",
+  },
+  ".cm-button:active": {
+    backgroundImage: "none",
+    backgroundColor: "var(--accent-muted-hover)",
+    borderColor: "var(--accent)",
+    color: "var(--accent-text)",
+  },
+  ".cm-search label": {
+    color: "var(--text-tertiary)",
+    fontFamily: "var(--font-mono)",
+    fontSize: "13px",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    gap: "3px",
+    transition: "color 0.1s",
+  },
+  ".cm-search label:hover": {
+    color: "var(--accent-text)",
+  },
+  ".cm-search input[type=checkbox]": {
+    appearance: "none",
+    width: "13px",
+    height: "13px",
+    border: "1px solid var(--border-visible)",
+    borderRadius: "2px",
+    backgroundColor: "transparent",
+    cursor: "pointer",
+    position: "relative" as const,
+    transition: "border-color 0.1s, background 0.1s",
+    verticalAlign: "middle",
+  },
+  ".cm-search input[type=checkbox]:checked": {
+    backgroundColor: "var(--accent-muted)",
+    borderColor: "var(--accent)",
+  },
+  ".cm-search input[type=checkbox]:checked::after": {
+    content: "'\\2713'",
+    position: "absolute" as const,
+    top: "-1px",
+    left: "1px",
+    fontSize: "11px",
+    lineHeight: "13px",
+    color: "var(--accent-text)",
+    fontFamily: "var(--font-mono)",
+  },
+  ".cm-search input[type=checkbox]:hover": {
+    borderColor: "var(--accent)",
+  },
+  ".cm-search br": {
+    flexBasis: "100%",
+    height: "0",
+    margin: "0",
+    border: "none",
+  },
+  "& .cm-search-replace-row": {
+    display: "flex",
+    gap: "6px",
+    alignItems: "center",
+  },
+  ".cm-searchMatch": {
+    backgroundColor: "rgba(255, 200, 50, 0.35)",
+    outline: "1px solid rgba(255, 200, 50, 0.5)",
+    borderRadius: "1px",
+  },
+  ".cm-searchMatch-selected": {
+    backgroundColor: "rgba(255, 200, 50, 0.7)",
+    outline: "1px solid rgba(255, 200, 50, 0.9)",
+  },
+}, { dark: true });
+
+/** Disable browser autocomplete on search panel inputs */
+const disableAutocomplete = ViewPlugin.define((view) => {
+  function patch() {
+    for (const el of view.dom.querySelectorAll<HTMLInputElement>(".cm-textfield")) {
+      if (el.getAttribute("autocomplete") !== "off") el.setAttribute("autocomplete", "off");
+    }
+  }
+  patch();
+  return { update: patch };
+});
+
+/** Wrap replace row elements into a grouped div so they wrap as a single unit */
+const searchPanelLayout = ViewPlugin.define((view) => {
+  function restructure() {
+    const editor = view.dom.closest(".cm-editor");
+    if (!editor) return;
+    const panel = editor.querySelector(".cm-search");
+    if (!panel || panel.querySelector(".cm-search-replace-row")) return;
+    const br = panel.querySelector("br");
+    if (!br) return;
+    const wrapper = document.createElement("div");
+    wrapper.className = "cm-search-replace-row";
+    let node = br.nextSibling;
+    while (node) {
+      const next = node.nextSibling;
+      wrapper.appendChild(node);
+      node = next;
+    }
+    br.after(wrapper);
+  }
+  return { update: restructure };
 });
 
 interface EditorViewProps {
@@ -127,11 +274,14 @@ export function EditorViewComponent({ tabId, filePath, fileName: _fileName }: Ed
       extensions: [
         saveKeymap,
         history(),
-        keymap.of([indentWithTab, ...defaultKeymap, ...historyKeymap]),
+        keymap.of([indentWithTab, ...defaultKeymap, ...historyKeymap, ...searchKeymap]),
         lineNumbers(),
         highlightActiveLine(),
         drawSelection(),
         bracketMatching(),
+        search({ top: true }),
+        disableAutocomplete,
+        searchPanelLayout,
         markdown(),
         markdownLivePreview,
         markdownLinkClick(filePath),
@@ -182,7 +332,7 @@ export function EditorViewComponent({ tabId, filePath, fileName: _fileName }: Ed
 
   return (
     <div ref={containerRef} className="editor-view">
-      {showCopied && <div className="terminal-status-line">path copied to clipboard</div>}
+      <StatusPill visible={showCopied}>* path copied to clipboard</StatusPill>
     </div>
   );
 }

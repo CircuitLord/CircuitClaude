@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import StatusPill from "./StatusPill";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
@@ -482,11 +483,8 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
           writePtySession(sid, textEncoder.encode("\r")).catch(() => {});
         }, 100);
       }} />
-      {screenshotStatus ? (
-        <div className="terminal-status-line">{screenshotStatus}</div>
-      ) : showCopied ? (
-        <div className="terminal-status-line">copied to clipboard</div>
-      ) : null}
+      <StatusPill visible={!!screenshotStatus}>* {screenshotStatus}</StatusPill>
+      <StatusPill visible={!screenshotStatus && showCopied}>* copied to clipboard</StatusPill>
     </div>
   );
 }
