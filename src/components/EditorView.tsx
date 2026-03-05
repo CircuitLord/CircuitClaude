@@ -3,10 +3,12 @@ import StatusPill from "./StatusPill";
 import { EditorState } from "@codemirror/state";
 import { EditorView, ViewPlugin, keymap, lineNumbers, highlightActiveLine, drawSelection } from "@codemirror/view";
 import { markdown } from "@codemirror/lang-markdown";
+import { languages } from "@codemirror/language-data";
 import { GFM } from "@lezer/markdown";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { search, searchKeymap, getSearchQuery } from "@codemirror/search";
-import { bracketMatching } from "@codemirror/language";
+import { bracketMatching, syntaxHighlighting } from "@codemirror/language";
+import { classHighlighter } from "@lezer/highlight";
 import { listen } from "@tauri-apps/api/event";
 import { useEditorStore } from "../stores/editorStore";
 import { useSessionStore } from "../stores/sessionStore";
@@ -180,6 +182,9 @@ const circuitTheme = EditorView.theme({
     outline: "1px solid rgba(255, 200, 50, 0.9)",
   },
 }, { dark: true });
+
+/** Syntax highlighting via CSS classes — scoped to fenced code blocks in App.css */
+const codeHighlight = syntaxHighlighting(classHighlighter);
 
 /** Disable browser autocomplete on search panel inputs */
 const disableAutocomplete = ViewPlugin.define((view) => {
@@ -387,7 +392,8 @@ export function EditorViewComponent({ tabId, filePath, fileName: _fileName }: Ed
         disableAutocomplete,
         searchPanelLayout,
         searchEnhancements,
-        markdown({ extensions: GFM }),
+        markdown({ extensions: GFM, codeLanguages: languages }),
+        codeHighlight,
         markdownLivePreview,
         markdownLinkClick(filePath),
         circuitTheme,

@@ -4476,6 +4476,16 @@ body,
 .cm-md-emphasis { font-style: italic; color: #c4b5fd; }
 .cm-md-strong { font-weight: bold; }
 .cm-md-code { background: var(--bg-elevated); border-radius: 3px; padding: 1px 4px; color: #3fb950; font-family: var(--font-mono); }
+.cm-md-fenced-code-line { background: var(--bg-elevated); }
+.cm-md-fenced-code-line .tok-keyword, .cm-md-fenced-code-line .tok-operator { color: var(--hljs-keyword); }
+.cm-md-fenced-code-line .tok-function, .cm-md-fenced-code-line .tok-typeName, .cm-md-fenced-code-line .tok-className, .cm-md-fenced-code-line .tok-definition { color: var(--hljs-function); }
+.cm-md-fenced-code-line .tok-string, .cm-md-fenced-code-line .tok-string2 { color: var(--hljs-string); }
+.cm-md-fenced-code-line .tok-number, .cm-md-fenced-code-line .tok-bool, .cm-md-fenced-code-line .tok-null { color: var(--hljs-number); }
+.cm-md-fenced-code-line .tok-comment { color: var(--hljs-comment); font-style: italic; }
+.cm-md-fenced-code-line .tok-propertyName, .cm-md-fenced-code-line .tok-tagName { color: var(--hljs-name); }
+.cm-md-fenced-code-line .tok-attributeName { color: var(--hljs-number); }
+.cm-md-fenced-code-line .tok-regexp { color: var(--hljs-regexp); }
+.cm-md-fenced-code-line .tok-meta { color: var(--hljs-meta); }
 .cm-md-link { color: #58a6ff; text-decoration: underline; cursor: pointer; }
 .cm-md-blockquote { border-left: 2px solid var(--border-visible); padding-left: 8px; color: var(--text-secondary); }
 .cm-md-hr { border-top: 1px solid var(--border-visible); display: block; }

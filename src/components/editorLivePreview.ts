@@ -84,6 +84,16 @@ function buildDecorations(view: EditorView): DecorationSet {
         }
       }
 
+      // Fenced code blocks — apply line decoration to every line in the block
+      if (name === "FencedCode") {
+        const startLine = state.doc.lineAt(node.from).number;
+        const endLine = state.doc.lineAt(node.to).number;
+        for (let ln = startLine; ln <= endLine; ln++) {
+          const line = state.doc.line(ln);
+          lineDecos.set(line.from, Decoration.line({ class: "cm-md-fenced-code-line" }));
+        }
+      }
+
       // Mark decorations — visual styling for rendered markdown
       const cls = markClasses[name];
       if (cls) {
