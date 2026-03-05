@@ -48,9 +48,6 @@ const circuitTheme = EditorView.theme({
   ".cm-activeLine": {
     backgroundColor: "var(--bg-elevated)",
   },
-  "& .cm-selectionLayer": {
-    zIndex: "1 !important",
-  },
   ".cm-scroller": {
     overflow: "auto",
   },
