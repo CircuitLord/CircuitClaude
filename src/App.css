@@ -4479,6 +4479,9 @@ body,
 .cm-md-link { color: #58a6ff; text-decoration: underline; cursor: pointer; }
 .cm-md-blockquote { border-left: 2px solid var(--border-visible); padding-left: 8px; color: var(--text-secondary); }
 .cm-md-hr { border-top: 1px solid var(--border-visible); display: block; }
+.cm-md-task-checked { color: #3fb950; }
+.cm-md-task-unchecked { color: var(--text-tertiary); }
+.cm-md-task-done { color: var(--text-tertiary); text-decoration: line-through; text-decoration-color: var(--text-tertiary); }
 
 .terminal-tab-dirty {
   color: var(--text-secondary);

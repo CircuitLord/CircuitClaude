@@ -28,7 +28,7 @@ React UI (xterm.js, CodeMirror, Zustand stores)
 Rust Backend (Tauri commands → managers → portable-pty / whisper-rs)
 ```
 
-**Frontend** (`src/`): React 19 + Zustand. Stores in `src/stores/` (sessionStore, projectStore, conversationStore, settingsStore, fileTreeStore, notesStore, voiceStore, gitStore, editorStore, claudeMdStore). IPC wrappers in `src/lib/`. Components in `src/components/`.
+**Frontend** (`src/`): React 19 + Zustand. Stores in `src/stores/` (sessionStore, projectStore, conversationStore, settingsStore, fileTreeStore, notesStore, voiceStore, gitStore, editorStore, commandPaletteStore). IPC wrappers in `src/lib/`. Components in `src/components/`.
 
 **Backend** (`src-tauri/src/`): Core modules:
 - `lib.rs` — App setup, plugin/command registration
@@ -39,6 +39,7 @@ Rust Backend (Tauri commands → managers → portable-pty / whisper-rs)
 - `conversation.rs` — Conversation state
 - `git.rs` — Git operations
 - `whisper_manager.rs` — Speech-to-text (CUDA-accelerated)
+- `file_watcher.rs` — File system watching with debouncing
 - `claude_title.rs` / `codex_title.rs` — Title generation
 
 **Terminal I/O flow**: xterm.js → `writeSession()` invoke → Rust PTY stdin. PTY stdout → reader thread → `Channel.send()` → xterm.js `terminal.write()`.

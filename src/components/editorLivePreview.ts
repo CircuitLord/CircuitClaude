@@ -62,6 +62,28 @@ function buildDecorations(view: EditorView): DecorationSet {
         lineDecos.set(line.from, Decoration.line({ class: headingCls + "-line" }));
       }
 
+      // Task list decorations — style completed tasks
+      if (name === "TaskMarker") {
+        const text = state.doc.sliceString(node.from, node.to);
+        const checked = text === "[x]" || text === "[X]";
+        decos.push({
+          from: node.from,
+          to: node.to,
+          deco: Decoration.mark({ class: checked ? "cm-md-task-checked" : "cm-md-task-unchecked" }),
+        });
+        if (checked) {
+          // Style the rest of the line after the marker as completed
+          const line = state.doc.lineAt(node.from);
+          if (node.to < line.to) {
+            decos.push({
+              from: node.to,
+              to: line.to,
+              deco: Decoration.mark({ class: "cm-md-task-done" }),
+            });
+          }
+        }
+      }
+
       // Mark decorations — visual styling for rendered markdown
       const cls = markClasses[name];
       if (cls) {

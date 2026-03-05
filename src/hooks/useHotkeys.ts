@@ -194,9 +194,11 @@ export function useHotkeys() {
         return;
       }
 
-      // Ctrl+F — suppress webview find (CodeMirror handles its own search)
+      // Ctrl+F — suppress webview find, but let CodeMirror handle its own search
       if (e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey && e.key.toLowerCase() === "f") {
-        e.preventDefault();
+        if (!(e.target as HTMLElement)?.closest(".cm-editor")) {
+          e.preventDefault();
+        }
         return;
       }
 

@@ -2,6 +2,21 @@
 
 A desktop terminal session manager for running multiple [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI sessions across different projects. Built with React/TypeScript and Rust/Tauri v2, featuring a tabbed terminal UI powered by xterm.js.
 
+## Features
+
+- **Multi-session terminals** — Run multiple Claude Code sessions in parallel with a tabbed interface and drag-to-reorder tabs
+- **Split panes** — Drag terminals to split horizontally, view multiple sessions side-by-side
+- **Command palette** — Quick access to files (with [Everything](https://www.voidtools.com/) integration on Windows) and commands
+- **File editor** — CodeMirror-based editor with preview tabs, breadcrumbs, in-editor search, and external file change syncing
+- **Markdown preview** — Live rendered markdown preview with syntax highlighting and link navigation
+- **Git integration** — Sidebar git section with diff viewer and commit dialog
+- **Voice input** — Local speech-to-text via whisper.cpp with CUDA GPU acceleration (falls back to CPU)
+- **Conversation view** — Browse and review past Claude Code conversations
+- **Auto-generated titles** — Sessions are automatically titled based on their content
+- **Notes** — Per-project scratchpad notes
+- **File tree** — Browse project files in the sidebar
+- **Auto-updates** — The app checks for updates on launch and installs them automatically
+
 ## Install
 
 Download the latest installer from [GitHub Releases](https://github.com/CircuitLord/CircuitClaude/releases/latest).
@@ -24,11 +39,11 @@ Rust Backend (Tauri commands → PtyManager → portable-pty)
 
 | Layer    | Technology                          |
 | -------- | ----------------------------------- |
-| UI       | React 19, TypeScript, xterm.js      |
-| State    | Zustand                             |
-| Desktop  | Tauri v2                            |
-| Backend  | Rust, portable-pty                  |
-| Build    | Vite, Cargo                         |
+| UI       | React 19, TypeScript, xterm.js, CodeMirror |
+| State    | Zustand                                     |
+| Desktop  | Tauri v2                                    |
+| Backend  | Rust, portable-pty, whisper-rs              |
+| Build    | Vite, Cargo                                 |
 
 ---
 

@@ -3,6 +3,7 @@ import StatusPill from "./StatusPill";
 import { EditorState } from "@codemirror/state";
 import { EditorView, ViewPlugin, keymap, lineNumbers, highlightActiveLine, drawSelection } from "@codemirror/view";
 import { markdown } from "@codemirror/lang-markdown";
+import { GFM } from "@lezer/markdown";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { search, searchKeymap, getSearchQuery } from "@codemirror/search";
 import { bracketMatching } from "@codemirror/language";
@@ -386,7 +387,7 @@ export function EditorViewComponent({ tabId, filePath, fileName: _fileName }: Ed
         disableAutocomplete,
         searchPanelLayout,
         searchEnhancements,
-        markdown(),
+        markdown({ extensions: GFM }),
         markdownLivePreview,
         markdownLinkClick(filePath),
         circuitTheme,
