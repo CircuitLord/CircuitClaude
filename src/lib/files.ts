@@ -107,3 +107,33 @@ export function readDirectory(
     dirPath: dirPath ?? null,
   });
 }
+
+// --- Everything search ---
+
+export interface EverythingResult {
+  path: string;
+  filename: string;
+  dir: string;
+}
+
+export interface EverythingResponse {
+  results: EverythingResult[];
+  available: boolean;
+  error: string | null;
+  /** "not_installed" | "not_running" | "es_error" | null */
+  errorKind: string | null;
+}
+
+export function searchEverything(
+  query: string,
+  maxResults?: number,
+): Promise<EverythingResponse> {
+  return invoke<EverythingResponse>("search_everything", {
+    query,
+    maxResults: maxResults ?? null,
+  });
+}
+
+export function downloadEsExe(): Promise<string> {
+  return invoke<string>("download_es_exe");
+}

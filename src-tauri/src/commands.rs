@@ -735,3 +735,219 @@ pub fn whisper_get_model_status(
 ) -> ModelInfo {
     whisper_manager.get_model_status(&model_name)
 }
+
+// --- Everything search ---
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EverythingResult {
+    pub path: String,
+    pub filename: String,
+    pub dir: String,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EverythingResponse {
+    pub results: Vec<EverythingResult>,
+    pub available: bool,
+    pub error: Option<String>,
+    /// "not_installed" | "not_running" | "es_error" | null
+    pub error_kind: Option<String>,
+}
+
+fn es_exe_config_path() -> std::path::PathBuf {
+    dirs::config_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join("CircuitClaude")
+        .join("bin")
+        .join("es.exe")
+}
+
+fn find_es_exe() -> Option<String> {
+    // Check app config dir first (downloaded by us)
+    let config_path = es_exe_config_path();
+    if config_path.exists() {
+        return Some(config_path.to_string_lossy().to_string());
+    }
+
+    // Try PATH via `where es`
+    let mut cmd = std::process::Command::new("where");
+    cmd.arg("es")
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null());
+    #[cfg(windows)]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+
+    if let Ok(output) = cmd.output() {
+        if output.status.success() {
+            if let Some(line) = String::from_utf8_lossy(&output.stdout).lines().next() {
+                let trimmed = line.trim();
+                if !trimmed.is_empty() {
+                    return Some(trimmed.to_string());
+                }
+            }
+        }
+    }
+
+    // Fallback paths
+    let fallbacks = [
+        r"C:\Program Files\Everything\es.exe",
+        r"C:\Program Files (x86)\Everything\es.exe",
+        r"C:\Program Files\Everything 1.5a\es.exe",
+    ];
+    for path in &fallbacks {
+        if std::path::Path::new(path).exists() {
+            return Some(path.to_string());
+        }
+    }
+
+    None
+}
+
+#[tauri::command]
+pub async fn search_everything(
+    query: String,
+    max_results: Option<u32>,
+) -> Result<EverythingResponse, String> {
+    let max = max_results.unwrap_or(50);
+
+    tauri::async_runtime::spawn_blocking(move || {
+        let es_path = match find_es_exe() {
+            Some(p) => p,
+            None => {
+                return Ok(EverythingResponse {
+                    results: vec![],
+                    available: false,
+                    error: Some("es.exe not found".into()),
+                    error_kind: Some("not_installed".into()),
+                });
+            }
+        };
+
+        let mut cmd = std::process::Command::new(&es_path);
+        cmd.args(["-sort", "dm", "-max-results", &max.to_string(), &query])
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped());
+        #[cfg(windows)]
+        cmd.creation_flags(CREATE_NO_WINDOW);
+
+        let output = match cmd.output() {
+            Ok(o) => o,
+            Err(e) => {
+                return Ok(EverythingResponse {
+                    results: vec![],
+                    available: false,
+                    error: Some(format!("failed to run es.exe: {}", e)),
+                    error_kind: Some("not_installed".into()),
+                });
+            }
+        };
+
+        if !output.status.success() {
+            let exit_code = output.status.code().unwrap_or(-1);
+            // Exit code 8 = Everything IPC window not found (not running)
+            if exit_code == 8 {
+                return Ok(EverythingResponse {
+                    results: vec![],
+                    available: false,
+                    error: Some("Everything is not running".into()),
+                    error_kind: Some("not_running".into()),
+                });
+            }
+            let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+            return Ok(EverythingResponse {
+                results: vec![],
+                available: true,
+                error: Some(if stderr.trim().is_empty() {
+                    format!("es.exe error (exit code {})", exit_code)
+                } else {
+                    stderr
+                }),
+                error_kind: Some("es_error".into()),
+            });
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let results: Vec<EverythingResult> = stdout
+            .lines()
+            .filter(|line| !line.trim().is_empty())
+            .map(|line| {
+                let normalized = line.trim().replace('\\', "/");
+                let path = std::path::Path::new(&normalized);
+                let filename = path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                let dir = path
+                    .parent()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                EverythingResult {
+                    path: normalized,
+                    filename,
+                    dir,
+                }
+            })
+            .collect();
+
+        Ok(EverythingResponse {
+            results,
+            available: true,
+            error: None,
+            error_kind: None,
+        })
+    })
+    .await
+    .map_err(|e| format!("Task join failed: {}", e))?
+}
+
+const ES_EXE_URL: &str = "https://www.voidtools.com/ES-1.1.0.30.x64.zip";
+
+#[tauri::command]
+pub async fn download_es_exe() -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        let dest = es_exe_config_path();
+        if let Some(parent) = dest.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("failed to create bin dir: {}", e))?;
+        }
+
+        let client = reqwest::blocking::Client::new();
+        let response = client
+            .get(ES_EXE_URL)
+            .send()
+            .map_err(|e| format!("download failed: {}", e))?;
+
+        if !response.status().is_success() {
+            return Err(format!("download failed: HTTP {}", response.status()));
+        }
+
+        let bytes = response
+            .bytes()
+            .map_err(|e| format!("failed to read response: {}", e))?;
+
+        // Extract es.exe from the zip
+        let cursor = std::io::Cursor::new(&bytes);
+        let mut archive =
+            zip::ZipArchive::new(cursor).map_err(|e| format!("failed to open zip: {}", e))?;
+
+        for i in 0..archive.len() {
+            let mut file = archive
+                .by_index(i)
+                .map_err(|e| format!("failed to read zip entry: {}", e))?;
+            let name = file.name().to_lowercase();
+            if name == "es.exe" || name.ends_with("/es.exe") {
+                let mut out = std::fs::File::create(&dest)
+                    .map_err(|e| format!("failed to create es.exe: {}", e))?;
+                std::io::copy(&mut file, &mut out)
+                    .map_err(|e| format!("failed to write es.exe: {}", e))?;
+                return Ok(dest.to_string_lossy().to_string());
+            }
+        }
+
+        Err("es.exe not found in downloaded zip".into())
+    })
+    .await
+    .map_err(|e| format!("Task join failed: {}", e))?
+}

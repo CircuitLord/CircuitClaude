@@ -194,6 +194,12 @@ export function useHotkeys() {
         return;
       }
 
+      // Ctrl+F — suppress webview find (CodeMirror handles its own search)
+      if (e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey && e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        return;
+      }
+
       // Skip when dialog/overlay is open
       if (document.querySelector(".dialog-overlay") || document.querySelector(".diff-overlay")) return;
 

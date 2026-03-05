@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useCommandPaletteStore } from "../stores/commandPaletteStore";
 import { useSessionStore } from "../stores/sessionStore";
-import { scanProjectFiles, fileColorClass } from "../lib/files";
+import { scanProjectFiles, fileColorClass, searchEverything, downloadEsExe, type EverythingResult } from "../lib/files";
 import { openFileTab } from "../lib/sessions";
 import {
   fuzzyMatch,
@@ -34,6 +34,13 @@ export function CommandPalette() {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [files, setFiles] = useState<string[]>([]);
   const [filesLoading, setFilesLoading] = useState(false);
+  const [everythingResults, setEverythingResults] = useState<EverythingResult[]>([]);
+  const [everythingLoading, setEverythingLoading] = useState(false);
+  const [everythingAvailable, setEverythingAvailable] = useState(true);
+  const [everythingError, setEverythingError] = useState<string | null>(null);
+  const [everythingErrorKind, setEverythingErrorKind] = useState<string | null>(null);
+  const [esDownloading, setEsDownloading] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const activeItemRef = useRef<HTMLDivElement>(null);
@@ -64,8 +71,48 @@ export function CommandPalette() {
       setQuery("");
       setMode("files");
       setFiles([]);
+      setEverythingResults([]);
+      setEverythingLoading(false);
+      setEverythingError(null);
+      setEverythingErrorKind(null);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
     }
   }, [isOpen, initialMode]);
+
+  // Debounced Everything search
+  useEffect(() => {
+    if (mode !== "everything") return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    if (!searchQuery) {
+      setEverythingResults([]);
+      setEverythingLoading(false);
+      setEverythingError(null);
+      setEverythingErrorKind(null);
+      return;
+    }
+
+    setEverythingLoading(true);
+    debounceRef.current = setTimeout(() => {
+      searchEverything(searchQuery)
+        .then((resp) => {
+          setEverythingAvailable(resp.available);
+          setEverythingError(resp.error);
+          setEverythingErrorKind(resp.errorKind);
+          setEverythingResults(resp.results);
+        })
+        .catch(() => {
+          setEverythingError("failed to search");
+          setEverythingErrorKind(null);
+          setEverythingResults([]);
+        })
+        .finally(() => setEverythingLoading(false));
+    }, 200);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [mode, searchQuery]);
 
   // Scroll active item into view
   useEffect(() => {
@@ -107,8 +154,18 @@ export function CommandPalette() {
         .map((s) => cmdToItem(s.cmd));
     }
 
+    if (mode === "everything") {
+      return everythingResults.map((r) => ({
+        type: "file" as const,
+        path: r.path,
+        filename: r.filename,
+        dir: r.dir,
+        isAbsolute: true,
+      }));
+    }
+
     return [];
-  }, [mode, searchQuery, files]);
+  }, [mode, searchQuery, files, everythingResults]);
 
   // Clamp selection when results change
   useEffect(() => {
@@ -146,9 +203,12 @@ export function CommandPalette() {
         close();
         return;
       }
-      if (e.key === "Backspace" && !query && mode === "commands") {
+      if (e.key === "Backspace" && !query && (mode === "commands" || mode === "everything")) {
         e.preventDefault();
         setMode("files");
+        setEverythingResults([]);
+        setEverythingError(null);
+        setEverythingErrorKind(null);
         return;
       }
       if (e.key === "ArrowDown") {
@@ -188,6 +248,7 @@ export function CommandPalette() {
       <div className="command-palette">
         <div className="command-palette-input-row">
           {mode === "commands" && <span className="command-palette-mode-badge">:</span>}
+          {mode === "everything" && <span className="command-palette-mode-badge">*</span>}
           <input
             ref={inputRef}
             className="command-palette-input"
@@ -200,11 +261,16 @@ export function CommandPalette() {
                 setMode("commands");
                 value = value.slice(1);
               }
+              // Typing "*" in file mode switches to everything mode
+              if (mode === "files" && value.startsWith("*")) {
+                setMode("everything");
+                value = value.slice(1);
+              }
               setQuery(value);
               setSelectedIndex(0);
             }}
             onKeyDown={handleKeyDown}
-            placeholder={mode === "commands" ? "search commands..." : "search files..."}
+            placeholder={mode === "commands" ? "search commands..." : mode === "everything" ? "search everything..." : "search files..."}
             spellCheck={false}
             autoComplete="off"
           />
@@ -214,7 +280,52 @@ export function CommandPalette() {
           {filesLoading && mode === "files" && (
             <div className="command-palette-empty">scanning files...</div>
           )}
-          {!filesLoading && results.length === 0 && (
+          {everythingLoading && mode === "everything" && (
+            <div className="command-palette-empty">searching...</div>
+          )}
+          {mode === "everything" && !everythingLoading && everythingErrorKind === "not_installed" && (
+            <div className="command-palette-empty">
+              {esDownloading ? "downloading es.exe..." : (
+                <>
+                  es.exe not found{" "}
+                  <span
+                    className="command-palette-action"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setEsDownloading(true);
+                      downloadEsExe()
+                        .then(() => {
+                          setEverythingAvailable(true);
+                          setEverythingError(null);
+                          setEverythingErrorKind(null);
+                          setEsDownloading(false);
+                        })
+                        .catch((err) => {
+                          setEverythingError(String(err));
+                          setEsDownloading(false);
+                        });
+                    }}
+                  >
+                    :download
+                  </span>
+                </>
+              )}
+            </div>
+          )}
+          {mode === "everything" && !everythingLoading && everythingErrorKind === "not_running" && (
+            <div className="command-palette-empty">Everything is not running — start it to use search</div>
+          )}
+          {mode === "everything" && !everythingLoading && everythingErrorKind === "es_error" && (
+            <div className="command-palette-empty">{everythingError}</div>
+          )}
+          {mode === "everything" && !everythingLoading && !searchQuery && everythingAvailable && !everythingError && (
+            <div className="command-palette-empty">type to search everything</div>
+          )}
+          {mode !== "everything" && !filesLoading && results.length === 0 && (
+            <div className="command-palette-empty">no results</div>
+          )}
+          {mode === "everything" && !everythingLoading && !!searchQuery && everythingAvailable && !everythingError && results.length === 0 && (
             <div className="command-palette-empty">no results</div>
           )}
           {results.map((item, i) => (
@@ -237,7 +348,14 @@ export function CommandPalette() {
         </div>
 
         <div className="command-palette-footer">
-          <span className="command-palette-hint">: commands</span>
+          {mode === "files" && (
+            <>
+              <span className="command-palette-hint">: commands</span>
+              <span className="command-palette-hint">* everything</span>
+            </>
+          )}
+          {mode === "commands" && <span className="command-palette-hint">backspace to go back</span>}
+          {mode === "everything" && <span className="command-palette-hint">backspace to go back</span>}
         </div>
       </div>
     </div>

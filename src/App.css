@@ -4560,6 +4560,14 @@ body,
   font-size: 13px;
 }
 
+.command-palette-action {
+  color: var(--accent-text);
+  cursor: pointer;
+}
+.command-palette-action:hover {
+  text-decoration: underline;
+}
+
 .command-palette-item {
   display: flex;
   align-items: center;

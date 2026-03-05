@@ -3,7 +3,7 @@ import { useSettingsStore } from "../stores/settingsStore";
 import { readClaudeMd, readAgentsMd } from "./config";
 import { spawnNewSession, closeTab, openFileTab } from "./sessions";
 
-export type PaletteMode = "files" | "commands";
+export type PaletteMode = "files" | "commands" | "everything";
 
 export interface PaletteCommand {
   id: string;

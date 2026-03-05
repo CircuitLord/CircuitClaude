@@ -107,6 +107,8 @@ pub fn run() {
             commands::whisper_get_model_status,
             commands::watch_file,
             commands::unwatch_file,
+            commands::search_everything,
+            commands::download_es_exe,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
