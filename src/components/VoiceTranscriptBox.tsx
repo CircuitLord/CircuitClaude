@@ -27,11 +27,6 @@ export function VoiceTranscriptBox({ tabId, onSubmit }: VoiceTranscriptBoxProps)
 
   if (!isActive) return null;
 
-  // Transient status only (no listening, no transcript) — show simple status line
-  if (!isListening && !hasTranscript) {
-    return <div className="terminal-status-line">{statusMessage}</div>;
-  }
-
   function dismiss() {
     useVoiceStore.getState().setIdle();
     voiceInputController.stop();
