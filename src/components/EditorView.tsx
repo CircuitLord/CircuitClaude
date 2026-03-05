@@ -4,10 +4,11 @@ import { EditorState } from "@codemirror/state";
 import { EditorView, ViewPlugin, keymap, lineNumbers, highlightActiveLine, drawSelection } from "@codemirror/view";
 import { markdown } from "@codemirror/lang-markdown";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
-import { search, searchKeymap } from "@codemirror/search";
+import { search, searchKeymap, getSearchQuery } from "@codemirror/search";
 import { bracketMatching } from "@codemirror/language";
 import { listen } from "@tauri-apps/api/event";
 import { useEditorStore } from "../stores/editorStore";
+import { useSessionStore } from "../stores/sessionStore";
 import { pinTab } from "../lib/sessions";
 import { markdownLivePreview, markdownLinkClick } from "./editorLivePreview";
 
@@ -57,6 +58,11 @@ const circuitTheme = EditorView.theme({
     fontFamily: "var(--font-mono)",
     fontSize: "13px",
     color: "var(--text-secondary)",
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
   },
   ".cm-search": {
     padding: "4px 8px",
@@ -154,6 +160,15 @@ const circuitTheme = EditorView.theme({
     gap: "6px",
     alignItems: "center",
   },
+  ".cm-match-counter": {
+    color: "var(--text-tertiary)",
+    fontFamily: "var(--font-mono)",
+    fontSize: "13px",
+    minWidth: "60px",
+    userSelect: "none",
+    flexShrink: 0,
+    padding: "0 4px",
+  },
   ".cm-searchMatch": {
     backgroundColor: "rgba(255, 200, 50, 0.35)",
     outline: "1px solid rgba(255, 200, 50, 0.5)",
@@ -174,6 +189,87 @@ const disableAutocomplete = ViewPlugin.define((view) => {
   }
   patch();
   return { update: patch };
+});
+
+/** Auto-scroll to nearest match on query change + show "X of Y" match counter */
+const searchEnhancements = ViewPlugin.define(() => {
+  let lastQuery = "";
+  let lastSelFrom = -1;
+  let counterEl: HTMLSpanElement | null = null;
+
+  function ensureCounter(view: EditorView): HTMLSpanElement | null {
+    const panel = view.dom.closest(".cm-editor")?.querySelector(".cm-search");
+    if (!panel) { counterEl = null; return null; }
+    if (counterEl && counterEl.parentElement === panel) return counterEl;
+    counterEl = document.createElement("span");
+    counterEl.className = "cm-match-counter";
+    const searchInput = panel.querySelector('input[name="search"]');
+    if (searchInput && searchInput.nextSibling) {
+      panel.insertBefore(counterEl, searchInput.nextSibling);
+    } else {
+      panel.appendChild(counterEl);
+    }
+    return counterEl;
+  }
+
+  function updateCounter(view: EditorView) {
+    const state = view.state;
+    const sq = getSearchQuery(state);
+    if (!sq.search || !sq.valid) {
+      if (counterEl) { counterEl.remove(); counterEl = null; }
+      return;
+    }
+    const el = ensureCounter(view);
+    if (!el) return;
+
+    const selFrom = state.selection.main.from;
+    const selTo = state.selection.main.to;
+    const cursor = sq.getCursor(state.doc);
+    let total = 0;
+    let currentIndex = 0;
+    let r = cursor.next();
+    while (!r.done) {
+      total++;
+      if (r.value.from === selFrom && r.value.to === selTo) currentIndex = total;
+      r = cursor.next();
+    }
+
+    if (total === 0) {
+      el.textContent = "no results";
+    } else if (currentIndex > 0) {
+      el.textContent = `${currentIndex} of ${total}`;
+    } else {
+      el.textContent = `${total} found`;
+    }
+  }
+
+  return {
+    update(update) {
+      const sq = getSearchQuery(update.state);
+      const queryChanged = sq.search !== lastQuery;
+      const selFrom = update.state.selection.main.from;
+      const selChanged = selFrom !== lastSelFrom;
+      lastQuery = sq.search;
+      lastSelFrom = selFrom;
+
+      // Auto-scroll to nearest match on query change
+      if (queryChanged && sq.search && sq.valid) {
+        const cursor = sq.getCursor(update.state.doc);
+        const first = cursor.next();
+        if (!first.done) {
+          const from = first.value.from;
+          requestAnimationFrame(() => {
+            update.view.dispatch({ effects: EditorView.scrollIntoView(from, { y: "center" }) });
+          });
+        }
+      }
+
+      // Update match counter on query or selection change
+      if (queryChanged || selChanged) {
+        updateCounter(update.view);
+      }
+    },
+  };
 });
 
 /** Wrap replace row elements into a grouped div so they wrap as a single unit */
@@ -212,6 +308,16 @@ export function EditorViewComponent({ tabId, filePath, fileName: _fileName }: Ed
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { files, loadFile, updateContent, saveFile, checkExternalChange } = useEditorStore();
   const fileState = files.get(tabId);
+  const activeSessionId = useSessionStore((s) => s.activeSessionId);
+
+  // Auto-focus editor when tab becomes active
+  useEffect(() => {
+    if (activeSessionId !== tabId) return;
+    const raf = requestAnimationFrame(() => {
+      editorViewRef.current?.focus();
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [activeSessionId, tabId]);
 
   // Listen for path-copied events targeting this tab
   useEffect(() => {
@@ -279,6 +385,7 @@ export function EditorViewComponent({ tabId, filePath, fileName: _fileName }: Ed
         search({ top: true }),
         disableAutocomplete,
         searchPanelLayout,
+        searchEnhancements,
         markdown(),
         markdownLivePreview,
         markdownLinkClick(filePath),
