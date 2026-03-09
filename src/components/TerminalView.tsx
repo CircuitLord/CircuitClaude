@@ -5,6 +5,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { Channel } from "@tauri-apps/api/core";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   attachPtySessionStream,
   closePtySession,
@@ -24,6 +25,65 @@ import { regenerateCodexTitle } from "../lib/codexTitles";
 import { PtyOutputEvent, SessionType } from "../types";
 import { playWaitingSound } from "../lib/sounds";
 import "@xterm/xterm/css/xterm.css";
+
+/** Regex for lines that start a new markdown block (lists, headings, quotes, etc.) */
+const BLOCK_START_RE = /^(?:[-*+•] |#{1,6} |\d+[.)] |>|```|---|\|)/;
+
+/** Get selected text, joining wrapped lines without inserting false newlines.
+ *  Handles both terminal auto-wrap (isWrapped) and application word-wrap
+ *  (detected by lines filling close to the terminal width). */
+function getSelectionText(terminal: Terminal): string {
+  const sel = terminal.getSelectionPosition();
+  if (!sel) return terminal.getSelection();
+
+  const buf = terminal.buffer.active;
+  const cols = terminal.cols;
+  const segments: string[] = [];
+  let prevLineWidth = 0;
+
+  for (let y = sel.start.y; y <= sel.end.y; y++) {
+    const line = buf.getLine(y);
+    if (!line) continue;
+
+    const isFirst = y === sel.start.y;
+    const isLast = y === sel.end.y;
+    const startX = isFirst ? sel.start.x : 0;
+    const endX = isLast ? sel.end.x : undefined;
+    const text = line.translateToString(true, startX, endX);
+
+    let shouldJoin = false;
+    if (segments.length > 0) {
+      if (line.isWrapped) {
+        shouldJoin = true;
+      } else if (
+        prevLineWidth >= cols - 10 &&
+        text.trim().length > 0 &&
+        !BLOCK_START_RE.test(text.trimStart())
+      ) {
+        // Previous line filled near-terminal-width → likely application word-wrap
+        shouldJoin = true;
+      }
+    }
+
+    if (shouldJoin) {
+      if (line.isWrapped) {
+        // Terminal auto-wrap: characters are contiguous, just concatenate
+        segments[segments.length - 1] += text;
+      } else {
+        // Application word-wrap: reintroduce space if the break consumed one
+        const prev = segments[segments.length - 1];
+        const needsSpace = prev.length > 0 && !prev.endsWith(" ") && !text.startsWith(" ");
+        segments[segments.length - 1] += (needsSpace ? " " : "") + text;
+      }
+    } else {
+      segments.push(text);
+    }
+
+    prevLineWidth = line.translateToString(true).length;
+  }
+
+  return segments.join("\n");
+}
 
 /** Check if any of the last N lines near the cursor contain an interactive prompt indicator */
 function hasQuestionPrompt(terminal: Terminal): boolean {
@@ -158,7 +218,9 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
 
     const fitAddon = new FitAddon();
     terminal.loadAddon(fitAddon);
-    terminal.loadAddon(new WebLinksAddon());
+    terminal.loadAddon(new WebLinksAddon((_event, url) => {
+      openUrl(url);
+    }));
     terminal.open(containerEl);
 
     try {
@@ -292,7 +354,7 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
     });
 
     const onSelectionDisposable = terminal.onSelectionChange(() => {
-      const selection = terminal.getSelection();
+      const selection = getSelectionText(terminal);
       if (selection) {
         navigator.clipboard.writeText(selection).then(() => {
           terminal.clearSelection();
