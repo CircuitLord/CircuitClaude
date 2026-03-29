@@ -3,11 +3,14 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 use tauri::ipc::Channel;
 
 const INFERENCE_THRESHOLD_SAMPLES: usize = 24_000; // 1.5s at 16kHz
 const MAX_BUFFER_SAMPLES: usize = 480_000; // 30s at 16kHz
 const COMMIT_THRESHOLD_SAMPLES: usize = 384_000; // 24s — commit early audio beyond this
+const MODEL_IDLE_TIMEOUT_SECS: u64 = 5 * 60; // unload model after 5 min idle
+const IDLE_CHECK_INTERVAL_SECS: u64 = 30;
 
 /// How many hardware threads to give whisper.cpp for inference.
 /// Using all physical cores starves the UI; cap at a sensible default.
@@ -73,16 +76,57 @@ pub struct WhisperManager {
     context: Arc<Mutex<Option<whisper_rs::WhisperContext>>>,
     loaded_model: Arc<Mutex<Option<String>>>,
     models_dir: PathBuf,
+    last_activity: Arc<Mutex<Instant>>,
 }
 
 impl WhisperManager {
     pub fn new(models_dir: PathBuf) -> Self {
-        Self {
-            sessions: Arc::new(Mutex::new(HashMap::new())),
-            context: Arc::new(Mutex::new(None)),
-            loaded_model: Arc::new(Mutex::new(None)),
-            models_dir,
+        let sessions = Arc::new(Mutex::new(HashMap::new()));
+        let context: Arc<Mutex<Option<whisper_rs::WhisperContext>>> =
+            Arc::new(Mutex::new(None));
+        let loaded_model = Arc::new(Mutex::new(None));
+        let last_activity = Arc::new(Mutex::new(Instant::now()));
+
+        // Watchdog thread: unloads the model after idle timeout
+        {
+            let sessions = sessions.clone();
+            let context = context.clone();
+            let loaded_model = loaded_model.clone();
+            let last_activity = last_activity.clone();
+
+            std::thread::spawn(move || loop {
+                std::thread::sleep(std::time::Duration::from_secs(IDLE_CHECK_INTERVAL_SECS));
+
+                // Nothing to unload
+                if context.lock().unwrap().is_none() {
+                    continue;
+                }
+
+                // Don't unload while sessions are active
+                if !sessions.lock().unwrap().is_empty() {
+                    continue;
+                }
+
+                let elapsed = last_activity.lock().unwrap().elapsed();
+                if elapsed.as_secs() >= MODEL_IDLE_TIMEOUT_SECS {
+                    *context.lock().unwrap() = None;
+                    loaded_model.lock().unwrap().take();
+                    eprintln!("[whisper] unloaded idle model after {}s", elapsed.as_secs());
+                }
+            });
         }
+
+        Self {
+            sessions,
+            context,
+            loaded_model,
+            models_dir,
+            last_activity,
+        }
+    }
+
+    fn touch_activity(&self) {
+        *self.last_activity.lock().unwrap() = Instant::now();
     }
 
     fn model_path(&self, name: &str) -> PathBuf {
@@ -131,6 +175,7 @@ impl WhisperManager {
         channel: Channel<WhisperEvent>,
     ) -> Result<(), String> {
         self.load_model(model_name)?;
+        self.touch_activity();
 
         let session = WhisperSession {
             buffer: Vec::new(),
@@ -151,6 +196,7 @@ impl WhisperManager {
     }
 
     pub fn push_audio(&self, session_id: &str, samples: Vec<f32>) -> Result<(), String> {
+        self.touch_activity();
         let (inference_in_flight, channel) = {
             let sessions = self.sessions.lock().unwrap();
             let session = sessions
@@ -188,6 +234,7 @@ impl WhisperManager {
     }
 
     pub fn stop_session(&self, session_id: &str) -> Result<String, String> {
+        self.touch_activity();
         // Extract what we need and remove the session atomically
         let (buffer, committed_text, last_transcript, last_transcript_at_samples, channel, inference_flag) = {
             let sessions = self.sessions.lock().unwrap();
