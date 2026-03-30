@@ -54,7 +54,7 @@ const circuitTheme = EditorView.theme({
     color: "var(--text-secondary)",
   },
   ".cm-activeLine": {
-    backgroundColor: "var(--bg-elevated)",
+    backgroundColor: "rgba(255, 255, 255, 0.035)",
   },
   ".cm-scroller": {
     overflow: "auto",
