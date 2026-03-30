@@ -27,6 +27,7 @@ const EXT_COLORS: Record<string, string> = {
   svg: "file-ext-markup",
   // Data / config — dimmed
   json: "file-ext-config",
+  jsonc: "file-ext-config",
   yaml: "file-ext-config",
   yml: "file-ext-config",
   toml: "file-ext-config",

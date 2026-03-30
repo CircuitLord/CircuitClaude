@@ -64,6 +64,35 @@ pub fn save(app_handle: &tauri::AppHandle, projects: &[ProjectConfig]) -> Result
     fs::write(&path, json).map_err(|e| e.to_string())
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PinnedFileConfig {
+    pub path: String,
+    pub name: String,
+    #[serde(default)]
+    pub group: Option<String>,
+}
+
+fn pinned_files_path(app_handle: &tauri::AppHandle) -> PathBuf {
+    config_dir(app_handle).join("pinned_files.json")
+}
+
+pub fn load_pinned_files(app_handle: &tauri::AppHandle) -> Vec<PinnedFileConfig> {
+    let path = pinned_files_path(app_handle);
+    match fs::read_to_string(&path) {
+        Ok(contents) => serde_json::from_str(&contents).unwrap_or_default(),
+        Err(_) => Vec::new(),
+    }
+}
+
+pub fn save_pinned_files(
+    app_handle: &tauri::AppHandle,
+    pins: &[PinnedFileConfig],
+) -> Result<(), String> {
+    let path = pinned_files_path(app_handle);
+    let json = serde_json::to_string_pretty(pins).map_err(|e| e.to_string())?;
+    fs::write(&path, json).map_err(|e| e.to_string())
+}
+
 fn default_theme() -> String {
     "midnight".to_string()
 }

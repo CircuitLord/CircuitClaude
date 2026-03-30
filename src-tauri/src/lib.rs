@@ -76,6 +76,8 @@ pub fn run() {
             commands::save_projects,
             commands::load_settings,
             commands::save_settings,
+            commands::load_pinned_files,
+            commands::save_pinned_files,
             commands::load_note,
             commands::save_note,
             commands::get_git_status,

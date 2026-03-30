@@ -13,6 +13,7 @@ import { useNotesStore } from "./stores/notesStore";
 import { useSettingsStore } from "./stores/settingsStore";
 import { useProjectStore } from "./stores/projectStore";
 import { useGitStore } from "./stores/gitStore";
+import { usePinnedFilesStore } from "./stores/pinnedFilesStore";
 import { applyThemeToDOM, applySyntaxThemeToDOM } from "./lib/themes";
 import { useHotkeys } from "./hooks/useHotkeys";
 import { useUpdateCheck } from "./hooks/useUpdateCheck";
@@ -35,6 +36,7 @@ function App() {
     Promise.all([
       useSettingsStore.getState().load(),
       useProjectStore.getState().load(),
+      usePinnedFilesStore.getState().load(),
     ])
       .then(() => {
         useGitStore.getState().initViewModeFromSettings();

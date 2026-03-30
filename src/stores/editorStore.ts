@@ -8,6 +8,7 @@ interface EditorFileState {
   loading: boolean;
   saving: boolean;
   error: string | null;
+  readOnly: boolean;
 }
 
 interface EditorStore {
@@ -17,6 +18,7 @@ interface EditorStore {
   saveFile: (tabId: string, filePath: string) => Promise<void>;
   closeFile: (tabId: string) => void;
   isDirty: (tabId: string) => boolean;
+  setReadOnly: (tabId: string, readOnly: boolean) => void;
   /** Re-reads file from disk; returns new content if it changed externally, null otherwise. */
   checkExternalChange: (tabId: string, filePath: string) => Promise<string | null>;
 }
@@ -34,6 +36,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
         loading: true,
         saving: false,
         error: null,
+        readOnly: true,
       });
       return { files: next };
     });
@@ -49,6 +52,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
           loading: false,
           saving: false,
           error: null,
+          readOnly: true,
         });
         return { files: next };
       });
@@ -63,6 +67,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
           loading: false,
           saving: false,
           error: err instanceof Error ? err.message : String(err),
+          readOnly: true,
         });
         return { files: next };
       });
@@ -127,6 +132,15 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       return { files: next };
     });
   },
+
+  setReadOnly: (tabId, readOnly) =>
+    set((state) => {
+      const existing = state.files.get(tabId);
+      if (!existing) return {};
+      const next = new Map(state.files);
+      next.set(tabId, { ...existing, readOnly });
+      return { files: next };
+    }),
 
   isDirty: (tabId) => {
     const fileState = get().files.get(tabId);

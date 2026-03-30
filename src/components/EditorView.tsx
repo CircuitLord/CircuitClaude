@@ -1,19 +1,23 @@
 import { useEffect, useRef, useState } from "react";
 import StatusPill from "./StatusPill";
-import { EditorState } from "@codemirror/state";
+import { EditorState, Compartment, Extension } from "@codemirror/state";
 import { EditorView, ViewPlugin, keymap, lineNumbers, highlightActiveLine, drawSelection } from "@codemirror/view";
 import { markdown } from "@codemirror/lang-markdown";
 import { languages } from "@codemirror/language-data";
 import { GFM } from "@lezer/markdown";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { search, searchKeymap, getSearchQuery } from "@codemirror/search";
-import { bracketMatching, syntaxHighlighting } from "@codemirror/language";
+import { bracketMatching, syntaxHighlighting, LanguageDescription } from "@codemirror/language";
 import { classHighlighter } from "@lezer/highlight";
 import { listen } from "@tauri-apps/api/event";
 import { useEditorStore } from "../stores/editorStore";
 import { useSessionStore } from "../stores/sessionStore";
 import { pinTab } from "../lib/sessions";
 import { markdownLivePreview, markdownLinkClick } from "./editorLivePreview";
+
+function isMarkdownFile(path: string): boolean {
+  return /\.(md|markdown|mkd)$/i.test(path);
+}
 
 const circuitTheme = EditorView.theme({
   "&": {
@@ -309,6 +313,7 @@ interface EditorViewProps {
 export function EditorViewComponent({ tabId, filePath, fileName: _fileName }: EditorViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const editorViewRef = useRef<EditorView | null>(null);
+  const editableCompartmentRef = useRef(new Compartment());
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showCopied, setShowCopied] = useState(false);
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -361,6 +366,19 @@ export function EditorViewComponent({ tabId, filePath, fileName: _fileName }: Ed
     return () => { unlisten.then((fn) => fn()); };
   }, [tabId, filePath, checkExternalChange]);
 
+  // Sync read-only state with CodeMirror compartment
+  useEffect(() => {
+    const view = editorViewRef.current;
+    if (!view || !fileState || fileState.loading) return;
+    const ro = fileState.readOnly;
+    view.dispatch({
+      effects: editableCompartmentRef.current.reconfigure([
+        EditorView.editable.of(!ro),
+        EditorState.readOnly.of(ro),
+      ]),
+    });
+  }, [fileState?.readOnly, fileState?.loading]);
+
   // Initialize/update CodeMirror
   useEffect(() => {
     if (!containerRef.current || !fileState || fileState.loading) return;
@@ -378,10 +396,26 @@ export function EditorViewComponent({ tabId, filePath, fileName: _fileName }: Ed
       },
     ]);
 
+    const languageCompartment = new Compartment();
+    const isMd = isMarkdownFile(filePath);
+    const languageExtensions = isMd
+      ? [
+          markdown({ extensions: GFM, codeLanguages: languages }),
+          markdownLivePreview,
+          markdownLinkClick(filePath),
+        ]
+      : [languageCompartment.of([])];
+
+    const editableExt: Extension = editableCompartmentRef.current.of([
+      EditorView.editable.of(false),
+      EditorState.readOnly.of(true),
+    ]);
+
     const state = EditorState.create({
       doc: fileState.content,
       extensions: [
         saveKeymap,
+        editableExt,
         history(),
         keymap.of([indentWithTab, ...defaultKeymap, ...historyKeymap, ...searchKeymap]),
         lineNumbers(),
@@ -392,16 +426,17 @@ export function EditorViewComponent({ tabId, filePath, fileName: _fileName }: Ed
         disableAutocomplete,
         searchPanelLayout,
         searchEnhancements,
-        markdown({ extensions: GFM, codeLanguages: languages }),
+        ...languageExtensions,
         codeHighlight,
-        markdownLivePreview,
-        markdownLinkClick(filePath),
         circuitTheme,
         EditorView.lineWrapping,
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
             updateContent(tabId, update.state.doc.toString());
             pinTab(tabId);
+            // Skip autosave when in read-only mode
+            const ro = useEditorStore.getState().files.get(tabId)?.readOnly;
+            if (ro) return;
             if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
             autosaveTimer.current = setTimeout(() => saveFile(tabId, filePath), 1500);
           }
@@ -415,6 +450,23 @@ export function EditorViewComponent({ tabId, filePath, fileName: _fileName }: Ed
     });
 
     editorViewRef.current = view;
+
+    // For non-markdown files, detect and load the appropriate language
+    if (!isMd) {
+      const fileName = filePath.replace(/^.*[\\/]/, "");
+      const desc = /\.jsonc$/i.test(fileName)
+        ? LanguageDescription.matchFilename(languages, "file.json")
+        : LanguageDescription.matchFilename(languages, fileName);
+      if (desc) {
+        desc.load().then((langSupport) => {
+          if (editorViewRef.current === view) {
+            view.dispatch({
+              effects: languageCompartment.reconfigure(langSupport),
+            });
+          }
+        });
+      }
+    }
 
     return () => {
       if (autosaveTimer.current) clearTimeout(autosaveTimer.current);

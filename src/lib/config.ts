@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { Project, Settings } from "../types";
+import { PinnedFile, Project, Settings } from "../types";
 
 export function loadProjects(): Promise<Project[]> {
   return invoke<Project[]>("load_projects");
@@ -15,6 +15,14 @@ export function loadSettings(): Promise<Settings | null> {
 
 export function saveSettings(settings: Settings): Promise<void> {
   return invoke("save_settings", { settings });
+}
+
+export function loadPinnedFiles(): Promise<PinnedFile[]> {
+  return invoke<PinnedFile[]>("load_pinned_files");
+}
+
+export function savePinnedFiles(pins: PinnedFile[]): Promise<void> {
+  return invoke("save_pinned_files", { pins });
 }
 
 export function readClaudeMd(projectPath?: string): Promise<{ path: string; content: string }> {

@@ -1,7 +1,7 @@
 use crate::claude_manager::{ClaudeEvent, ClaudeManager};
 use crate::claude_title;
 use crate::codex_title;
-use crate::config::{self, ProjectConfig, SettingsConfig};
+use crate::config::{self, PinnedFileConfig, ProjectConfig, SettingsConfig};
 use crate::conversation;
 use crate::git;
 use crate::pty_manager::{AttachStreamResult, PtyManager, PtyOutputEvent, PtySessionInfo};
@@ -159,6 +159,19 @@ pub fn load_settings(app_handle: tauri::AppHandle) -> Option<SettingsConfig> {
 #[tauri::command]
 pub fn save_settings(app_handle: tauri::AppHandle, settings: SettingsConfig) -> Result<(), String> {
     config::save_settings(&app_handle, &settings)
+}
+
+#[tauri::command]
+pub fn load_pinned_files(app_handle: tauri::AppHandle) -> Vec<PinnedFileConfig> {
+    config::load_pinned_files(&app_handle)
+}
+
+#[tauri::command]
+pub fn save_pinned_files(
+    app_handle: tauri::AppHandle,
+    pins: Vec<PinnedFileConfig>,
+) -> Result<(), String> {
+    config::save_pinned_files(&app_handle, &pins)
 }
 
 #[tauri::command]

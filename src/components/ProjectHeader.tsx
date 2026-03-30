@@ -3,6 +3,7 @@ import { useProjectStore } from "../stores/projectStore";
 import { useNotesStore } from "../stores/notesStore";
 import { WindowControls } from "./WindowControls";
 import { NewSessionMenu } from "./NewSessionMenu";
+import { PinsDropdown } from "./PinsDropdown";
 import { readClaudeMd, readAgentsMd } from "../lib/config";
 import { openFileTab } from "../lib/sessions";
 
@@ -42,6 +43,7 @@ export function ProjectHeader() {
       <div className="project-header-actions">
         <span className="project-header-count">[{sessionCount}]</span>
         <NewSessionMenu variant="pill" />
+        <PinsDropdown />
         <button
           className={`project-header-text-btn${notesOpen ? " active" : ""}`}
           onClick={toggleNotes}

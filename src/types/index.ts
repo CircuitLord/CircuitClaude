@@ -8,6 +8,12 @@ export interface Project {
   theme: ThemeName;
 }
 
+export interface PinnedFile {
+  path: string;
+  name: string;
+  group?: string;
+}
+
 export interface TerminalSession {
   id: string;
   projectName: string;

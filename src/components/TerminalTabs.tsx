@@ -38,6 +38,9 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
     reorderPaneSessions,
   } = useSessionStore();
 
+  // Subscribe to editor files so breadcrumb re-renders on readOnly toggle
+  const editorFiles = useEditorStore((s) => s.files);
+
   const tabBarRef = useRef<HTMLDivElement>(null);
   const panelsRef = useRef<HTMLDivElement>(null);
   const pane1TabBarRef = useRef<HTMLDivElement>(null);
@@ -145,6 +148,8 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
     const session = sessionById.get(activeSessionId);
     if (!session || session.sessionType !== "editor" || !session.filePath) return null;
     const segments = computeBreadcrumb(session.filePath);
+    const editorFile = editorFiles.get(activeSessionId);
+    const isReadOnly = editorFile?.readOnly ?? true;
     return (
       <div className="editor-breadcrumb">
         {segments.map((seg, i) => (
@@ -153,6 +158,15 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
             <span className="editor-breadcrumb-segment">{seg}</span>
           </span>
         ))}
+        <span
+          className={`editor-mode-toggle${!isReadOnly ? " editor-mode-toggle--edit" : ""}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            useEditorStore.getState().setReadOnly(activeSessionId, !isReadOnly);
+          }}
+        >
+          {isReadOnly ? ":view" : ":edit"}
+        </span>
       </div>
     );
   }

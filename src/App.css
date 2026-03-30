@@ -2669,6 +2669,25 @@ body,
   color: var(--text-primary);
 }
 
+.editor-mode-toggle {
+  margin-left: auto;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  user-select: none;
+  flex-shrink: 0;
+  transition: color 0.15s ease;
+}
+
+.editor-mode-toggle:hover {
+  color: var(--accent-text);
+}
+
+.editor-mode-toggle--edit {
+  color: var(--accent-text);
+}
+
 .terminal-tabs-bar {
   display: flex;
   align-items: stretch;
@@ -4376,6 +4395,147 @@ body,
   color: var(--accent-text);
 }
 
+/* --- Pins Dropdown --- */
+
+.pins-menu {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  z-index: 10;
+}
+
+.pins-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-visible);
+  border-radius: 2px;
+  padding: 0;
+  z-index: 10;
+  min-width: 200px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.pins-dropdown::-webkit-scrollbar {
+  width: 4px;
+}
+.pins-dropdown::-webkit-scrollbar-track {
+  background: transparent;
+}
+.pins-dropdown::-webkit-scrollbar-thumb {
+  background: var(--border-visible);
+  border-radius: 2px;
+}
+
+.pins-empty {
+  padding: 0 10px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  color: var(--text-tertiary);
+  font-size: 13px;
+  font-family: var(--font-mono);
+}
+
+.pins-list {
+  padding: 0;
+}
+
+.pins-group-header {
+  padding: 6px 10px 2px;
+  color: var(--text-tertiary);
+  font-size: 13px;
+  font-family: var(--font-mono);
+}
+
+.pins-item {
+  display: flex;
+  align-items: stretch;
+}
+
+.pins-item-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 0 10px;
+  height: 32px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  text-align: left;
+  transition: color 0.1s, background 0.1s;
+  white-space: nowrap;
+}
+
+.pins-item:hover .pins-item-btn {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.pins-item-marker {
+  width: 1ch;
+  flex-shrink: 0;
+  color: var(--accent-text);
+}
+
+.pins-item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pins-item-remove {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 13px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  padding: 0 8px;
+  opacity: 0;
+  transition: opacity 0.1s, color 0.1s;
+}
+
+.pins-item:hover .pins-item-remove {
+  opacity: 1;
+}
+
+.pins-item-remove:hover {
+  color: var(--text-primary);
+}
+
+.pins-add-row {
+  border-top: 1px solid var(--border-subtle);
+  padding: 4px 6px;
+}
+
+.pins-add-btn {
+  background: var(--accent-muted);
+  color: var(--accent-text);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.pins-add-btn:hover {
+  background: var(--accent-muted-hover);
+  border-color: var(--accent);
+}
+
 /* --- Update Banner --- */
 .update-banner {
   display: flex;
@@ -4486,6 +4646,16 @@ body,
 .cm-md-fenced-code-line .tok-attributeName { color: var(--hljs-number); }
 .cm-md-fenced-code-line .tok-regexp { color: var(--hljs-regexp); }
 .cm-md-fenced-code-line .tok-meta { color: var(--hljs-meta); }
+/* Syntax highlighting for non-markdown files (JSON, TypeScript, etc.) */
+.cm-content .tok-keyword, .cm-content .tok-operator { color: var(--hljs-keyword); }
+.cm-content .tok-function, .cm-content .tok-typeName, .cm-content .tok-className, .cm-content .tok-definition { color: var(--hljs-function); }
+.cm-content .tok-string, .cm-content .tok-string2 { color: var(--hljs-string); }
+.cm-content .tok-number, .cm-content .tok-bool, .cm-content .tok-null { color: var(--hljs-number); }
+.cm-content .tok-comment { color: var(--hljs-comment); font-style: italic; }
+.cm-content .tok-propertyName, .cm-content .tok-tagName { color: var(--hljs-name); }
+.cm-content .tok-attributeName { color: var(--hljs-number); }
+.cm-content .tok-regexp { color: var(--hljs-regexp); }
+.cm-content .tok-meta { color: var(--hljs-meta); }
 .cm-md-link { color: #58a6ff; text-decoration: underline; cursor: pointer; }
 .cm-md-blockquote { border-left: 2px solid var(--border-visible); padding-left: 8px; color: var(--text-secondary); }
 .cm-md-hr { border-top: 1px solid var(--border-visible); display: block; }
