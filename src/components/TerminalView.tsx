@@ -193,7 +193,7 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
 
     const maybeAutoGenerateTitle = () => {
       if (sessionType !== "codex" && sessionType !== "claude") return;
-      if (!useSettingsStore.getState().settings.useGeneratedTitles) return;
+      if (!useSettingsStore.getState().settings.useGeneratedTitles2) return;
       const store = useSessionStore.getState();
       if (store.autoTitleDone.has(tabId)) return;
       if (autoTitleSpawnedAtMs === null) {
@@ -348,7 +348,7 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
     });
 
     const onTitleDisposable = terminal.onTitleChange((nextTitle) => {
-      if (useSettingsStore.getState().settings.useGeneratedTitles) return;
+      if (useSettingsStore.getState().settings.useGeneratedTitles2) return;
       const clean = nextTitle.replace(/^[^\x20-\x7E]+\s*/, "").trim() || nextTitle;
       setSessionTitle(tabId, clean);
     });

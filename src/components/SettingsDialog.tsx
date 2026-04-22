@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { useSettingsStore } from "../stores/settingsStore";
-import { DEFAULT_SETTINGS, ThemeName, SyntaxThemeName, type VoiceEngine } from "../types";
+import { DEFAULT_SETTINGS, ThemeName, SyntaxThemeName, type VoiceEngine, type SpawnableSessionType } from "../types";
 import { THEME_OPTIONS, SYNTAX_THEME_OPTIONS } from "../lib/themes";
 import { whisperGetAvailableModels, whisperDownloadModel, type ModelInfo, type DownloadProgress } from "../lib/whisper";
 import { checkForUpdate, downloadAndInstallUpdate } from "../lib/updater";
@@ -35,6 +35,14 @@ const FONT_OPTIONS = [
   { label: "Consolas", value: "'Consolas', 'Monaco', monospace" },
   { label: "Fira Code", value: "'Fira Code', 'Consolas', monospace" },
   { label: "JetBrains Mono", value: "'JetBrains Mono', 'Consolas', monospace" },
+];
+
+const SESSION_TYPE_OPTIONS: Array<{ label: string; value: SpawnableSessionType }> = [
+  { label: "claude", value: "claude" },
+  { label: "codex", value: "codex" },
+  { label: "copilot", value: "copilot" },
+  { label: "opencode", value: "opencode" },
+  { label: "terminal", value: "shell" },
 ];
 
 const DEFAULT_MIC_OPTIONS = [{ label: "system default", value: "default" }];
@@ -539,13 +547,23 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
               <div className="settings-section-title">~tabs</div>
               <div className="settings-row">
                 <div className="settings-row-label">
+                  <span className="settings-row-name">default cli</span>
+                </div>
+                <CustomSelect
+                  value={settings.defaultSessionType}
+                  options={SESSION_TYPE_OPTIONS}
+                  onChange={(v) => update({ defaultSessionType: v as SpawnableSessionType })}
+                />
+              </div>
+              <div className="settings-row">
+                <div className="settings-row-label">
                   <span className="settings-row-name">auto-generate titles</span>
                 </div>
                 <button
-                  className={`settings-toggle ${settings.useGeneratedTitles ? "settings-toggle--on" : ""}`}
-                  onClick={() => update({ useGeneratedTitles: !settings.useGeneratedTitles })}
+                  className={`settings-toggle ${settings.useGeneratedTitles2 ? "settings-toggle--on" : ""}`}
+                  onClick={() => update({ useGeneratedTitles2: !settings.useGeneratedTitles2 })}
                 >
-                  {settings.useGeneratedTitles ? "[on]" : "[off]"}
+                  {settings.useGeneratedTitles2 ? "[on]" : "[off]"}
                 </button>
               </div>
             </div>

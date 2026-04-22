@@ -9,6 +9,7 @@ interface NewSessionMenuProps {
 const OPTIONS = [
   { type: "claude" as const, label: "claude" },
   { type: "codex" as const, label: "codex" },
+  { type: "copilot" as const, label: "copilot" },
   { type: "opencode" as const, label: "opencode" },
   { type: "terminal" as const, label: "terminal" },
 ] as const;
@@ -38,7 +39,7 @@ export function NewSessionMenu({ variant, targetPane }: NewSessionMenuProps) {
     };
   }, [open]);
 
-  function handleSelect(type: "claude" | "codex" | "opencode" | "terminal") {
+  function handleSelect(type: "claude" | "codex" | "copilot" | "opencode" | "terminal") {
     setOpen(false);
     spawnNewSession(type === "terminal" ? "shell" : type, targetPane);
   }

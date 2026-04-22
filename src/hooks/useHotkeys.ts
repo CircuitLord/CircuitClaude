@@ -300,7 +300,8 @@ export function useHotkeys() {
       // Ctrl+T — new session (before input guards so it works from editor/inputs)
       if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key === "t") {
         e.preventDefault();
-        spawnNewSession();
+        const { defaultSessionType } = useSettingsStore.getState().settings;
+        spawnNewSession(defaultSessionType);
         return;
       }
 

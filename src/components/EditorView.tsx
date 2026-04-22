@@ -373,7 +373,6 @@ export function EditorViewComponent({ tabId, filePath, fileName: _fileName }: Ed
     const ro = fileState.readOnly;
     view.dispatch({
       effects: editableCompartmentRef.current.reconfigure([
-        EditorView.editable.of(!ro),
         EditorState.readOnly.of(ro),
       ]),
     });
@@ -407,7 +406,6 @@ export function EditorViewComponent({ tabId, filePath, fileName: _fileName }: Ed
       : [languageCompartment.of([])];
 
     const editableExt: Extension = editableCompartmentRef.current.of([
-      EditorView.editable.of(false),
       EditorState.readOnly.of(true),
     ]);
 

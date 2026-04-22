@@ -340,6 +340,9 @@ impl PtyManager {
                     cmd.args(["/c", "codex"]);
                 }
             }
+            "copilot" => {
+                cmd.args(["/c", "gh", "copilot"]);
+            }
             "claude" => {
                 let resume_id = resume_session_id
                     .as_deref()

@@ -31,6 +31,12 @@ export function getPaletteCommands(): PaletteCommand[] {
     action: () => spawnNewSession("codex"),
   });
   commands.push({
+    id: "new-copilot",
+    label: "New Copilot session",
+    category: "session",
+    action: () => spawnNewSession("copilot"),
+  });
+  commands.push({
     id: "new-shell",
     label: "New shell session",
     category: "session",

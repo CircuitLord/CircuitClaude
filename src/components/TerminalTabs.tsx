@@ -539,9 +539,11 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
           ? "o>"
           : s.sessionType === "codex"
             ? "c>"
-            : s.sessionType === "shell"
-              ? ">_"
-              : ">";
+            : s.sessionType === "copilot"
+              ? "g>"
+              : s.sessionType === "shell"
+                ? ">_"
+                : ">";
     const label = isEditor
       ? (s.fileName ?? "file")
       : s.sessionType === "shell"

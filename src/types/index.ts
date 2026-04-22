@@ -1,4 +1,6 @@
-export type SessionType = "claude" | "codex" | "opencode" | "shell" | "editor";
+export type SessionType = "claude" | "codex" | "copilot" | "opencode" | "shell" | "editor";
+
+export type SpawnableSessionType = Exclude<SessionType, "editor">;
 
 export type TabStatus = "thinking" | "waiting";
 
@@ -195,7 +197,8 @@ export interface Settings {
   voiceMicDeviceId: string;
   whisperModel: string;
   soundEnabled: boolean;
-  useGeneratedTitles: boolean;
+  useGeneratedTitles2: boolean;
+  defaultSessionType: SpawnableSessionType;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -211,5 +214,6 @@ export const DEFAULT_SETTINGS: Settings = {
   voiceMicDeviceId: "default",
   whisperModel: "medium.en",
   soundEnabled: true,
-  useGeneratedTitles: true,
+  useGeneratedTitles2: false,
+  defaultSessionType: "claude",
 };
