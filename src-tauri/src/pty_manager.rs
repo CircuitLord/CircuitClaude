@@ -341,7 +341,7 @@ impl PtyManager {
                 }
             }
             "copilot" => {
-                cmd.args(["/c", "gh", "copilot"]);
+                cmd.args(["/c", "copilot"]);
             }
             "claude" => {
                 let resume_id = resume_session_id
