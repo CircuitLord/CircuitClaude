@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from "react";
+import type { CSSProperties } from "react";
 import { useProjectStore } from "../stores/projectStore";
 import { useSessionStore } from "../stores/sessionStore";
 import { useAddProject } from "./AddProjectDialog";
@@ -279,6 +280,12 @@ export function Sidebar() {
           const isWaitingAny = projectSessions.some((s) => tabStatuses.get(s.id) === "waiting");
           const isThinkingAny = !isWaitingAny && projectSessions.some((s) => tabStatuses.get(s.id) === "thinking");
           const isActive = p.path === activeProjectPath;
+          const projectTheme = THEMES[p.theme] ?? THEMES.midnight;
+          const thinkingStatusStyle: CSSProperties = {
+            "--sidebar-project-accent": projectTheme.css["--accent"],
+            "--sidebar-project-accent-text": projectTheme.css["--accent-text"],
+            "--sidebar-project-text-tertiary": projectTheme.css["--text-tertiary"],
+          } as CSSProperties;
 
           const entryClasses = [
             "sidebar-entry",
@@ -301,7 +308,7 @@ export function Sidebar() {
                 {isWaitingAny ? (
                   <span className="sidebar-entry-status-text waiting"><span className="sidebar-entry-status-symbol">?</span> waiting</span>
                 ) : isThinkingAny ? (
-                  <span className="sidebar-entry-status-text alive"><span className="sidebar-entry-status-symbol">*</span> thinking</span>
+                  <span className="sidebar-entry-status-text alive" style={thinkingStatusStyle}><span className="sidebar-entry-status-symbol">*</span> thinking</span>
                 ) : (
                   <span className="sidebar-entry-status-text idle">idle</span>
                 )}

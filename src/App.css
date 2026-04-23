@@ -300,7 +300,7 @@ body,
 }
 
 .sidebar-entry-status-text.alive {
-  color: var(--accent-text);
+  color: var(--sidebar-project-accent-text, var(--accent-text));
 }
 
 .sidebar-entry-status-text.waiting {
@@ -331,11 +331,11 @@ body,
 }
 
 @keyframes tui-color-cycle {
-  0%   { color: var(--text-tertiary); }
-  25%  { color: var(--accent-text); }
-  50%  { color: var(--accent); }
-  75%  { color: var(--accent-text); }
-  100% { color: var(--text-tertiary); }
+  0%   { color: var(--sidebar-project-text-tertiary, var(--text-tertiary)); }
+  25%  { color: var(--sidebar-project-accent-text, var(--accent-text)); }
+  50%  { color: var(--sidebar-project-accent, var(--accent)); }
+  75%  { color: var(--sidebar-project-accent-text, var(--accent-text)); }
+  100% { color: var(--sidebar-project-text-tertiary, var(--text-tertiary)); }
 }
 
 @keyframes tui-blink {

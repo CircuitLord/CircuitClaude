@@ -119,16 +119,30 @@ function logPtyLifecycle(message: string, details?: Record<string, unknown>) {
 
 const textEncoder = new TextEncoder();
 
-function fitTerminalAndScrollToBottom(terminal: Terminal, fitAddon: FitAddon) {
+function fitTerminal(terminal: Terminal, fitAddon: FitAddon, preserveScroll = false) {
+  const buf = terminal.buffer.active;
+  const wasAtBottom = !preserveScroll || buf.viewportY >= buf.baseY;
+  const linesFromBottom = buf.baseY - buf.viewportY;
+
   try {
     fitAddon.fit();
   } catch {
     // FitAddon throws if the terminal renderer hasn't initialized dimensions yet.
-    // Safe to ignore — a subsequent resize/fit will succeed once rendering completes.
     return;
   }
-  terminal.scrollToBottom();
-  requestAnimationFrame(() => terminal.scrollToBottom());
+
+  if (wasAtBottom) {
+    terminal.scrollToBottom();
+    requestAnimationFrame(() => terminal.scrollToBottom());
+  } else {
+    const restore = () => {
+      const target = Math.max(0, terminal.buffer.active.baseY - linesFromBottom);
+      terminal.scrollToTop();
+      if (target > 0) terminal.scrollLines(target);
+    };
+    restore();
+    requestAnimationFrame(restore);
+  }
 }
 
 export function TerminalView({ tabId, projectPath, projectName, sessionType, hideTitleBar, onClose }: TerminalViewProps) {
@@ -236,7 +250,7 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
     terminalRef.current = terminal;
     fitAddonRef.current = fitAddon;
     requestAnimationFrame(() => {
-      fitTerminalAndScrollToBottom(terminal, fitAddon);
+      fitTerminal(terminal, fitAddon);
       const channel = new Channel<PtyOutputEvent>();
       channel.onmessage = (event: PtyOutputEvent) => {
         if (cleanedUp || spawnGenerationRef.current !== spawnGeneration) return;
@@ -461,7 +475,7 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
       const entry = entries[0];
       if (!entry || entry.contentRect.width === 0 || entry.contentRect.height === 0) return;
       requestAnimationFrame(() => {
-        fitTerminalAndScrollToBottom(terminal, fitAddon);
+        fitTerminal(terminal, fitAddon, true);
       });
     });
     resizeObserver.observe(containerRef.current);
@@ -509,7 +523,7 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
       const terminal = terminalRef.current;
       const fitAddon = fitAddonRef.current;
       if (!terminal) return;
-      if (fitAddon) fitTerminalAndScrollToBottom(terminal, fitAddon);
+      if (fitAddon) fitTerminal(terminal, fitAddon);
       terminal.focus();
     });
     return () => cancelAnimationFrame(raf);
@@ -523,7 +537,7 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
     terminal.options.fontFamily = settings.terminalFontFamily;
     terminal.options.theme = THEMES[projectTheme].xterm;
     const fitAddon = fitAddonRef.current;
-    if (fitAddon) fitTerminalAndScrollToBottom(terminal, fitAddon);
+    if (fitAddon) fitTerminal(terminal, fitAddon, true);
   }, [settings.terminalFontSize, settings.terminalFontFamily, projectTheme]);
 
   return (
