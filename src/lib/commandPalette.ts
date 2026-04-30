@@ -2,6 +2,7 @@ import { useSessionStore } from "../stores/sessionStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { readClaudeMd, readAgentsMd } from "./config";
 import { spawnNewSession, closeTab, openFileTab } from "./sessions";
+import { getSessionTypes } from "./sessionTypes";
 
 export type PaletteMode = "files" | "commands" | "everything";
 
@@ -16,32 +17,17 @@ export interface PaletteCommand {
 export function getPaletteCommands(): PaletteCommand[] {
   const commands: PaletteCommand[] = [];
 
-  // Session commands
-  commands.push({
-    id: "new-claude",
-    label: "New Claude session",
-    shortcut: "Ctrl+T",
-    category: "session",
-    action: () => spawnNewSession("claude"),
-  });
-  commands.push({
-    id: "new-codex",
-    label: "New Codex session",
-    category: "session",
-    action: () => spawnNewSession("codex"),
-  });
-  commands.push({
-    id: "new-copilot",
-    label: "New Copilot session",
-    category: "session",
-    action: () => spawnNewSession("copilot"),
-  });
-  commands.push({
-    id: "new-shell",
-    label: "New shell session",
-    category: "session",
-    action: () => spawnNewSession("shell"),
-  });
+  // Dynamic session commands from configured session types
+  const sessionTypes = getSessionTypes();
+  for (const st of sessionTypes) {
+    commands.push({
+      id: `new-${st.id}`,
+      label: `New ${st.name} session`,
+      shortcut: st.id === useSettingsStore.getState().settings.defaultSessionType ? "Ctrl+T" : undefined,
+      category: "session",
+      action: () => spawnNewSession(st.id),
+    });
+  }
   commands.push({
     id: "close-tab",
     label: "Close active tab",

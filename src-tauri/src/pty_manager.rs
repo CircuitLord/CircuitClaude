@@ -93,6 +93,7 @@ impl PtyManager {
         claude_session_id: Option<String>,
         resume_session_id: Option<String>,
         continue_session: bool,
+        command: Option<String>,
     ) -> Result<SessionId, String> {
         let cmd = Self::build_command(
             project_path,
@@ -100,6 +101,7 @@ impl PtyManager {
             claude_session_id,
             resume_session_id,
             continue_session,
+            command,
         )?;
 
         let pty_system = native_pty_system();
@@ -321,28 +323,11 @@ impl PtyManager {
         claude_session_id: Option<String>,
         resume_session_id: Option<String>,
         continue_session: bool,
+        command: Option<String>,
     ) -> Result<CommandBuilder, String> {
         let mut cmd = CommandBuilder::new("cmd.exe");
 
         match session_type {
-            "shell" => {}
-            "opencode" => {
-                if continue_session {
-                    cmd.args(["/c", "opencode", "--continue"]);
-                } else {
-                    cmd.args(["/c", "opencode"]);
-                }
-            }
-            "codex" => {
-                if continue_session {
-                    cmd.args(["/c", "codex", "resume", "--last"]);
-                } else {
-                    cmd.args(["/c", "codex"]);
-                }
-            }
-            "copilot" => {
-                cmd.args(["/c", "copilot"]);
-            }
             "claude" => {
                 let resume_id = resume_session_id
                     .as_deref()
@@ -363,7 +348,22 @@ impl PtyManager {
                     cmd.args(["/c", "claude"]);
                 }
             }
-            other => return Err(format!("Unsupported session type: {}", other)),
+            "codex" => {
+                if continue_session {
+                    cmd.args(["/c", "codex", "resume", "--last"]);
+                } else {
+                    cmd.args(["/c", "codex"]);
+                }
+            }
+            _ => {
+                // Generic: use the command string from config
+                let cmd_str = command.unwrap_or_default();
+                if cmd_str.is_empty() {
+                    // Empty command = bare shell (terminal)
+                } else {
+                    cmd.args(["/c", &cmd_str]);
+                }
+            }
         }
 
         cmd.cwd(project_path);

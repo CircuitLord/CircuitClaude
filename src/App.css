@@ -1996,6 +1996,120 @@ body,
   white-space: nowrap;
 }
 
+/* --- Session Types Settings --- */
+
+.settings-input {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 2px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: var(--font-mono);
+  padding: 4px 8px;
+  min-width: 140px;
+  outline: none;
+}
+
+.settings-input:focus {
+  border-color: var(--accent);
+}
+
+.settings-input--short {
+  min-width: 50px;
+  max-width: 60px;
+}
+
+.settings-input:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.settings-row--clickable {
+  cursor: pointer;
+}
+
+.settings-row--clickable:hover:not(.settings-row--dragging) {
+  background: var(--bg-elevated);
+}
+
+.settings-section--dragging .settings-row--clickable:hover {
+  background: none;
+}
+
+.settings-row-prefix {
+  color: var(--accent-text);
+  font-size: 13px;
+  font-family: var(--font-mono);
+  margin-right: 6px;
+  min-width: 20px;
+}
+
+.settings-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-row-command {
+  color: var(--text-tertiary);
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+.settings-badge {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  margin-left: 8px;
+  opacity: 0.6;
+}
+
+.settings-drag-handle {
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  cursor: grab;
+  padding: 0 6px 0 0;
+  user-select: none;
+  opacity: 0.4;
+  letter-spacing: 1px;
+}
+
+.settings-drag-handle:hover {
+  opacity: 0.8;
+  color: var(--accent-text);
+}
+
+.settings-drag-handle:active {
+  cursor: grabbing;
+}
+
+.settings-row--dragging {
+  opacity: 0.4;
+}
+
+.settings-drop-indicator {
+  height: 2px;
+  background: var(--accent);
+  border-radius: 1px;
+  margin: 0 4px;
+}
+
+.settings-session-type-row {
+  position: relative;
+}
+
+.settings-session-type-row > .settings-row {
+  padding-left: 12px;
+}
+
+.settings-session-type-edit {
+  padding: 4px 0;
+  border-left: 1px solid var(--accent);
+  margin-left: 4px;
+  padding-left: 8px;
+}
+
 /* --- Custom Select --- */
 
 .settings-select {

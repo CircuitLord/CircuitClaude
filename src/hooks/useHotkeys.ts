@@ -3,7 +3,6 @@ import { useSessionStore } from "../stores/sessionStore";
 import { useProjectStore } from "../stores/projectStore";
 import { useNotesStore } from "../stores/notesStore";
 import { spawnNewSession, closeTab } from "../lib/sessions";
-import { regenerateCodexTitle } from "../lib/codexTitles";
 import { voiceInputController, type VoiceInputState } from "../lib/voiceInput";
 import { whisperDownloadModel, whisperGetModelStatus, type DownloadProgress } from "../lib/whisper";
 import { useVoiceStore } from "../stores/voiceStore";
@@ -27,7 +26,6 @@ export function useHotkeys() {
   const activeProjectPath = useSessionStore((s) => s.activeProjectPath);
   const setActiveSession = useSessionStore((s) => s.setActiveSession);
   const setActiveProject = useSessionStore((s) => s.setActiveProject);
-  const setSessionTitle = useSessionStore((s) => s.setSessionTitle);
   const projects = useProjectStore((s) => s.projects);
   const voiceEngine = useSettingsStore((s) => s.settings.voiceEngine);
   const voiceMicDeviceId = useSettingsStore((s) => s.settings.voiceMicDeviceId);
@@ -314,21 +312,6 @@ export function useHotkeys() {
         return;
       }
 
-      // Ctrl+R — regenerate title for current Codex tab
-      if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "r") {
-        e.preventDefault();
-        if (!activeSessionId) return;
-        const active = sessions.find((s) => s.id === activeSessionId);
-        if (!active || active.sessionType !== "codex") return;
-        regenerateCodexTitle(active.projectPath, active.createdAt)
-          .then((title) => {
-            if (!title) return;
-            setSessionTitle(active.id, title);
-          })
-          .catch(() => {});
-        return;
-      }
-
       // Ctrl+Shift+C — copy current editor file path to clipboard
       if (e.ctrlKey && e.shiftKey && !e.altKey && e.key.toLowerCase() === "c") {
         const active = sessions.find((s) => s.id === activeSessionId);
@@ -357,5 +340,5 @@ export function useHotkeys() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown, { capture: true });
     };
-  }, [sessions, activeSessionId, activeProjectPath, setActiveSession, setActiveProject, setSessionTitle, projects, voiceEngine, voiceMicDeviceId, whisperModel]);
+  }, [sessions, activeSessionId, activeProjectPath, setActiveSession, setActiveProject, projects, voiceEngine, voiceMicDeviceId, whisperModel]);
 }

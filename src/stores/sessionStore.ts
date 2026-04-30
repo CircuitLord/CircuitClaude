@@ -10,8 +10,6 @@ interface SessionStore {
   projectActiveSessionIds: Map<string, string>;
   tabStatuses: Map<string, TabStatus>;
   sessionTitles: Map<string, string>;
-  autoTitleDone: Set<string>;
-  titleRegenCounter: Map<string, number>;
   addSession: (session: TerminalSession) => void;
   removeSession: (id: string) => void;
   removeProjectSessions: (projectPath: string) => void;
@@ -20,8 +18,6 @@ interface SessionStore {
   updateSessionPtyId: (id: string, sessionId: string) => void;
   setTabStatus: (tabId: string, status: TabStatus | null) => void;
   setSessionTitle: (tabId: string, title: string) => void;
-  markAutoTitleDone: (tabId: string) => void;
-  requestTitleRegen: (tabId: string) => void;
   updateSession: (id: string, partial: Partial<Pick<TerminalSession, "isPreview">>) => void;
   reorderSessions: (projectPath: string, fromIndex: number, toIndex: number) => void;
   projectSplits: Map<string, SplitState>;
@@ -58,8 +54,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   projectActiveSessionIds: new Map(),
   tabStatuses: new Map(),
   sessionTitles: new Map(),
-  autoTitleDone: new Set(),
-  titleRegenCounter: new Map(),
   projectSplits: new Map(),
 
   addSession: (session) =>
@@ -157,10 +151,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       tabStatuses.delete(id);
       const sessionTitles = new Map(state.sessionTitles);
       sessionTitles.delete(id);
-      const autoTitleDone = new Set(state.autoTitleDone);
-      autoTitleDone.delete(id);
-      const titleRegenCounter = new Map(state.titleRegenCounter);
-      titleRegenCounter.delete(id);
       const projectActiveSessionIds = new Map(state.projectActiveSessionIds);
 
       if (removed) {
@@ -193,8 +183,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         activeProjectPath,
         tabStatuses,
         sessionTitles,
-        autoTitleDone,
-        titleRegenCounter,
         projectActiveSessionIds,
         projectSplits,
       };
@@ -226,15 +214,11 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           .filter((s) => s.projectPath === projectPath)
           .map((s) => s.id)
       );
-      const autoTitleDone = new Set(state.autoTitleDone);
       const tabStatuses = new Map(state.tabStatuses);
       const sessionTitles = new Map(state.sessionTitles);
-      const titleRegenCounter = new Map(state.titleRegenCounter);
       for (const id of removedIds) {
-        autoTitleDone.delete(id);
         tabStatuses.delete(id);
         sessionTitles.delete(id);
-        titleRegenCounter.delete(id);
       }
       return {
         sessions,
@@ -242,10 +226,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         activeProjectPath,
         projectActiveSessionIds,
         projectSplits,
-        autoTitleDone,
         tabStatuses,
         sessionTitles,
-        titleRegenCounter,
       };
     }),
 
@@ -335,21 +317,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       const next = new Map(state.sessionTitles);
       next.set(tabId, title);
       return { sessionTitles: next };
-    }),
-
-  markAutoTitleDone: (tabId) =>
-    set((state) => {
-      if (state.autoTitleDone.has(tabId)) return {};
-      const next = new Set(state.autoTitleDone);
-      next.add(tabId);
-      return { autoTitleDone: next };
-    }),
-
-  requestTitleRegen: (tabId) =>
-    set((state) => {
-      const next = new Map(state.titleRegenCounter);
-      next.set(tabId, (next.get(tabId) ?? 0) + 1);
-      return { titleRegenCounter: next };
     }),
 
   reorderSessions: (projectPath, fromIndex, toIndex) =>

@@ -1,22 +1,16 @@
 import { useState, useRef, useEffect } from "react";
 import { spawnNewSession } from "../lib/sessions";
+import { useSettingsStore } from "../stores/settingsStore";
 
 interface NewSessionMenuProps {
   variant: "button" | "pill";
   targetPane?: 1 | 2;
 }
 
-const OPTIONS = [
-  { type: "claude" as const, label: "claude" },
-  { type: "codex" as const, label: "codex" },
-  { type: "copilot" as const, label: "copilot" },
-  { type: "opencode" as const, label: "opencode" },
-  { type: "terminal" as const, label: "terminal" },
-] as const;
-
 export function NewSessionMenu({ variant, targetPane }: NewSessionMenuProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const sessionTypes = useSettingsStore((s) => s.settings.sessionTypes);
 
   useEffect(() => {
     if (!open) return;
@@ -39,10 +33,25 @@ export function NewSessionMenu({ variant, targetPane }: NewSessionMenuProps) {
     };
   }, [open]);
 
-  function handleSelect(type: "claude" | "codex" | "copilot" | "opencode" | "terminal") {
+  function handleSelect(id: string) {
     setOpen(false);
-    spawnNewSession(type === "terminal" ? "shell" : type, targetPane);
+    spawnNewSession(id, targetPane);
   }
+
+  const dropdownContent = (
+    <>
+      {sessionTypes.map((st) => (
+        <button
+          key={st.id}
+          className="new-session-option"
+          onClick={() => handleSelect(st.id)}
+        >
+          <span className="new-session-option-marker">{">"}</span>
+          {st.name}
+        </button>
+      ))}
+    </>
+  );
 
   if (variant === "button") {
     return (
@@ -56,16 +65,7 @@ export function NewSessionMenu({ variant, targetPane }: NewSessionMenuProps) {
         </button>
         {open && (
           <div className="new-session-dropdown new-session-dropdown--tab">
-            {OPTIONS.map((opt) => (
-              <button
-                key={opt.type}
-                className="new-session-option"
-                onClick={() => handleSelect(opt.type)}
-              >
-                <span className="new-session-option-marker">{">"}</span>
-                {opt.label}
-              </button>
-            ))}
+            {dropdownContent}
           </div>
         )}
       </div>
@@ -82,16 +82,7 @@ export function NewSessionMenu({ variant, targetPane }: NewSessionMenuProps) {
       </button>
       {open && (
         <div className="new-session-dropdown new-session-dropdown--pill">
-          {OPTIONS.map((opt) => (
-            <button
-              key={opt.type}
-              className="new-session-option"
-              onClick={() => handleSelect(opt.type)}
-            >
-              <span className="new-session-option-marker">{">"}</span>
-              {opt.label}
-            </button>
-          ))}
+          {dropdownContent}
         </div>
       )}
     </div>

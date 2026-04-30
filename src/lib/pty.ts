@@ -1,14 +1,15 @@
 import { invoke, Channel } from "@tauri-apps/api/core";
-import { PtyOutputEvent, SessionType } from "../types";
+import { PtyOutputEvent } from "../types";
 
 export interface CreatePtySessionRequest {
   projectPath: string;
   cols: number;
   rows: number;
-  sessionType: SessionType;
+  sessionType: string;
   claudeSessionId?: string;
   resumeSessionId?: string;
   continueSession?: boolean;
+  command?: string;
 }
 
 export interface CreatePtySessionResponse {

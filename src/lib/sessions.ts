@@ -1,9 +1,8 @@
 import { useSessionStore, generateTabId } from "../stores/sessionStore";
 import { useProjectStore } from "../stores/projectStore";
 import { closePtySession } from "./pty";
-import type { SessionType } from "../types";
 
-export function spawnNewSession(type: SessionType = "claude", targetPane?: 1 | 2) {
+export function spawnNewSession(type: string = "claude", targetPane?: 1 | 2) {
   const { activeProjectPath, addSession, projectSplits, setFocusedPane } = useSessionStore.getState();
   const { projects } = useProjectStore.getState();
   if (!activeProjectPath) return;

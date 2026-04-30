@@ -6,6 +6,7 @@ import { EditorViewComponent } from "./EditorView";
 import { NewSessionMenu } from "./NewSessionMenu";
 import { closeTab, pinTab } from "../lib/sessions";
 import { SplitDirection, PaneState } from "../types";
+import { getTabPrefix } from "../lib/sessionTypes";
 
 function checkTabBarOverflow(tabBar: HTMLDivElement | null) {
   if (!tabBar) return;
@@ -532,23 +533,10 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
     const isPreview = s.isPreview === true;
     const tabStatus = isEditor ? null : (tabStatuses.get(s.id) ?? null);
     const editorDirty = isEditor ? useEditorStore.getState().isDirty(s.id) : false;
-    const prefix =
-      s.sessionType === "editor"
-        ? "#"
-        : s.sessionType === "opencode"
-          ? "o>"
-          : s.sessionType === "codex"
-            ? "c>"
-            : s.sessionType === "copilot"
-              ? "g>"
-              : s.sessionType === "shell"
-                ? ">_"
-                : ">";
+    const prefix = getTabPrefix(s.sessionType);
     const label = isEditor
       ? (s.fileName ?? "file")
-      : s.sessionType === "shell"
-        ? "terminal"
-        : (sessionTitles.get(s.id) ?? s.projectName);
+      : (sessionTitles.get(s.id) ?? s.projectName);
 
     return (
       <div

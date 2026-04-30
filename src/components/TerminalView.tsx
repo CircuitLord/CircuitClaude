@@ -20,10 +20,9 @@ import { useSettingsStore } from "../stores/settingsStore";
 import { useProjectStore } from "../stores/projectStore";
 import { VoiceTranscriptBox } from "./VoiceTranscriptBox";
 import { THEMES } from "../lib/themes";
-import { regenerateClaudeTitle } from "../lib/claudeTitles";
-import { regenerateCodexTitle } from "../lib/codexTitles";
-import { PtyOutputEvent, SessionType } from "../types";
+import { PtyOutputEvent } from "../types";
 import { playWaitingSound } from "../lib/sounds";
+import { getSessionCommand } from "../lib/sessionTypes";
 import "@xterm/xterm/css/xterm.css";
 
 /** Regex for lines that start a new markdown block (lists, headings, quotes, etc.) */
@@ -105,7 +104,7 @@ interface TerminalViewProps {
   tabId: string;
   projectPath: string;
   projectName: string;
-  sessionType: SessionType;
+  sessionType: string;
   hideTitleBar?: boolean;
   onClose: () => void;
 }
@@ -154,8 +153,6 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
   const subscriberIdRef = useRef<string | null>(null);
   const spawnGenerationRef = useRef(0);
   const initializedRef = useRef(false);
-  const refreshAutoTitleRef = useRef<() => Promise<boolean>>(async () => false);
-  const regenCounter = useSessionStore((s) => s.titleRegenCounter.get(tabId) ?? 0);
   const updateSessionPtyId = useSessionStore((s) => s.updateSessionPtyId);
   const setSessionTitle = useSessionStore((s) => s.setSessionTitle);
   const setTabStatus = useSessionStore((s) => s.setTabStatus);
@@ -177,48 +174,8 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
     const spawnGeneration = ++spawnGenerationRef.current;
     let cleanedUp = false;
     let activityTimer: ReturnType<typeof setTimeout> | null = null;
-    let autoTitleTimer: ReturnType<typeof setTimeout> | null = null;
-    let autoTitleSpawnedAtMs: number | null = null;
-    let autoTitleInFlight = false;
     let lastUserInputTime = 0;
     logPtyLifecycle("mount:init", { tabId, sessionType, projectPath, spawnGeneration });
-
-    const refreshAutoTitle = async (): Promise<boolean> => {
-      if (sessionType !== "codex" && sessionType !== "claude") return false;
-      if (autoTitleSpawnedAtMs === null) return false;
-      if (autoTitleInFlight) return false;
-      autoTitleInFlight = true;
-      try {
-        const generatedTitle = sessionType === "codex"
-          ? await regenerateCodexTitle(projectPath, autoTitleSpawnedAtMs)
-          : await regenerateClaudeTitle(projectPath, autoTitleSpawnedAtMs);
-        if (!generatedTitle) return false;
-        if (cleanedUp || spawnGenerationRef.current !== spawnGeneration) return false;
-        setSessionTitle(tabId, generatedTitle);
-        return true;
-      } catch {
-        return false;
-      } finally {
-        autoTitleInFlight = false;
-      }
-    };
-
-    refreshAutoTitleRef.current = refreshAutoTitle;
-
-    const maybeAutoGenerateTitle = () => {
-      if (sessionType !== "codex" && sessionType !== "claude") return;
-      if (!useSettingsStore.getState().settings.useGeneratedTitles2) return;
-      const store = useSessionStore.getState();
-      if (store.autoTitleDone.has(tabId)) return;
-      if (autoTitleSpawnedAtMs === null) {
-        autoTitleSpawnedAtMs = Date.now();
-      }
-      void refreshAutoTitle().then((generated) => {
-        if (generated) {
-          useSessionStore.getState().markAutoTitleDone(tabId);
-        }
-      });
-    };
 
     const currentSettings = useSettingsStore.getState().settings;
     const currentProjectTheme = useProjectStore.getState().projects.find((p) => p.path === projectPath)?.theme ?? "midnight";
@@ -297,15 +254,13 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
           ?.sessionId ?? null;
 
         if (!sid) {
-          if (sessionType === "codex" || sessionType === "claude") {
-            autoTitleSpawnedAtMs = Date.now();
-          }
           const created = await createPtySession({
             projectPath,
             cols,
             rows,
             sessionType,
             continueSession: false,
+            command: getSessionCommand(sessionType),
           });
           sid = created.sessionId;
           if (cleanedUp || spawnGenerationRef.current !== spawnGeneration) {
@@ -313,8 +268,6 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
             return;
           }
           updateSessionPtyId(tabId, sid);
-        } else if (sessionType === "codex" || sessionType === "claude") {
-          autoTitleSpawnedAtMs = Date.now();
         }
 
         if (cleanedUp || spawnGenerationRef.current !== spawnGeneration) return;
@@ -346,13 +299,6 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
       if (sessionIdRef.current) {
         writePtySession(sessionIdRef.current, textEncoder.encode(data)).catch(() => {});
       }
-      if ((sessionType === "codex" || sessionType === "claude") && (data.includes("\r") || data.includes("\n"))) {
-        if (autoTitleTimer) return;
-        autoTitleTimer = setTimeout(() => {
-          autoTitleTimer = null;
-          maybeAutoGenerateTitle();
-        }, 1000);
-      }
     });
 
     const onResizeDisposable = terminal.onResize(({ cols, rows }) => {
@@ -362,7 +308,6 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
     });
 
     const onTitleDisposable = terminal.onTitleChange((nextTitle) => {
-      if (useSettingsStore.getState().settings.useGeneratedTitles2) return;
       const clean = nextTitle.replace(/^[^\x20-\x7E]+\s*/, "").trim() || nextTitle;
       setSessionTitle(tabId, clean);
     });
@@ -485,7 +430,6 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
       logPtyLifecycle("mount:cleanup:start", { tabId, spawnGeneration });
 
       if (activityTimer) clearTimeout(activityTimer);
-      if (autoTitleTimer) clearTimeout(autoTitleTimer);
       containerEl.removeEventListener("paste", onPasteCapture, true);
       setTabStatus(tabId, null);
       resizeObserver.disconnect();
@@ -510,11 +454,6 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectPath, tabId, sessionType]);
-
-  useEffect(() => {
-    if (regenCounter === 0) return;
-    void refreshAutoTitleRef.current();
-  }, [regenCounter]);
 
   useEffect(() => {
     if (activeProjectPath !== projectPath) return;

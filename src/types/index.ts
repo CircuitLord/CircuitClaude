@@ -1,6 +1,18 @@
-export type SessionType = "claude" | "codex" | "copilot" | "opencode" | "shell" | "editor";
+export type SessionType = string;
 
-export type SpawnableSessionType = Exclude<SessionType, "editor">;
+export interface SessionTypeConfig {
+  id: string;
+  name: string;
+  command: string;
+  builtIn?: boolean;
+  prefix?: string;
+}
+
+export const BUILT_IN_SESSION_TYPES: SessionTypeConfig[] = [
+  { id: "claude", name: "claude", command: "claude", builtIn: true, prefix: ">" },
+  { id: "codex", name: "codex", command: "codex", builtIn: true, prefix: "c>" },
+  { id: "terminal", name: "terminal", command: "", builtIn: true, prefix: ">_" },
+];
 
 export type TabStatus = "thinking" | "waiting";
 
@@ -197,8 +209,8 @@ export interface Settings {
   voiceMicDeviceId: string;
   whisperModel: string;
   soundEnabled: boolean;
-  useGeneratedTitles2: boolean;
-  defaultSessionType: SpawnableSessionType;
+  defaultSessionType: string;
+  sessionTypes: SessionTypeConfig[];
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -214,6 +226,6 @@ export const DEFAULT_SETTINGS: Settings = {
   voiceMicDeviceId: "default",
   whisperModel: "medium.en",
   soundEnabled: true,
-  useGeneratedTitles2: false,
   defaultSessionType: "claude",
+  sessionTypes: [...BUILT_IN_SESSION_TYPES],
 };

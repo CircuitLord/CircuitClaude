@@ -131,6 +131,18 @@ fn default_whisper_model() -> String {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct SessionTypeConfigRust {
+    pub id: String,
+    pub name: String,
+    pub command: String,
+    #[serde(default)]
+    pub built_in: Option<bool>,
+    #[serde(default)]
+    pub prefix: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SettingsConfig {
     #[serde(default = "default_theme")]
     pub theme: String,
@@ -146,18 +158,28 @@ pub struct SettingsConfig {
     pub sidebar_panel_mode: String,
     #[serde(default)]
     pub notes_panel_open: bool,
+    #[serde(default = "default_notes_panel_width")]
+    pub notes_panel_width: f64,
     #[serde(default = "default_voice_engine")]
     pub voice_engine: String,
     #[serde(default = "default_voice_mic_device_id")]
     pub voice_mic_device_id: String,
     #[serde(default = "default_whisper_model")]
     pub whisper_model: String,
-    #[serde(default = "default_use_generated_titles")]
-    pub use_generated_titles: bool,
+    #[serde(default)]
+    pub sound_enabled: bool,
+    #[serde(default = "default_session_type")]
+    pub default_session_type: String,
+    #[serde(default)]
+    pub session_types: Vec<SessionTypeConfigRust>,
 }
 
-fn default_use_generated_titles() -> bool {
-    true
+fn default_notes_panel_width() -> f64 {
+    350.0
+}
+
+fn default_session_type() -> String {
+    "claude".to_string()
 }
 
 fn settings_path(app_handle: &tauri::AppHandle) -> PathBuf {
