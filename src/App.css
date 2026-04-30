@@ -1705,7 +1705,7 @@ body,
   background: var(--bg-surface);
   border: 1px solid var(--border-visible);
   border-radius: 2px;
-  width: 480px;
+  width: 540px;
   max-width: calc(100vw - 32px);
   overflow: visible;
 }
@@ -1881,12 +1881,16 @@ body,
   height: 36px;
   padding: 0 12px 0 36px;
   gap: 12px;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .settings-row-label {
-  flex-shrink: 0;
   flex: 1;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .settings-row-name {
@@ -1982,6 +1986,17 @@ body,
   color: var(--accent-text);
 }
 
+.settings-toggle--danger {
+  margin-left: auto;
+  color: var(--text-tertiary);
+  opacity: 0.5;
+}
+
+.settings-toggle--danger:hover {
+  color: #e06c75;
+  opacity: 1;
+}
+
 /* --- Hotkey Kbd --- */
 
 .settings-hotkey-kbd {
@@ -2048,12 +2063,20 @@ body,
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  flex-shrink: 1;
+  overflow: hidden;
 }
 
 .settings-row-command {
   color: var(--text-tertiary);
   font-size: 12px;
   font-family: var(--font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 1;
+  min-width: 0;
 }
 
 .settings-badge {

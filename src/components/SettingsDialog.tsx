@@ -895,6 +895,14 @@ function SettingsSessionTypesPage({
                 <div className="settings-row">
                   <button className="settings-toggle settings-toggle--on" onClick={saveEdit}>:save</button>
                   <button className="settings-toggle" onClick={cancelEdit}>:cancel</button>
+                  {!st.builtIn && (
+                    <button
+                      className="settings-toggle settings-toggle--danger"
+                      onClick={() => deleteType(st.id)}
+                    >
+                      :delete
+                    </button>
+                  )}
                 </div>
               </div>
             ) : (
@@ -912,17 +920,9 @@ function SettingsSessionTypesPage({
                   <span className="settings-row-name">{st.name}</span>
                   {st.builtIn && <span className="settings-badge">built-in</span>}
                 </div>
-                <div className="settings-row-actions">
-                  {st.command && <span className="settings-row-command">{st.command}</span>}
-                  {!st.builtIn && (
-                    <button
-                      className="settings-toggle"
-                      onClick={(e) => { e.stopPropagation(); deleteType(st.id); }}
-                    >
-                      :delete
-                    </button>
-                  )}
-                </div>
+                {st.command && (
+                  <span className="settings-row-command" title={st.command}>{st.command}</span>
+                )}
               </div>
             )}
             {dragIndex !== null && dropIndex === settings.sessionTypes.length && index === settings.sessionTypes.length - 1 && dropIndex !== dragIndex + 1 && (
