@@ -1821,6 +1821,11 @@ body,
   padding-top: 4px;
 }
 
+.settings-section:has(.settings-select-dropdown) {
+  position: relative;
+  z-index: 1;
+}
+
 .settings-section:has(> .settings-section-link) {
   padding-top: 0;
 }
@@ -1882,7 +1887,6 @@ body,
   padding: 0 12px 0 36px;
   gap: 12px;
   white-space: nowrap;
-  overflow: hidden;
 }
 
 .settings-row-label {
