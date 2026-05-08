@@ -1890,10 +1890,7 @@ body,
 }
 
 .settings-row-label {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex-shrink: 0;
   white-space: nowrap;
 }
 
@@ -2038,6 +2035,21 @@ body,
   max-width: 60px;
 }
 
+.settings-input--multiline {
+  resize: vertical;
+  line-height: 1.4;
+  flex: 1;
+  overflow: hidden;
+}
+
+.settings-row--top {
+  align-items: flex-start;
+  height: auto;
+  min-height: 36px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
 .settings-input:disabled {
   opacity: 0.4;
   cursor: not-allowed;
@@ -2079,7 +2091,7 @@ body,
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  flex-shrink: 1;
+  flex: 1;
   min-width: 0;
 }
 

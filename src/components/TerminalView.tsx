@@ -259,7 +259,6 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
             cols,
             rows,
             sessionType,
-            continueSession: false,
             command: getSessionCommand(sessionType),
           });
           sid = created.sessionId;

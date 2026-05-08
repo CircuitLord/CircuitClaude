@@ -6,10 +6,7 @@ export interface CreatePtySessionRequest {
   cols: number;
   rows: number;
   sessionType: string;
-  claudeSessionId?: string;
-  resumeSessionId?: string;
-  continueSession?: boolean;
-  command?: string;
+  command: string;
 }
 
 export interface CreatePtySessionResponse {

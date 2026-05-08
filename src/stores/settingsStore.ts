@@ -1,7 +1,6 @@
 import { create } from "zustand";
 import { Settings, DEFAULT_SETTINGS } from "../types";
 import { loadSettings, saveSettings } from "../lib/config";
-import { ensureBuiltIns } from "../lib/sessionTypes";
 
 interface SettingsStore {
   settings: Settings;
@@ -22,11 +21,8 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     const saved = await loadSettings();
     if (saved) {
       const merged = { ...DEFAULT_SETTINGS, ...saved };
-      // Migration: ensure sessionTypes exists and has built-ins
       if (!merged.sessionTypes || merged.sessionTypes.length === 0) {
         merged.sessionTypes = [...DEFAULT_SETTINGS.sessionTypes];
-      } else {
-        merged.sessionTypes = ensureBuiltIns(merged.sessionTypes);
       }
       set({ settings: merged, loaded: true });
     } else {

@@ -4,14 +4,13 @@ export interface SessionTypeConfig {
   id: string;
   name: string;
   command: string;
-  builtIn?: boolean;
   prefix?: string;
 }
 
-export const BUILT_IN_SESSION_TYPES: SessionTypeConfig[] = [
-  { id: "claude", name: "claude", command: "claude", builtIn: true, prefix: ">" },
-  { id: "codex", name: "codex", command: "codex", builtIn: true, prefix: "c>" },
-  { id: "terminal", name: "terminal", command: "", builtIn: true, prefix: ">_" },
+export const DEFAULT_SESSION_TYPES: SessionTypeConfig[] = [
+  { id: "claude", name: "claude", command: "claude", prefix: ">" },
+  { id: "codex", name: "codex", command: "codex", prefix: "c>" },
+  { id: "terminal", name: "terminal", command: "powershell", prefix: ">_" },
 ];
 
 export type TabStatus = "thinking" | "waiting";
@@ -32,8 +31,7 @@ export interface TerminalSession {
   id: string;
   projectName: string;
   projectPath: string;
-  sessionId: string | null; // PTY session ID from Rust
-  claudeSessionId?: string; // Optional explicit Claude session ID for resume/attach workflows
+  sessionId: string | null;
   createdAt: number;
   sessionType: SessionType;
   filePath?: string;
@@ -227,5 +225,5 @@ export const DEFAULT_SETTINGS: Settings = {
   whisperModel: "medium.en",
   soundEnabled: true,
   defaultSessionType: "claude",
-  sessionTypes: [...BUILT_IN_SESSION_TYPES],
+  sessionTypes: [...DEFAULT_SESSION_TYPES],
 };

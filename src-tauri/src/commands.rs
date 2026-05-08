@@ -48,10 +48,7 @@ pub struct CreatePtySessionRequest {
     pub cols: u16,
     pub rows: u16,
     pub session_type: String,
-    pub claude_session_id: Option<String>,
-    pub resume_session_id: Option<String>,
-    pub continue_session: Option<bool>,
-    pub command: Option<String>,
+    pub command: String,
 }
 
 #[derive(serde::Serialize)]
@@ -70,10 +67,7 @@ pub fn create_pty_session(
         request.cols,
         request.rows,
         &request.session_type,
-        request.claude_session_id,
-        request.resume_session_id,
-        request.continue_session.unwrap_or(false),
-        request.command,
+        &request.command,
     )?;
     Ok(CreatePtySessionResponse { session_id })
 }

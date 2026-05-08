@@ -874,13 +874,14 @@ function SettingsSessionTypesPage({
                     autoFocus
                   />
                 </div>
-                <div className="settings-row">
+                <div className="settings-row settings-row--top">
                   <div className="settings-row-label"><span className="settings-row-name">command</span></div>
-                  <input
-                    className="settings-input"
+                  <textarea
+                    className="settings-input settings-input--multiline"
                     value={editCommand}
                     onChange={(e) => setEditCommand(e.target.value)}
                     placeholder="e.g. claude"
+                    rows={3}
                   />
                 </div>
                 <div className="settings-row">
@@ -895,14 +896,12 @@ function SettingsSessionTypesPage({
                 <div className="settings-row">
                   <button className="settings-toggle settings-toggle--on" onClick={saveEdit}>:save</button>
                   <button className="settings-toggle" onClick={cancelEdit}>:cancel</button>
-                  {!st.builtIn && (
-                    <button
-                      className="settings-toggle settings-toggle--danger"
-                      onClick={() => deleteType(st.id)}
-                    >
-                      :delete
-                    </button>
-                  )}
+                  <button
+                    className="settings-toggle settings-toggle--danger"
+                    onClick={() => deleteType(st.id)}
+                  >
+                    :delete
+                  </button>
                 </div>
               </div>
             ) : (
@@ -918,7 +917,6 @@ function SettingsSessionTypesPage({
                 <div className="settings-row-label">
                   <span className="settings-row-prefix">{st.prefix || ">"}</span>
                   <span className="settings-row-name">{st.name}</span>
-                  {st.builtIn && <span className="settings-badge">built-in</span>}
                 </div>
                 {st.command && (
                   <span className="settings-row-command" title={st.command}>{st.command}</span>
@@ -945,13 +943,14 @@ function SettingsSessionTypesPage({
               autoFocus
             />
           </div>
-          <div className="settings-row">
+          <div className="settings-row settings-row--top">
             <div className="settings-row-label"><span className="settings-row-name">command</span></div>
-            <input
-              className="settings-input"
+            <textarea
+              className="settings-input settings-input--multiline"
               value={newCommand}
               onChange={(e) => setNewCommand(e.target.value)}
               placeholder="e.g. opencode"
+              rows={3}
             />
           </div>
           <div className="settings-row">

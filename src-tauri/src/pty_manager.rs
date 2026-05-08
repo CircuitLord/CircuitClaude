@@ -90,19 +90,9 @@ impl PtyManager {
         cols: u16,
         rows: u16,
         session_type: &str,
-        claude_session_id: Option<String>,
-        resume_session_id: Option<String>,
-        continue_session: bool,
-        command: Option<String>,
+        command: &str,
     ) -> Result<SessionId, String> {
-        let cmd = Self::build_command(
-            project_path,
-            session_type,
-            claude_session_id,
-            resume_session_id,
-            continue_session,
-            command,
-        )?;
+        let cmd = Self::build_command(project_path, command)?;
 
         let pty_system = native_pty_system();
         let pair = pty_system
@@ -317,55 +307,9 @@ impl PtyManager {
             .ok_or_else(|| format!("Session not found: {}", session_id))
     }
 
-    fn build_command(
-        project_path: &str,
-        session_type: &str,
-        claude_session_id: Option<String>,
-        resume_session_id: Option<String>,
-        continue_session: bool,
-        command: Option<String>,
-    ) -> Result<CommandBuilder, String> {
+    fn build_command(project_path: &str, command: &str) -> Result<CommandBuilder, String> {
         let mut cmd = CommandBuilder::new("cmd.exe");
-
-        match session_type {
-            "claude" => {
-                let resume_id = resume_session_id
-                    .as_deref()
-                    .map(str::trim)
-                    .filter(|id| !id.is_empty());
-                let explicit_session_id = claude_session_id
-                    .as_deref()
-                    .map(str::trim)
-                    .filter(|id| !id.is_empty());
-
-                if let Some(id) = resume_id {
-                    cmd.args(["/c", "claude", "--resume", id]);
-                } else if let Some(id) = explicit_session_id {
-                    cmd.args(["/c", "claude", "--session-id", id]);
-                } else if continue_session {
-                    cmd.args(["/c", "claude", "--continue"]);
-                } else {
-                    cmd.args(["/c", "claude"]);
-                }
-            }
-            "codex" => {
-                if continue_session {
-                    cmd.args(["/c", "codex", "resume", "--last"]);
-                } else {
-                    cmd.args(["/c", "codex"]);
-                }
-            }
-            _ => {
-                // Generic: use the command string from config
-                let cmd_str = command.unwrap_or_default();
-                if cmd_str.is_empty() {
-                    // Empty command = bare shell (terminal)
-                } else {
-                    cmd.args(["/c", &cmd_str]);
-                }
-            }
-        }
-
+        cmd.args(["/c", command]);
         cmd.cwd(project_path);
         Ok(cmd)
     }
