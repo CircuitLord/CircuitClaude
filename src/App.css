@@ -246,15 +246,22 @@ body,
   animation: tui-scanline 0.2s step-end forwards;
 }
 
-.sidebar-entry.active.thinking::after {
+.sidebar-entry.thinking::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 12px;
+  right: 12px;
+  height: 1px;
   background: linear-gradient(90deg,
-    var(--accent) 0%,
-    color-mix(in srgb, var(--accent-text) 70%, var(--accent)) 45%,
-    var(--accent-text) 50%,
-    color-mix(in srgb, var(--accent-text) 70%, var(--accent)) 55%,
-    var(--accent) 100%
+    var(--sidebar-project-accent) 0%,
+    color-mix(in srgb, var(--sidebar-project-accent-text) 70%, var(--sidebar-project-accent)) 45%,
+    var(--sidebar-project-accent-text) 50%,
+    color-mix(in srgb, var(--sidebar-project-accent-text) 70%, var(--sidebar-project-accent)) 55%,
+    var(--sidebar-project-accent) 100%
   );
   background-size: 300% 100%;
+  box-shadow: 0 0 6px var(--sidebar-project-accent);
   animation: tui-scanline 0.2s step-end forwards,
              tui-bar-pulse 1.5s step-end 0.2s infinite;
 }
@@ -319,6 +326,10 @@ body,
 .sidebar-entry-count {
   color: var(--text-tertiary);
   font-size: 12px;
+}
+
+.sidebar-entry-count.has-sessions {
+  color: var(--sidebar-project-accent-text);
 }
 
 .sidebar-entry.active .sidebar-entry-count {

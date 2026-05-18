@@ -281,7 +281,7 @@ export function Sidebar() {
           const isThinkingAny = !isWaitingAny && projectSessions.some((s) => tabStatuses.get(s.id) === "thinking");
           const isActive = p.path === activeProjectPath;
           const projectTheme = THEMES[p.theme] ?? THEMES.midnight;
-          const thinkingStatusStyle: CSSProperties = {
+          const entryStyle: CSSProperties = {
             "--sidebar-project-accent": projectTheme.css["--accent"],
             "--sidebar-project-accent-text": projectTheme.css["--accent-text"],
             "--sidebar-project-text-tertiary": projectTheme.css["--text-tertiary"],
@@ -299,6 +299,7 @@ export function Sidebar() {
               className={entryClasses}
               onClick={() => handleSelectProject(p.path)}
               title={p.path}
+              style={entryStyle}
             >
               <div className="sidebar-entry-line1">
                 <span className="sidebar-entry-prefix">{">"}</span>
@@ -308,12 +309,12 @@ export function Sidebar() {
                 {isWaitingAny ? (
                   <span className="sidebar-entry-status-text waiting"><span className="sidebar-entry-status-symbol">?</span> waiting</span>
                 ) : isThinkingAny ? (
-                  <span className="sidebar-entry-status-text alive" style={thinkingStatusStyle}><span className="sidebar-entry-status-symbol">*</span> thinking</span>
+                  <span className="sidebar-entry-status-text alive"><span className="sidebar-entry-status-symbol">*</span> thinking</span>
                 ) : (
                   <span className="sidebar-entry-status-text idle">idle</span>
                 )}
                 {sessionCount > 0 && (
-                  <span className="sidebar-entry-count">[{sessionCount} {sessionCount === 1 ? "session" : "sessions"}]</span>
+                  <span className="sidebar-entry-count has-sessions">[{sessionCount} {sessionCount === 1 ? "session" : "sessions"}]</span>
                 )}
               </div>
             </div>
