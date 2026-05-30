@@ -3,6 +3,7 @@ import { useSessionStore } from "../stores/sessionStore";
 import { useEditorStore } from "../stores/editorStore";
 import { TerminalView } from "./TerminalView";
 import { EditorViewComponent } from "./EditorView";
+import { PiChatView } from "./PiChatView";
 import { NewSessionMenu } from "./NewSessionMenu";
 import { closeTab, pinTab } from "../lib/sessions";
 import { SplitDirection, PaneState } from "../types";
@@ -609,6 +610,11 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
             tabId={session.id}
             filePath={session.filePath}
             fileName={session.fileName ?? "file"}
+          />
+        ) : session.sessionType === "pi-chat" ? (
+          <PiChatView
+            tabId={session.id}
+            projectPath={session.projectPath}
           />
         ) : (
           <TerminalView

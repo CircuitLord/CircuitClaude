@@ -1,6 +1,7 @@
 import { useSessionStore, generateTabId } from "../stores/sessionStore";
 import { useProjectStore } from "../stores/projectStore";
 import { closePtySession } from "./pty";
+import { destroyPiSession } from "./pi";
 
 export function spawnNewSession(type: string = "claude", targetPane?: 1 | 2) {
   const { activeProjectPath, addSession, projectSplits, setFocusedPane } = useSessionStore.getState();
@@ -101,7 +102,9 @@ export function closeTab(tabId: string) {
   const session = state.sessions.find((s) => s.id === tabId);
   if (!session) return;
 
-  if (session.sessionType !== "editor" && session.sessionId) {
+  if (session.sessionType === "pi-chat" && session.sessionId) {
+    destroyPiSession(session.sessionId).catch(() => {});
+  } else if (session.sessionType !== "editor" && session.sessionId) {
     closePtySession(session.sessionId).catch(() => {});
   }
 

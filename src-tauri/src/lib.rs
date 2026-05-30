@@ -7,6 +7,7 @@ mod conversation;
 mod file_watcher;
 mod git;
 mod pty_manager;
+mod pi_manager;
 mod whisper_manager;
 
 fn resolve_bridge_path(app: &tauri::App) -> String {
@@ -38,6 +39,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
         .manage(pty_manager::PtyManager::new())
+        .manage(pi_manager::PiManager::new())
         .setup(|app| {
             #[cfg(desktop)]
             app.handle()
@@ -70,6 +72,10 @@ pub fn run() {
             commands::respond_to_question,
             commands::interrupt_claude_session,
             commands::destroy_claude_session,
+            commands::create_pi_session,
+            commands::send_pi_message,
+            commands::abort_pi_session,
+            commands::destroy_pi_session,
             commands::load_projects,
             commands::save_projects,
             commands::load_settings,
@@ -116,6 +122,8 @@ pub fn run() {
                 pty_manager.close_all("app_exit");
                 let claude_manager = app.state::<claude_manager::ClaudeManager>();
                 claude_manager.destroy_all();
+                let pi_manager = app.state::<pi_manager::PiManager>();
+                pi_manager.destroy_all();
                 let whisper_manager = app.state::<whisper_manager::WhisperManager>();
                 whisper_manager.cancel_all();
                 let file_watcher = app.state::<file_watcher::FileWatcherManager>();

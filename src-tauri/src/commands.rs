@@ -3,6 +3,7 @@ use crate::config::{self, PinnedFileConfig, ProjectConfig, SettingsConfig};
 use crate::conversation;
 use crate::git;
 use crate::pty_manager::{AttachStreamResult, PtyManager, PtyOutputEvent, PtySessionInfo};
+use crate::pi_manager::{PiManager, PiRpcEvent};
 use crate::file_watcher::FileWatcherManager;
 use crate::whisper_manager::{DownloadProgress, ModelInfo, WhisperEvent, WhisperManager};
 use tauri::ipc::Channel;
@@ -364,6 +365,40 @@ pub fn destroy_claude_session(
     tab_id: String,
 ) -> Result<(), String> {
     claude_manager.destroy_session(&tab_id)
+}
+
+#[tauri::command]
+pub fn create_pi_session(
+    pi_manager: State<'_, PiManager>,
+    project_path: String,
+    on_event: Channel<PiRpcEvent>,
+) -> Result<String, String> {
+    pi_manager.create_session(&project_path, on_event)
+}
+
+#[tauri::command]
+pub fn send_pi_message(
+    pi_manager: State<'_, PiManager>,
+    session_id: String,
+    message: String,
+) -> Result<(), String> {
+    pi_manager.send_message(&session_id, &message)
+}
+
+#[tauri::command]
+pub fn abort_pi_session(
+    pi_manager: State<'_, PiManager>,
+    session_id: String,
+) -> Result<(), String> {
+    pi_manager.abort_session(&session_id)
+}
+
+#[tauri::command]
+pub fn destroy_pi_session(
+    pi_manager: State<'_, PiManager>,
+    session_id: String,
+) -> Result<(), String> {
+    pi_manager.destroy_session(&session_id)
 }
 
 #[tauri::command]

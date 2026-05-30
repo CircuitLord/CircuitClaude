@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { spawnNewSession } from "../lib/sessions";
 import { useSettingsStore } from "../stores/settingsStore";
+import { getSessionTypes } from "../lib/sessionTypes";
 
 interface NewSessionMenuProps {
   variant: "button" | "pill";
@@ -10,7 +11,8 @@ interface NewSessionMenuProps {
 export function NewSessionMenu({ variant, targetPane }: NewSessionMenuProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const sessionTypes = useSettingsStore((s) => s.settings.sessionTypes);
+  const editableSessionTypes = useSettingsStore((s) => s.settings.sessionTypes);
+  const sessionTypes = getSessionTypes(editableSessionTypes);
 
   useEffect(() => {
     if (!open) return;

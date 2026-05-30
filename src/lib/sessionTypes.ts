@@ -1,8 +1,11 @@
 import { useSettingsStore } from "../stores/settingsStore";
+import { PI_CHAT_SESSION_TYPE } from "../types";
 import type { SessionTypeConfig } from "../types";
 
-export function getSessionTypes(): SessionTypeConfig[] {
-  return useSettingsStore.getState().settings.sessionTypes;
+export function getSessionTypes(editableTypes = useSettingsStore.getState().settings.sessionTypes): SessionTypeConfig[] {
+  return editableTypes.some((type) => type.id === PI_CHAT_SESSION_TYPE.id)
+    ? editableTypes
+    : [...editableTypes, PI_CHAT_SESSION_TYPE];
 }
 
 export function getSessionTypeConfig(id: string): SessionTypeConfig | undefined {

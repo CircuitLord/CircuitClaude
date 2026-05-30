@@ -4984,3 +4984,44 @@ body,
   font-size: 11px;
   color: var(--text-tertiary);
 }
+
+/* ========================================================================
+   Pi Chat View
+   ======================================================================== */
+
+.pi-chat-text-block {
+  margin: 0;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.pi-chat-details summary {
+  list-style: none;
+}
+
+.pi-chat-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.pi-chat-tool {
+  padding: 4px 16px 8px;
+}
+
+.pi-chat-tool-header {
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  padding: 4px 0;
+}
+
+.pi-chat-tool--running .pi-chat-tool-header {
+  color: var(--accent-text);
+}
+
+.pi-chat-tool--error .pi-chat-tool-header {
+  color: var(--git-deleted);
+}

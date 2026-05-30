@@ -14,7 +14,13 @@ export function loadSettings(): Promise<Settings | null> {
 }
 
 export function saveSettings(settings: Settings): Promise<void> {
-  return invoke("save_settings", { settings });
+  return invoke("save_settings", {
+    settings: {
+      ...settings,
+      sessionTypes: settings.sessionTypes.filter((type) => type.id !== "pi-chat"),
+      defaultSessionType: settings.defaultSessionType === "pi-chat" ? "claude" : settings.defaultSessionType,
+    },
+  });
 }
 
 export function loadPinnedFiles(): Promise<PinnedFile[]> {

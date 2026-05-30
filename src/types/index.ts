@@ -7,6 +7,13 @@ export interface SessionTypeConfig {
   prefix?: string;
 }
 
+export const PI_CHAT_SESSION_TYPE: SessionTypeConfig = {
+  id: "pi-chat",
+  name: "pi chat",
+  command: "pi",
+  prefix: "p>",
+};
+
 export const DEFAULT_SESSION_TYPES: SessionTypeConfig[] = [
   { id: "claude", name: "claude", command: "claude", prefix: ">" },
   { id: "codex", name: "codex", command: "codex", prefix: "c>" },
