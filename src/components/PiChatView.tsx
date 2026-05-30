@@ -122,19 +122,19 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
   }, [handleSend]);
 
   return (
-    <div className="pi-chat-view conversation-view">
-      <div className="conversation-messages" ref={scrollRef}>
+    <div className="pi-chat-view">
+      <div className="pi-chat-log" ref={scrollRef}>
         {messages.length === 0 ? (
-          <div className="conversation-empty">send a message to pi...</div>
+          <div className="pi-chat-empty">p&gt; send a message to pi...</div>
         ) : (
           messages.map((message) => (
             message.role === "user" ? (
-              <div className="conversation-user-message" key={message.id}>
-                <span className="conversation-user-marker">&gt;</span>
-                <span className="conversation-user-text">{getMessageText(message.blocks)}</span>
+              <div className="pi-chat-message pi-chat-message--user" key={message.id}>
+                <span className="pi-chat-message-prefix">&gt;</span>
+                <pre className="pi-chat-user-text">{getMessageText(message.blocks)}</pre>
               </div>
             ) : (
-              <div className="conversation-assistant-message" key={message.id}>
+              <div className="pi-chat-message pi-chat-message--assistant" key={message.id}>
                 {message.blocks.map((block, index) => (
                   <PiBlockView block={block} key={`${block.type}-${index}`} />
                 ))}
@@ -143,41 +143,39 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
           ))
         )}
         {isStreaming && (
-          <div className="conversation-streaming-indicator">
+          <div className="pi-chat-working">
             <span className="tui-blink">*</span> pi is working...
           </div>
         )}
       </div>
 
-      <div className="conversation-input-wrapper">
-        <div className="conversation-input-area">
-          {isStreaming ? (
-            <div className="conversation-input-streaming">
-              <span className="conversation-streaming-text">
-                <span className="tui-blink">*</span> running...
-              </span>
-              <button className="conversation-interrupt-btn" onClick={handleInterrupt}>
-                :interrupt
-              </button>
-            </div>
-          ) : (
-            <div className="conversation-input-row">
-              <span className="conversation-input-prefix">p&gt;</span>
-              <textarea
-                ref={inputRef}
-                className="conversation-textarea"
-                value={inputValue}
-                onChange={(event) => setInputValue(event.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="message pi..."
-                rows={1}
-              />
-              <button className="conversation-send-btn" onClick={handleSend} disabled={!inputValue.trim()}>
-                :send
-              </button>
-            </div>
-          )}
-        </div>
+      <div className="pi-chat-input-shell">
+        {isStreaming ? (
+          <div className="pi-chat-running-row">
+            <span className="pi-chat-running-label">
+              <span className="tui-blink">*</span> running...
+            </span>
+            <button className="pi-chat-command" onClick={handleInterrupt}>
+              :interrupt
+            </button>
+          </div>
+        ) : (
+          <div className="pi-chat-input-row">
+            <span className="pi-chat-input-prefix">p&gt;</span>
+            <textarea
+              ref={inputRef}
+              className="pi-chat-input"
+              value={inputValue}
+              onChange={(event) => setInputValue(event.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="message pi..."
+              rows={1}
+            />
+            <button className="pi-chat-command" onClick={handleSend} disabled={!inputValue.trim()}>
+              :send
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -185,17 +183,17 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
 
 function PiBlockView({ block }: { block: PiChatBlock }) {
   if (block.type === "text") {
-    return <pre className="pi-chat-text-block conversation-text-block">{block.content}</pre>;
+    return <pre className="pi-chat-text">{block.content}</pre>;
   }
 
   if (block.type === "thinking") {
     return (
-      <details className="conversation-collapsible pi-chat-details">
-        <summary className="conversation-collapsible-header">
-          <span className="conversation-collapsible-toggle">~</span>
-          <span className="conversation-collapsible-label">thinking</span>
+      <details className="pi-chat-fold">
+        <summary className="pi-chat-fold-title">
+          <span className="pi-chat-fold-marker">~</span>
+          <span>thinking</span>
         </summary>
-        <pre className="conversation-thinking-content">{block.content}</pre>
+        <pre className="pi-chat-thinking">{block.content}</pre>
       </details>
     );
   }
@@ -205,18 +203,18 @@ function PiBlockView({ block }: { block: PiChatBlock }) {
       <div className={`pi-chat-tool pi-chat-tool--${block.status}`}>
         <div className="pi-chat-tool-header">tool: {block.name} [{block.status}]</div>
         {block.args !== null && block.args !== undefined ? (
-          <pre className="conversation-tool-input">{formatJson(block.args)}</pre>
+          <pre className="pi-chat-tool-body">{formatJson(block.args)}</pre>
         ) : null}
         {block.output ? (
-          <pre className="conversation-tool-result-content">{block.output}</pre>
+          <pre className="pi-chat-tool-output">{block.output}</pre>
         ) : null}
       </div>
     );
   }
 
   return (
-    <div className="conversation-error-block">
-      <span className="conversation-error-prefix">error: </span>{block.content}
+    <div className="pi-chat-error">
+      <span>error: </span>{block.content}
     </div>
   );
 }
