@@ -1,4 +1,7 @@
 .pi-chat-view {
+  --pi-chat-col: 760px;
+  --pi-chat-danger: #e0705e;
+  --pi-chat-danger-hover: #ec8170;
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -8,6 +11,12 @@
   color: var(--text-primary);
   font-family: var(--font-mono);
   overflow: hidden;
+}
+
+/* Center all log content in a fixed column; scrollbar stays at viewport edge */
+.pi-chat-log > * {
+  max-width: var(--pi-chat-col);
+  margin-inline: auto;
 }
 
 .pi-chat-log {
@@ -49,25 +58,10 @@
   font-size: 13px;
 }
 
-.pi-chat-message {
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.pi-chat-message:last-child {
-  border-bottom: none;
-}
-
 .pi-chat-message--user {
   display: flex;
-  gap: 8px;
+  justify-content: flex-end;
   padding: 8px 16px;
-  color: var(--text-secondary);
-}
-
-.pi-chat-message-prefix,
-.pi-chat-input-prefix {
-  color: var(--accent-text);
-  flex-shrink: 0;
 }
 
 .pi-chat-user-text,
@@ -82,7 +76,11 @@
 }
 
 .pi-chat-user-text {
-  color: var(--text-secondary);
+  max-width: 72%;
+  padding: 8px 12px;
+  background: var(--bg-elevated);
+  border-radius: 4px;
+  color: var(--text-primary);
   font-size: 13px;
   line-height: 1.5;
 }
@@ -181,20 +179,61 @@
 
 .pi-chat-input-shell {
   flex-shrink: 0;
-  border-top: 1px solid var(--border-subtle);
-  background: var(--bg-base);
+  padding: 8px 16px 16px;
+  background: transparent;
 }
 
-.pi-chat-input-row,
-.pi-chat-running-row {
+.pi-chat-composer {
+  width: 100%;
+  max-width: calc(var(--pi-chat-col) - 32px);
+  margin-inline: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 112px;
+  padding: 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-visible);
+  border-radius: 4px;
+  transition: border-color 0.1s, box-shadow 0.1s;
+}
+
+.pi-chat-composer:focus-within {
+  border-color: color-mix(in srgb, var(--pi-chat-project-accent, var(--accent)) 60%, var(--border-visible));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--pi-chat-project-accent, var(--accent)) 14%, transparent),
+    0 0 8px color-mix(in srgb, var(--pi-chat-project-accent, var(--accent)) 18%, transparent);
+}
+
+.pi-chat-composer--running,
+.pi-chat-composer--running:focus-within {
+  border-color: color-mix(in srgb, var(--pi-chat-project-accent, var(--accent)) 65%, var(--border-visible));
+  box-shadow: 0 0 8px color-mix(in srgb, var(--pi-chat-project-accent, var(--accent)) 22%, transparent);
+}
+
+.pi-chat-composer-main {
+  display: flex;
+  flex: 1;
+  gap: 8px;
+  min-height: 0;
+}
+
+.pi-chat-controls-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+
+.pi-chat-controls-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-left: auto;
 }
 
 .pi-chat-input {
-  flex: 1;
+  display: block;
+  width: 100%;
   min-width: 0;
   max-height: 180px;
   padding: 0;
@@ -215,7 +254,146 @@
 }
 
 .pi-chat-input::placeholder {
+  color: color-mix(in srgb, var(--text-tertiary) 55%, transparent);
+  font-style: italic;
+}
+
+.pi-chat-select {
+  position: relative;
+  min-width: 0;
+}
+
+.pi-chat-select-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.1s;
+}
+
+.pi-chat-select-trigger:hover:not(:disabled),
+.pi-chat-select-trigger:hover:not(:disabled) .pi-chat-select-chevron,
+.pi-chat-select-trigger:hover:not(:disabled) .pi-chat-select-prefix {
+  color: var(--accent-text);
+}
+
+.pi-chat-select-trigger:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.pi-chat-select-chevron,
+.pi-chat-select-prefix {
+  flex-shrink: 0;
   color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  transition: color 0.1s;
+}
+
+.pi-chat-select-prefix {
+  margin-right: -2px;
+}
+
+.pi-chat-select-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pi-chat-select-dropdown {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  z-index: 40;
+  min-width: 100%;
+  max-width: min(320px, 62vw);
+  padding: 2px 0;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-visible);
+  border-radius: 2px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+.pi-chat-select-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 10px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.1s, background 0.1s;
+}
+
+.pi-chat-select-option:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.pi-chat-select-option--active {
+  color: var(--text-primary);
+}
+
+.pi-chat-select-option-marker {
+  width: 1ch;
+  flex-shrink: 0;
+  color: var(--accent-text);
+}
+
+.pi-chat-select-option-content {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pi-chat-permission-select {
+  min-width: 158px;
+}
+
+/* Permission mode coloring: default = accent (safe), bypass = danger */
+.pi-chat-permission-select--default .pi-chat-select-trigger:not(:disabled),
+.pi-chat-permission-select--default .pi-chat-select-trigger:not(:disabled) .pi-chat-select-prefix,
+.pi-chat-permission-select--default .pi-chat-select-trigger:not(:disabled) .pi-chat-select-chevron {
+  color: var(--accent-text);
+}
+
+.pi-chat-permission-select--bypassPermissions .pi-chat-select-trigger:not(:disabled),
+.pi-chat-permission-select--bypassPermissions .pi-chat-select-trigger:not(:disabled) .pi-chat-select-prefix,
+.pi-chat-permission-select--bypassPermissions .pi-chat-select-trigger:not(:disabled) .pi-chat-select-chevron {
+  color: var(--pi-chat-danger);
+}
+
+.pi-chat-permission-select--bypassPermissions .pi-chat-select-trigger:hover:not(:disabled),
+.pi-chat-permission-select--bypassPermissions .pi-chat-select-trigger:hover:not(:disabled) .pi-chat-select-prefix,
+.pi-chat-permission-select--bypassPermissions .pi-chat-select-trigger:hover:not(:disabled) .pi-chat-select-chevron {
+  color: var(--pi-chat-danger-hover);
+}
+
+.pi-chat-effort-select {
+  min-width: 92px;
+}
+
+.pi-chat-effort-select .pi-chat-select-dropdown,
+.pi-chat-model-select .pi-chat-select-dropdown {
+  right: 0;
+  left: auto;
 }
 
 .pi-chat-command {
@@ -239,7 +417,7 @@
 }
 
 .pi-chat-running-label {
-  flex: 1;
+  display: block;
   color: var(--text-tertiary);
   font-size: 13px;
 }

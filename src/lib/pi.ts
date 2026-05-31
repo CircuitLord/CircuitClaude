@@ -1,5 +1,5 @@
 import { invoke, Channel } from "@tauri-apps/api/core";
-import type { PiRpcEvent } from "./piRpc";
+import type { PiRpcCommand, PiRpcEvent } from "./piRpc";
 
 export function createPiSession(
   projectPath: string,
@@ -20,6 +20,13 @@ export function sendPiMessage(sessionId: string, message: string): Promise<void>
 
 export function abortPiSession(sessionId: string): Promise<void> {
   return invoke("abort_pi_session", { sessionId });
+}
+
+export function sendPiCommand(sessionId: string, command: PiRpcCommand): Promise<void> {
+  return invoke("send_pi_command", {
+    sessionId,
+    command,
+  });
 }
 
 export function destroyPiSession(sessionId: string): Promise<void> {

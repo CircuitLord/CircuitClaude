@@ -3,9 +3,11 @@ import {
   extractToolCall,
   getAssistantEvent,
   getContentIndex,
+  getPermissionModeFromStatus,
   normalizePiError,
   readString,
   toolSnapshotFromExecutionEvent,
+  type PiPermissionMode,
   type PiRpcEvent,
   type PiToolSnapshot,
   type PiToolStatus,
@@ -30,6 +32,7 @@ export interface PiChatMessage {
 interface PiChatState {
   chats: Map<string, PiChatMessage[]>;
   streamingTabs: Set<string>;
+  permissionModes: Map<string, PiPermissionMode>;
   addUserMessage: (tabId: string, text: string) => void;
   appendEvent: (tabId: string, event: PiRpcEvent) => void;
   appendError: (tabId: string, message: string) => void;
@@ -263,6 +266,7 @@ function updateStreamingTabs(streamingTabs: Set<string>, tabId: string, event: P
 export const usePiChatStore = create<PiChatState>((set) => ({
   chats: new Map(),
   streamingTabs: new Set(),
+  permissionModes: new Map(),
 
   addUserMessage: (tabId, text) =>
     set((state) => {
@@ -283,10 +287,22 @@ export const usePiChatStore = create<PiChatState>((set) => ({
       const chats = new Map(state.chats);
       const messages = reducePiEvent([...getMessages(chats, tabId)], event);
       chats.set(tabId, messages);
-      return {
+
+      const nextState: Partial<PiChatState> = {
         chats,
         streamingTabs: updateStreamingTabs(state.streamingTabs, tabId, event),
       };
+
+      if (event.type === "extension_ui_request" && event.method === "setStatus" && event.statusKey === "permissions") {
+        const mode = getPermissionModeFromStatus(event.statusText);
+        if (mode) {
+          const permissionModes = new Map(state.permissionModes);
+          permissionModes.set(tabId, mode);
+          nextState.permissionModes = permissionModes;
+        }
+      }
+
+      return nextState;
     }),
 
   appendError: (tabId, message) =>
@@ -305,6 +321,8 @@ export const usePiChatStore = create<PiChatState>((set) => ({
       chats.delete(tabId);
       const streamingTabs = new Set(state.streamingTabs);
       streamingTabs.delete(tabId);
-      return { chats, streamingTabs };
+      const permissionModes = new Map(state.permissionModes);
+      permissionModes.delete(tabId);
+      return { chats, streamingTabs, permissionModes };
     }),
 }));

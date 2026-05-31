@@ -394,6 +394,15 @@ pub fn abort_pi_session(
 }
 
 #[tauri::command]
+pub fn send_pi_command(
+    pi_manager: State<'_, PiManager>,
+    session_id: String,
+    command: serde_json::Value,
+) -> Result<(), String> {
+    pi_manager.send_command(&session_id, &command)
+}
+
+#[tauri::command]
 pub fn destroy_pi_session(
     pi_manager: State<'_, PiManager>,
     session_id: String,

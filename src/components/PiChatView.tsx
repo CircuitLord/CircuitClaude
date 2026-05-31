@@ -1,7 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
 import { usePiSession } from "../hooks/usePiSession";
+import { THEMES } from "../lib/themes";
 import { usePiChatStore } from "../stores/piChatStore";
+import { useProjectStore } from "../stores/projectStore";
 import { useSessionStore } from "../stores/sessionStore";
+import type { PiModel, PiPermissionMode, PiThinkingLevel } from "../lib/piRpc";
+import { getSupportedThinkingLevels } from "../lib/piRpc";
 import { PiChatMessageView } from "./PiChatBlocks";
 import "./PiChatView.css";
 
@@ -10,12 +14,148 @@ interface PiChatViewProps {
   projectPath: string;
 }
 
+interface AvailableModelsResponse {
+  models?: PiModel[];
+}
+
+interface PiStateResponse {
+  model?: PiModel | null;
+  thinkingLevel?: PiThinkingLevel;
+}
+
 const EMPTY_MESSAGES = [] as const;
+
+interface PiChatSelectOption<T extends string> {
+  label: string;
+  value: T;
+}
+
+function modelKey(model: PiModel): string {
+  return `${model.provider}\u0000${model.id}`;
+}
+
+function modelLabel(model: PiModel): string {
+  return model.id;
+}
+
+function getDuplicateModelIds(models: PiModel[]): Set<string> {
+  const counts = new Map<string, number>();
+  for (const model of models) {
+    const key = model.id.trim().toLowerCase();
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return new Set([...counts.entries()].filter(([, count]) => count > 1).map(([id]) => id));
+}
+
+function modelOptionLabel(model: PiModel, duplicateModelIds: Set<string>): string {
+  return duplicateModelIds.has(model.id.trim().toLowerCase())
+    ? `${modelLabel(model)} [${model.provider}]`
+    : modelLabel(model);
+}
+
+function isPreferredModel(model: PiModel): boolean {
+  return /5\.[45]/.test(model.id) || /5\.[45]/.test(model.name ?? "");
+}
+
+function modeCommand(mode: PiPermissionMode): string {
+  return `/permissions mode ${mode}`;
+}
+
+function isInteractiveTarget(target: EventTarget | null): boolean {
+  return target instanceof Element && Boolean(target.closest("button, textarea, input, select, summary, a, [role='button']"));
+}
+
+function PiChatSelect<T extends string>({
+  ariaLabel,
+  className,
+  disabled,
+  options,
+  value,
+  onChange,
+  triggerPrefix,
+}: {
+  ariaLabel: string;
+  className?: string;
+  disabled?: boolean;
+  options: Array<PiChatSelectOption<T>>;
+  value: T;
+  onChange: (value: T) => void;
+  triggerPrefix?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const selectedLabel = options.find((option) => option.value === value)?.label ?? value;
+
+  useEffect(() => {
+    if (!open) return;
+
+    function handleClick(event: MouseEvent) {
+      if (ref.current && !ref.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+
+    function handleKey(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClick);
+    window.addEventListener("keydown", handleKey, true);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      window.removeEventListener("keydown", handleKey, true);
+    };
+  }, [open]);
+
+  return (
+    <div className={`pi-chat-select${className ? ` ${className}` : ""}`} ref={ref}>
+      <button
+        type="button"
+        className="pi-chat-select-trigger"
+        onClick={() => !disabled && setOpen((current) => !current)}
+        disabled={disabled}
+        aria-label={ariaLabel}
+      >
+        <span className="pi-chat-select-chevron">{">"}</span>
+        {triggerPrefix && <span className="pi-chat-select-prefix">{triggerPrefix}</span>}
+        <span className="pi-chat-select-label">{selectedLabel}</span>
+      </button>
+      {open && !disabled && (
+        <div className="pi-chat-select-dropdown">
+          {options.map((option) => (
+            <button
+              type="button"
+              key={option.value}
+              className={`pi-chat-select-option${option.value === value ? " pi-chat-select-option--active" : ""}`}
+              onClick={() => {
+                onChange(option.value);
+                setOpen(false);
+              }}
+            >
+              <span className="pi-chat-select-option-marker">
+                {option.value === value ? "*" : " "}
+              </span>
+              <span className="pi-chat-select-option-content">{option.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [inputValue, setInputValue] = useState("");
+  const [permissionMode, setPermissionMode] = useState<PiPermissionMode>("default");
+  const [availableModels, setAvailableModels] = useState<PiModel[]>([]);
+  const [currentModel, setCurrentModel] = useState<PiModel | null>(null);
+  const [thinkingLevel, setThinkingLevel] = useState<PiThinkingLevel>("off");
+  const [, setToolbarError] = useState<string | null>(null);
 
   const messages = usePiChatStore(
     useCallback((state) => state.chats.get(tabId) ?? EMPTY_MESSAGES, [tabId]),
@@ -23,11 +163,30 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
   const isStreaming = usePiChatStore(
     useCallback((state) => state.streamingTabs.has(tabId), [tabId]),
   );
+  const syncedPermissionMode = usePiChatStore(
+    useCallback((state) => state.permissionModes.get(tabId) ?? "default", [tabId]),
+  );
   const addUserMessage = usePiChatStore((state) => state.addUserMessage);
   const appendError = usePiChatStore((state) => state.appendError);
   const setTabStatus = useSessionStore((state) => state.setTabStatus);
   const activeSessionId = useSessionStore((state) => state.activeSessionId);
-  const { ready, sendMessage, interrupt } = usePiSession({ tabId, projectPath });
+  const projectTheme = useProjectStore((state) => state.projects.find((project) => project.path === projectPath)?.theme ?? "midnight");
+  const { ready, sendMessage, sendCommand, interrupt } = usePiSession({ tabId, projectPath });
+
+  const preferredModels = availableModels.filter(isPreferredModel);
+  const modelOptions = currentModel && !preferredModels.some((model) => modelKey(model) === modelKey(currentModel))
+    ? [currentModel, ...preferredModels]
+    : preferredModels;
+  const duplicateModelIds = getDuplicateModelIds(modelOptions);
+  const currentModelKey = currentModel ? modelKey(currentModel) : "";
+  const effortLevels = getSupportedThinkingLevels(currentModel);
+  const effortValue = effortLevels.includes(thinkingLevel) ? thinkingLevel : (effortLevels[0] ?? "off");
+  const projectAccent = THEMES[projectTheme]?.accent ?? "var(--accent)";
+  const composerStyle = { "--pi-chat-project-accent": projectAccent } as CSSProperties;
+
+  useEffect(() => {
+    setPermissionMode(syncedPermissionMode);
+  }, [syncedPermissionMode]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -39,6 +198,42 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
       inputRef.current?.focus();
     }
   }, [activeSessionId, isStreaming, ready, tabId]);
+
+  useEffect(() => {
+    if (!ready) {
+      setAvailableModels([]);
+      setCurrentModel(null);
+      setThinkingLevel("off");
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadModels() {
+      try {
+        const [modelsResponse, stateResponse] = await Promise.all([
+          sendCommand<AvailableModelsResponse>({ type: "get_available_models" }),
+          sendCommand<PiStateResponse>({ type: "get_state" }),
+        ]);
+        if (cancelled) return;
+
+        const models = Array.isArray(modelsResponse.models) ? modelsResponse.models : [];
+        setAvailableModels(models);
+        setCurrentModel(stateResponse.model ?? models[0] ?? null);
+        if (stateResponse.thinkingLevel) setThinkingLevel(stateResponse.thinkingLevel);
+        setToolbarError(null);
+      } catch (err) {
+        if (cancelled) return;
+        setToolbarError(String(err));
+      }
+    }
+
+    void loadModels();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, sendCommand]);
 
   const handleSend = useCallback(async () => {
     const text = inputValue.trim();
@@ -65,6 +260,72 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
     }
   }, [appendError, interrupt, setTabStatus, tabId]);
 
+  const handlePermissionModeChange = useCallback(async (nextMode: PiPermissionMode) => {
+    const previousMode = permissionMode;
+    setPermissionMode(nextMode);
+
+    try {
+      await sendCommand({ type: "prompt", message: modeCommand(nextMode) });
+      setToolbarError(null);
+    } catch (err) {
+      setPermissionMode(previousMode);
+      appendError(tabId, String(err));
+    }
+  }, [appendError, permissionMode, sendCommand, tabId]);
+
+  const handleModelChange = useCallback(async (nextModelKey: string) => {
+    const nextModel = modelOptions.find((model) => modelKey(model) === nextModelKey);
+    if (!nextModel) return;
+
+    const previousModel = currentModel;
+    setCurrentModel(nextModel);
+
+    try {
+      const selectedModel = await sendCommand<PiModel>({
+        type: "set_model",
+        provider: nextModel.provider,
+        modelId: nextModel.id,
+      });
+      setCurrentModel(selectedModel);
+      // pi clamps the thinking level to the new model's capabilities, so re-read it.
+      const state = await sendCommand<PiStateResponse>({ type: "get_state" });
+      if (state.thinkingLevel) setThinkingLevel(state.thinkingLevel);
+      setToolbarError(null);
+    } catch (err) {
+      setCurrentModel(previousModel);
+      appendError(tabId, String(err));
+    }
+  }, [appendError, currentModel, modelOptions, sendCommand, tabId]);
+
+  const handleEffortChange = useCallback(async (nextLevel: PiThinkingLevel) => {
+    const previousLevel = thinkingLevel;
+    setThinkingLevel(nextLevel);
+
+    try {
+      await sendCommand({ type: "set_thinking_level", level: nextLevel });
+      setToolbarError(null);
+    } catch (err) {
+      setThinkingLevel(previousLevel);
+      appendError(tabId, String(err));
+    }
+  }, [appendError, sendCommand, tabId, thinkingLevel]);
+
+  const focusInput = useCallback(() => {
+    if (!ready || isStreaming) return;
+    inputRef.current?.focus({ preventScroll: true });
+  }, [isStreaming, ready]);
+
+  const handleViewMouseDown = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
+    if (isInteractiveTarget(event.target)) return;
+
+    event.preventDefault();
+    focusInput();
+  }, [focusInput]);
+
+  const handleViewClick = useCallback(() => {
+    requestAnimationFrame(focusInput);
+  }, [focusInput]);
+
   const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
@@ -73,10 +334,10 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
   }, [handleSend]);
 
   return (
-    <div className="pi-chat-view">
+    <div className="pi-chat-view" onMouseDown={handleViewMouseDown} onClick={handleViewClick}>
       <div className="pi-chat-log" ref={scrollRef}>
         {messages.length === 0 ? (
-          <div className="pi-chat-empty">p&gt; {ready ? "send a message to pi..." : "starting pi..."}</div>
+          <div className="pi-chat-empty">{ready ? "send a message to pi..." : "starting pi..."}</div>
         ) : (
           messages.map((message) => <PiChatMessageView message={message} key={message.id} />)
         )}
@@ -88,33 +349,70 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
       </div>
 
       <div className="pi-chat-input-shell">
-        {isStreaming ? (
-          <div className="pi-chat-running-row">
-            <span className="pi-chat-running-label">
-              <span className="tui-blink">*</span> running...
-            </span>
-            <button className="pi-chat-command" onClick={handleInterrupt}>
-              :interrupt
-            </button>
+        <div className={`pi-chat-composer${isStreaming ? " pi-chat-composer--running" : ""}`} style={composerStyle}>
+          <div className="pi-chat-composer-main">
+            {isStreaming ? (
+              <span className="pi-chat-running-label">
+                <span className="tui-blink">*</span> running...
+              </span>
+            ) : (
+              <textarea
+                ref={inputRef}
+                className="pi-chat-input"
+                value={inputValue}
+                onChange={(event) => setInputValue(event.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={ready ? "type a message..." : "starting pi..."}
+                rows={2}
+                disabled={!ready}
+              />
+            )}
           </div>
-        ) : (
-          <div className="pi-chat-input-row">
-            <span className="pi-chat-input-prefix">p&gt;</span>
-            <textarea
-              ref={inputRef}
-              className="pi-chat-input"
-              value={inputValue}
-              onChange={(event) => setInputValue(event.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={ready ? "message pi..." : "starting pi..."}
-              rows={1}
+
+          <div className="pi-chat-controls-row">
+            <PiChatSelect
+              ariaLabel="permissions mode"
+              className={`pi-chat-permission-select pi-chat-permission-select--${permissionMode}`}
+              value={permissionMode}
+              onChange={handlePermissionModeChange}
               disabled={!ready}
+              triggerPrefix="permissions: "
+              options={[
+                { value: "default", label: "default" },
+                { value: "bypassPermissions", label: "bypass" },
+              ]}
             />
-            <button className="pi-chat-command" onClick={handleSend} disabled={!ready || !inputValue.trim()}>
-              :send
-            </button>
+
+            {isStreaming && (
+              <button className="pi-chat-command" onClick={handleInterrupt}>
+                :interrupt
+              </button>
+            )}
+
+            <div className="pi-chat-controls-right">
+              <PiChatSelect
+                ariaLabel="reasoning effort"
+                className="pi-chat-effort-select"
+                value={effortValue}
+                onChange={handleEffortChange}
+                disabled={!ready || isStreaming || effortLevels.length <= 1}
+                triggerPrefix="effort: "
+                options={effortLevels.map((level) => ({ value: level, label: level }))}
+              />
+
+              <PiChatSelect
+                ariaLabel="model selector"
+                className="pi-chat-model-select"
+                value={currentModelKey}
+                onChange={handleModelChange}
+                disabled={!ready || isStreaming || modelOptions.length === 0}
+                options={modelOptions.length === 0
+                  ? [{ value: "", label: "model" }]
+                  : modelOptions.map((model) => ({ value: modelKey(model), label: modelOptionLabel(model, duplicateModelIds) }))}
+              />
+            </div>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

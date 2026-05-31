@@ -8,7 +8,6 @@ export function PiChatMessageView({ message }: PiChatMessageViewProps) {
   if (message.role === "user") {
     return (
       <div className="pi-chat-message pi-chat-message--user">
-        <span className="pi-chat-message-prefix">&gt;</span>
         <pre className="pi-chat-user-text">{getMessageText(message.blocks)}</pre>
       </div>
     );

@@ -25,9 +25,9 @@ struct PiSession {
 }
 
 impl PiSession {
-    fn write_command(&mut self, cmd: &PiCommand) -> Result<(), String> {
+    fn write_json_command(&mut self, command: &serde_json::Value) -> Result<(), String> {
         let stdin = self.stdin.as_mut().ok_or("pi stdin not available")?;
-        let json = serde_json::to_string(cmd).map_err(|e| e.to_string())?;
+        let json = serde_json::to_string(command).map_err(|e| e.to_string())?;
         stdin
             .write_all(json.as_bytes())
             .map_err(|e| format!("Write to pi stdin failed: {}", e))?;
@@ -36,6 +36,11 @@ impl PiSession {
             .map_err(|e| format!("Write newline failed: {}", e))?;
         stdin.flush().map_err(|e| format!("Flush failed: {}", e))?;
         Ok(())
+    }
+
+    fn write_command(&mut self, cmd: &PiCommand) -> Result<(), String> {
+        let command = serde_json::to_value(cmd).map_err(|e| e.to_string())?;
+        self.write_json_command(&command)
     }
 }
 
@@ -250,6 +255,14 @@ impl PiManager {
             .get_mut(session_id)
             .ok_or_else(|| format!("pi session not found: {}", session_id))?;
         session.write_command(&PiCommand::Abort)
+    }
+
+    pub fn send_command(&self, session_id: &str, command: &serde_json::Value) -> Result<(), String> {
+        let mut sessions = self.sessions.lock().unwrap();
+        let session = sessions
+            .get_mut(session_id)
+            .ok_or_else(|| format!("pi session not found: {}", session_id))?;
+        session.write_json_command(command)
     }
 
     pub fn destroy_session(&self, session_id: &str) -> Result<(), String> {
