@@ -18,10 +18,6 @@ export function getTabPrefix(sessionType: string): string {
   return config?.prefix ?? ">";
 }
 
-export function supportsStatusBar(sessionType: string): boolean {
-  return sessionType === "claude";
-}
-
 export function getSessionCommand(sessionType: string): string {
   const config = getSessionTypeConfig(sessionType);
   return config?.command ?? sessionType;

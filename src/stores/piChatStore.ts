@@ -1,11 +1,22 @@
 import { create } from "zustand";
+import {
+  extractToolCall,
+  getAssistantEvent,
+  getContentIndex,
+  normalizePiError,
+  readString,
+  toolSnapshotFromExecutionEvent,
+  type PiRpcEvent,
+  type PiToolSnapshot,
+  type PiToolStatus,
+} from "../lib/piRpc";
 
-export type PiRpcEvent = Record<string, unknown> & { type?: string };
+export type { PiRpcEvent } from "../lib/piRpc";
 
 export type PiChatBlock =
-  | { type: "text"; content: string }
-  | { type: "thinking"; content: string }
-  | { type: "tool"; id: string; name: string; args: unknown; output: string; status: "pending" | "running" | "done" | "error" }
+  | { type: "text"; content: string; contentIndex?: number }
+  | { type: "thinking"; content: string; contentIndex?: number }
+  | { type: "tool"; id: string; name: string; args: unknown; output: string; status: PiToolStatus }
   | { type: "error"; content: string };
 
 export interface PiChatMessage {
@@ -50,62 +61,82 @@ function ensureAssistantMessage(messages: PiChatMessage[]): PiChatMessage[] {
   ];
 }
 
-function appendDelta(messages: PiChatMessage[], type: "text" | "thinking", delta: string): PiChatMessage[] {
-  const ensured = ensureAssistantMessage(messages);
-  const last = ensured[ensured.length - 1];
-  if (!last || last.role !== "assistant") return ensured;
-
-  const blocks = [...last.blocks];
-  const lastBlock = blocks[blocks.length - 1];
-  if (lastBlock?.type === type) {
-    blocks[blocks.length - 1] = { ...lastBlock, content: lastBlock.content + delta };
-  } else {
-    blocks.push({ type, content: delta });
-  }
-
-  return [...ensured.slice(0, -1), { ...last, blocks }];
-}
-
-function appendErrorBlock(messages: PiChatMessage[], content: string): PiChatMessage[] {
-  const ensured = ensureAssistantMessage(messages);
-  const last = ensured[ensured.length - 1];
-  if (!last || last.role !== "assistant") return ensured;
-  return [
-    ...ensured.slice(0, -1),
-    { ...last, blocks: [...last.blocks, { type: "error", content }] },
-  ];
-}
-
-function upsertTool(
+function updateAssistantBlocks(
   messages: PiChatMessage[],
-  id: string,
-  name: string,
-  args: unknown,
-  output: string,
-  status: "pending" | "running" | "done" | "error",
+  updater: (blocks: PiChatBlock[]) => PiChatBlock[],
 ): PiChatMessage[] {
   const ensured = ensureAssistantMessage(messages);
   const last = ensured[ensured.length - 1];
   if (!last || last.role !== "assistant") return ensured;
+  return [...ensured.slice(0, -1), { ...last, blocks: updater(last.blocks) }];
+}
 
-  const blocks = [...last.blocks];
-  const index = blocks.findIndex((block) => block.type === "tool" && block.id === id);
-  if (index === -1) {
-    blocks.push({ type: "tool", id, name, args, output, status });
-  } else {
-    const existing = blocks[index];
-    if (existing.type === "tool") {
-      blocks[index] = {
+function appendContent(
+  messages: PiChatMessage[],
+  type: "text" | "thinking",
+  content: string,
+  contentIndex?: number,
+  mode: "append" | "replace" = "append",
+): PiChatMessage[] {
+  if (!content && mode === "append") return ensureAssistantMessage(messages);
+
+  return updateAssistantBlocks(messages, (blocks) => {
+    const next = [...blocks];
+    const index = findContentBlockIndex(next, type, contentIndex);
+
+    if (index === -1) {
+      if (!content) return next;
+      next.push({ type, content, contentIndex });
+      return next;
+    }
+
+    const existing = next[index];
+    if (existing.type === type) {
+      next[index] = {
         ...existing,
-        name: name || existing.name,
-        args: args ?? existing.args,
-        output,
-        status,
+        content: mode === "replace" ? content : existing.content + content,
       };
     }
-  }
+    return next;
+  });
+}
 
-  return [...ensured.slice(0, -1), { ...last, blocks }];
+function findContentBlockIndex(blocks: PiChatBlock[], type: "text" | "thinking", contentIndex?: number): number {
+  for (let i = blocks.length - 1; i >= 0; i -= 1) {
+    const block = blocks[i];
+    if (block.type !== type) continue;
+    if (contentIndex === undefined || block.contentIndex === contentIndex) return i;
+  }
+  return -1;
+}
+
+function appendErrorBlock(messages: PiChatMessage[], content: string): PiChatMessage[] {
+  return updateAssistantBlocks(messages, (blocks) => [...blocks, { type: "error", content }]);
+}
+
+function upsertTool(messages: PiChatMessage[], tool: PiToolSnapshot): PiChatMessage[] {
+  return updateAssistantBlocks(messages, (blocks) => {
+    const next = [...blocks];
+    const id = tool.id || "tool";
+    const index = next.findIndex((block) => block.type === "tool" && block.id === id);
+
+    if (index === -1) {
+      next.push({ type: "tool", ...tool, id });
+      return next;
+    }
+
+    const existing = next[index];
+    if (existing.type === "tool") {
+      next[index] = {
+        ...existing,
+        name: tool.name || existing.name,
+        args: tool.args ?? existing.args,
+        output: tool.output || existing.output,
+        status: tool.status,
+      };
+    }
+    return next;
+  });
 }
 
 function finishAssistant(messages: PiChatMessage[]): PiChatMessage[] {
@@ -114,35 +145,119 @@ function finishAssistant(messages: PiChatMessage[]): PiChatMessage[] {
   return [...messages.slice(0, -1), { ...last, streaming: false }];
 }
 
-function readString(value: unknown): string {
-  return typeof value === "string" ? value : "";
-}
+function reducePiEvent(messages: PiChatMessage[], event: PiRpcEvent): PiChatMessage[] {
+  switch (event.type) {
+    case "agent_start":
+    case "message_start":
+      return ensureAssistantMessage(messages);
 
-function readRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : null;
-}
+    case "agent_end":
+    case "message_end":
+    case "process_exit":
+      return finishAssistant(messages);
 
-function extractTextContent(value: unknown): string {
-  const record = readRecord(value);
-  const content = record?.content;
-  if (Array.isArray(content)) {
-    return content
-      .map((part) => {
-        const item = readRecord(part);
-        if (!item) return "";
-        return readString(item.text) || readString(item.content);
-      })
-      .filter(Boolean)
-      .join("\n");
+    case "message_update":
+      return reduceAssistantEvent(messages, event);
+
+    case "tool_execution_start":
+      return upsertTool(messages, toolSnapshotFromExecutionEvent(event, "running"));
+
+    case "tool_execution_update":
+      return upsertTool(messages, toolSnapshotFromExecutionEvent(event, "running", "partialResult"));
+
+    case "tool_execution_end":
+      return upsertTool(messages, toolSnapshotFromExecutionEvent(event, event.isError === true ? "error" : "done", "result"));
+
+    case "response":
+      return event.success === false ? appendErrorBlock(messages, normalizePiError(event)) : messages;
+
+    case "stderr":
+    case "process_error":
+    case "extension_error":
+      return appendErrorBlock(messages, normalizePiError(event));
+
+    default:
+      return messages;
   }
-  return readString(content) || readString(record?.text);
 }
 
-function normalizeError(event: PiRpcEvent): string {
-  const responseMessage = readString(readRecord(event.error)?.message) || readString(event.error);
-  return readString(event.message) || responseMessage || `${event.type ?? "pi_error"}`;
+function reduceAssistantEvent(messages: PiChatMessage[], event: PiRpcEvent): PiChatMessage[] {
+  const assistantEvent = getAssistantEvent(event);
+  if (!assistantEvent) return messages;
+
+  const contentIndex = getContentIndex(assistantEvent);
+  switch (assistantEvent.type) {
+    case "start":
+    case "text_start":
+    case "thinking_start":
+      return ensureAssistantMessage(messages);
+
+    case "text_delta":
+      return appendContent(messages, "text", readString(assistantEvent.delta), contentIndex);
+
+    case "thinking_delta":
+      return appendContent(messages, "thinking", readString(assistantEvent.delta), contentIndex);
+
+    case "text_end":
+      return appendContent(messages, "text", readString(assistantEvent.content), contentIndex, "replace");
+
+    case "thinking_end":
+      return appendContent(messages, "thinking", readString(assistantEvent.content), contentIndex, "replace");
+
+    case "toolcall_start":
+    case "toolcall_delta":
+    case "toolcall_end": {
+      const toolCall = extractToolCall(assistantEvent.toolCall ?? assistantEvent.partial);
+      return upsertTool(messages, {
+        id: toolCall.id ?? readString(assistantEvent.toolCallId),
+        name: toolCall.name || "tool",
+        args: toolCall.args ?? null,
+        output: "",
+        status: "pending",
+      });
+    }
+
+    case "error":
+      return appendErrorBlock(messages, normalizePiError(assistantEvent));
+
+    case "done":
+      return finishAssistant(messages);
+
+    default:
+      return messages;
+  }
+}
+
+function updateStreamingTabs(streamingTabs: Set<string>, tabId: string, event: PiRpcEvent): Set<string> {
+  const next = new Set(streamingTabs);
+  switch (event.type) {
+    case "agent_start":
+    case "message_start":
+    case "message_update":
+    case "tool_execution_start":
+    case "tool_execution_update":
+      next.add(tabId);
+      break;
+
+    case "agent_end":
+    case "turn_end":
+    case "message_end":
+    case "tool_execution_end":
+    case "process_exit":
+      next.delete(tabId);
+      break;
+
+    case "response":
+      if (event.success === false) next.delete(tabId);
+      break;
+  }
+
+  const assistantEvent = event.type === "message_update" ? getAssistantEvent(event) : null;
+  if (assistantEvent?.type === "error" || assistantEvent?.type === "done") {
+    next.delete(tabId);
+  }
+
+  return next;
 }
 
 export const usePiChatStore = create<PiChatState>((set) => ({
@@ -166,91 +281,12 @@ export const usePiChatStore = create<PiChatState>((set) => ({
   appendEvent: (tabId, event) =>
     set((state) => {
       const chats = new Map(state.chats);
-      const streamingTabs = new Set(state.streamingTabs);
-      let messages = [...getMessages(chats, tabId)];
-
-      switch (event.type) {
-        case "agent_start":
-        case "message_start":
-          messages = ensureAssistantMessage(messages);
-          streamingTabs.add(tabId);
-          break;
-
-        case "agent_end":
-          messages = finishAssistant(messages);
-          streamingTabs.delete(tabId);
-          break;
-
-        case "message_end":
-          messages = finishAssistant(messages);
-          break;
-
-        case "message_update": {
-          const assistantEvent = readRecord(event.assistantMessageEvent);
-          if (!assistantEvent) break;
-          const eventType = assistantEvent.type;
-          if (eventType === "text_delta") {
-            messages = appendDelta(messages, "text", readString(assistantEvent.delta));
-            streamingTabs.add(tabId);
-          } else if (eventType === "thinking_delta") {
-            messages = appendDelta(messages, "thinking", readString(assistantEvent.delta));
-            streamingTabs.add(tabId);
-          } else if (eventType === "toolcall_end") {
-            const toolCall = readRecord(assistantEvent.toolCall);
-            const id = readString(toolCall?.id) || `tool-${Date.now()}`;
-            const name = readString(toolCall?.name) || "tool";
-            messages = upsertTool(messages, id, name, toolCall?.arguments ?? null, "", "pending");
-          } else if (eventType === "error") {
-            messages = appendErrorBlock(messages, normalizeError(assistantEvent as PiRpcEvent));
-            streamingTabs.delete(tabId);
-          }
-          break;
-        }
-
-        case "tool_execution_start": {
-          const id = readString(event.toolCallId) || `tool-${Date.now()}`;
-          messages = upsertTool(messages, id, readString(event.toolName) || "tool", event.args ?? null, "", "running");
-          streamingTabs.add(tabId);
-          break;
-        }
-
-        case "tool_execution_update": {
-          const id = readString(event.toolCallId) || `tool-${Date.now()}`;
-          const output = extractTextContent(event.partialResult);
-          messages = upsertTool(messages, id, readString(event.toolName) || "tool", event.args ?? null, output, "running");
-          streamingTabs.add(tabId);
-          break;
-        }
-
-        case "tool_execution_end": {
-          const id = readString(event.toolCallId) || `tool-${Date.now()}`;
-          const isError = event.isError === true;
-          const output = extractTextContent(event.result);
-          messages = upsertTool(messages, id, readString(event.toolName) || "tool", event.args ?? null, output, isError ? "error" : "done");
-          break;
-        }
-
-        case "response":
-          if (event.success === false) {
-            messages = appendErrorBlock(messages, normalizeError(event));
-            streamingTabs.delete(tabId);
-          }
-          break;
-
-        case "stderr":
-        case "process_error":
-        case "extension_error":
-          messages = appendErrorBlock(messages, normalizeError(event));
-          break;
-
-        case "process_exit":
-          messages = finishAssistant(messages);
-          streamingTabs.delete(tabId);
-          break;
-      }
-
+      const messages = reducePiEvent([...getMessages(chats, tabId)], event);
       chats.set(tabId, messages);
-      return { chats, streamingTabs };
+      return {
+        chats,
+        streamingTabs: updateStreamingTabs(state.streamingTabs, tabId, event),
+      };
     }),
 
   appendError: (tabId, message) =>

@@ -1,5 +1,5 @@
 import { invoke, Channel } from "@tauri-apps/api/core";
-import type { PiRpcEvent } from "../stores/piChatStore";
+import type { PiRpcEvent } from "./piRpc";
 
 export function createPiSession(
   projectPath: string,

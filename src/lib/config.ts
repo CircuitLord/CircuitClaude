@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { PinnedFile, Project, Settings } from "../types";
+import { PI_CHAT_SESSION_TYPE, PinnedFile, Project, Settings } from "../types";
 
 export function loadProjects(): Promise<Project[]> {
   return invoke<Project[]>("load_projects");
@@ -17,8 +17,8 @@ export function saveSettings(settings: Settings): Promise<void> {
   return invoke("save_settings", {
     settings: {
       ...settings,
-      sessionTypes: settings.sessionTypes.filter((type) => type.id !== "pi-chat"),
-      defaultSessionType: settings.defaultSessionType === "pi-chat" ? "claude" : settings.defaultSessionType,
+      sessionTypes: settings.sessionTypes.filter((type) => type.id !== PI_CHAT_SESSION_TYPE.id),
+      defaultSessionType: settings.defaultSessionType === PI_CHAT_SESSION_TYPE.id ? "claude" : settings.defaultSessionType,
     },
   });
 }

@@ -1,12 +1,12 @@
 import { create } from "zustand";
-import { Settings, DEFAULT_SETTINGS } from "../types";
+import { Settings, DEFAULT_SETTINGS, PI_CHAT_SESSION_TYPE } from "../types";
 import { loadSettings, saveSettings } from "../lib/config";
 
 const EDITABLE_SESSION_TYPE_IDS = new Set(DEFAULT_SETTINGS.sessionTypes.map((type) => type.id));
 
 function normalizeEditableSessionTypes(settings: Settings): Settings {
   const sessionTypes = (settings.sessionTypes?.length ? settings.sessionTypes : DEFAULT_SETTINGS.sessionTypes)
-    .filter((type) => type.id !== "pi-chat");
+    .filter((type) => type.id !== PI_CHAT_SESSION_TYPE.id);
   const mergedIds = new Set(sessionTypes.map((type) => type.id));
   const mergedSessionTypes = [
     ...sessionTypes,
@@ -43,7 +43,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     if (saved) {
       const merged = normalizeEditableSessionTypes({ ...DEFAULT_SETTINGS, ...saved });
       set({ settings: merged, loaded: true });
-      if (saved.sessionTypes?.some((type) => type.id === "pi-chat") || saved.defaultSessionType === "pi-chat") {
+      if (saved.sessionTypes?.some((type) => type.id === PI_CHAT_SESSION_TYPE.id) || saved.defaultSessionType === PI_CHAT_SESSION_TYPE.id) {
         await saveSettings(merged);
       }
     } else {

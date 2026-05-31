@@ -22,8 +22,6 @@ enum PiCommand {
 struct PiSession {
     child: Option<Child>,
     stdin: Option<std::process::ChildStdin>,
-    #[allow(dead_code)]
-    project_path: String,
 }
 
 impl PiSession {
@@ -159,7 +157,6 @@ impl PiManager {
             PiSession {
                 child: Some(child),
                 stdin: Some(stdin),
-                project_path: project_path.to_string(),
             },
         );
 
