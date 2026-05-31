@@ -181,8 +181,11 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
   const currentModelKey = currentModel ? modelKey(currentModel) : "";
   const effortLevels = getSupportedThinkingLevels(currentModel);
   const effortValue = effortLevels.includes(thinkingLevel) ? thinkingLevel : (effortLevels[0] ?? "off");
-  const projectAccent = THEMES[projectTheme]?.accent ?? "var(--accent)";
-  const composerStyle = { "--pi-chat-project-accent": projectAccent } as CSSProperties;
+  const chatTheme = THEMES[projectTheme] ?? THEMES.midnight;
+  const chatStyle = {
+    "--pi-chat-project-accent": chatTheme.css["--accent"],
+    "--pi-chat-project-highlight": chatTheme.css["--accent-text"],
+  } as CSSProperties;
 
   useEffect(() => {
     setPermissionMode(syncedPermissionMode);
@@ -334,7 +337,7 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
   }, [handleSend]);
 
   return (
-    <div className="pi-chat-view" onMouseDown={handleViewMouseDown} onClick={handleViewClick}>
+    <div className="pi-chat-view" onMouseDown={handleViewMouseDown} onClick={handleViewClick} style={chatStyle}>
       <div className="pi-chat-log" ref={scrollRef}>
         {messages.length === 0 ? (
           <div className="pi-chat-empty">{ready ? "send a message to pi..." : "starting pi..."}</div>
@@ -343,30 +346,25 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
         )}
         {isStreaming && (
           <div className="pi-chat-working">
-            <span className="tui-blink">*</span> pi is working...
+            <span className="pi-chat-working-mark" aria-hidden="true" />
+            <span>Working...</span>
           </div>
         )}
       </div>
 
       <div className="pi-chat-input-shell">
-        <div className={`pi-chat-composer${isStreaming ? " pi-chat-composer--running" : ""}`} style={composerStyle}>
+        <div className={`pi-chat-composer${isStreaming ? " pi-chat-composer--running" : ""}`}>
           <div className="pi-chat-composer-main">
-            {isStreaming ? (
-              <span className="pi-chat-running-label">
-                <span className="tui-blink">*</span> running...
-              </span>
-            ) : (
-              <textarea
-                ref={inputRef}
-                className="pi-chat-input"
-                value={inputValue}
-                onChange={(event) => setInputValue(event.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={ready ? "type a message..." : "starting pi..."}
-                rows={2}
-                disabled={!ready}
-              />
-            )}
+            <textarea
+              ref={inputRef}
+              className="pi-chat-input"
+              value={inputValue}
+              onChange={(event) => setInputValue(event.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={ready ? "type a message..." : "starting pi..."}
+              rows={2}
+              disabled={!ready || isStreaming}
+            />
           </div>
 
           <div className="pi-chat-controls-row">

@@ -1,5 +1,7 @@
 .pi-chat-view {
   --pi-chat-col: 760px;
+  --pi-chat-block-padding-x: 16px;
+  --pi-chat-block-padding-y: 6px;
   --pi-chat-danger: #e0705e;
   --pi-chat-danger-hover: #ec8170;
   display: flex;
@@ -30,7 +32,6 @@
 
 .pi-chat-log::-webkit-scrollbar,
 .pi-chat-thinking::-webkit-scrollbar,
-.pi-chat-tool-body::-webkit-scrollbar,
 .pi-chat-tool-output::-webkit-scrollbar {
   width: 4px;
   height: 4px;
@@ -38,14 +39,12 @@
 
 .pi-chat-log::-webkit-scrollbar-track,
 .pi-chat-thinking::-webkit-scrollbar-track,
-.pi-chat-tool-body::-webkit-scrollbar-track,
 .pi-chat-tool-output::-webkit-scrollbar-track {
   background: transparent;
 }
 
 .pi-chat-log::-webkit-scrollbar-thumb,
 .pi-chat-thinking::-webkit-scrollbar-thumb,
-.pi-chat-tool-body::-webkit-scrollbar-thumb,
 .pi-chat-tool-output::-webkit-scrollbar-thumb {
   background: var(--border-visible);
   border-radius: 2px;
@@ -53,9 +52,35 @@
 
 .pi-chat-empty,
 .pi-chat-working {
-  padding: 16px;
+  padding: var(--pi-chat-block-padding-y) var(--pi-chat-block-padding-x);
   color: var(--text-tertiary);
   font-size: 13px;
+}
+
+.pi-chat-working,
+.pi-chat-running-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.pi-chat-working-mark {
+  width: 1ch;
+  flex: 0 0 1ch;
+  color: var(--pi-chat-project-highlight, var(--accent-text));
+}
+
+.pi-chat-working-mark::before {
+  content: "·";
+  animation: pi-chat-working-pulse 1s steps(4, end) infinite;
+}
+
+@keyframes pi-chat-working-pulse {
+  0% { content: "·"; }
+  25% { content: "•"; }
+  50% { content: "●"; }
+  75% { content: "•"; }
+  100% { content: "·"; }
 }
 
 .pi-chat-message--user {
@@ -67,7 +92,6 @@
 .pi-chat-user-text,
 .pi-chat-text,
 .pi-chat-thinking,
-.pi-chat-tool-body,
 .pi-chat-tool-output {
   margin: 0;
   font-family: var(--font-mono);
@@ -86,11 +110,11 @@
 }
 
 .pi-chat-message--assistant {
-  padding: 4px 0;
+  padding: 0;
 }
 
 .pi-chat-text {
-  padding: 10px 16px;
+  padding: var(--pi-chat-block-padding-y) var(--pi-chat-block-padding-x);
   color: var(--text-primary);
   font-size: 13px;
   line-height: 1.55;
@@ -136,40 +160,91 @@
 }
 
 .pi-chat-tool {
-  padding: 4px 16px 8px;
-}
-
-.pi-chat-tool-header {
-  padding: 4px 0;
+  padding: var(--pi-chat-block-padding-y) var(--pi-chat-block-padding-x);
   color: var(--text-tertiary);
   font-size: 13px;
+  line-height: 1.45;
 }
 
-.pi-chat-tool--running .pi-chat-tool-header {
-  color: var(--accent-text);
+.pi-chat-tool-line {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+  gap: 0;
 }
 
-.pi-chat-tool--error .pi-chat-tool-header,
+.pi-chat-tool-dot {
+  width: 1ch;
+  flex: 0 0 1ch;
+  margin-right: 7px;
+  color: var(--text-tertiary);
+}
+
+.pi-chat-tool-dot::before {
+  content: "●";
+}
+
+.pi-chat-tool--running .pi-chat-tool-dot,
+.pi-chat-tool--pending .pi-chat-tool-dot {
+  color: var(--text-tertiary);
+}
+
+.pi-chat-tool--done .pi-chat-tool-dot {
+  color: var(--git-added);
+}
+
+.pi-chat-tool--error .pi-chat-tool-dot,
 .pi-chat-error {
   color: var(--git-deleted);
 }
 
-.pi-chat-tool-body,
-.pi-chat-tool-output {
-  max-height: 280px;
-  overflow: auto;
-  margin: 4px 0;
-  padding: 8px 0 8px 12px;
-  border-left: 1px solid var(--border-subtle);
-  background: transparent;
+.pi-chat-tool-title {
+  flex-shrink: 0;
   color: var(--text-secondary);
-  font-size: 12px;
-  line-height: 1.5;
 }
 
-.pi-chat-tool--error .pi-chat-tool-output {
-  border-color: rgba(248, 81, 73, 0.35);
+.pi-chat-tool--running .pi-chat-tool-title,
+.pi-chat-tool--pending .pi-chat-tool-title {
+  color: var(--text-secondary);
+}
+
+.pi-chat-tool-paren {
+  color: var(--text-tertiary);
+}
+
+.pi-chat-tool-arg {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pi-chat-tool-detail {
+  display: flex;
+  gap: 8px;
+  padding-left: 2.2ch;
+  color: var(--text-tertiary);
+}
+
+.pi-chat-tool-caret {
+  color: var(--text-tertiary);
+}
+
+.pi-chat-tool-target {
+  color: var(--pi-chat-project-highlight, var(--accent-text));
+}
+
+.pi-chat-tool-output {
+  max-height: 160px;
+  overflow: auto;
+  margin: 4px 0 2px 2.2ch;
+  padding: 6px 0 6px 10px;
+  border-left: 1px solid rgba(248, 81, 73, 0.35);
+  background: transparent;
   color: var(--git-deleted);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .pi-chat-error {

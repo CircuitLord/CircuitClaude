@@ -106,6 +106,43 @@ export function getContentIndex(event: PiAssistantEvent): number | undefined {
   return readNumber(event.contentIndex);
 }
 
+export function getPiEventMessage(event: PiRpcEvent): Record<string, unknown> | null {
+  const assistantEvent = event.type === "message_update" ? getAssistantEvent(event) : null;
+  return readRecord(assistantEvent?.message)
+    ?? readRecord(assistantEvent?.error)
+    ?? readRecord(event.message);
+}
+
+export function getPiEventStopReason(event: PiRpcEvent): string {
+  const assistantEvent = event.type === "message_update" ? getAssistantEvent(event) : null;
+  return readString(assistantEvent?.reason)
+    || readString(readRecord(assistantEvent?.message)?.stopReason)
+    || readString(readRecord(assistantEvent?.error)?.stopReason)
+    || readString(readRecord(event.message)?.stopReason);
+}
+
+export function piMessageHasToolCalls(message: unknown): boolean {
+  const content = readRecord(message)?.content;
+  return Array.isArray(content) && content.some((part) => readRecord(part)?.type === "toolCall");
+}
+
+export function isFinalPiStopReason(reason: unknown): boolean {
+  const value = readString(reason);
+  return value.length > 0 && value !== "toolUse";
+}
+
+export function isFinalPiCompletionEvent(event: PiRpcEvent): boolean {
+  const stopReason = getPiEventStopReason(event);
+  if (isFinalPiStopReason(stopReason)) return true;
+  if (stopReason === "toolUse") return false;
+
+  const message = getPiEventMessage(event);
+  if (message) return !piMessageHasToolCalls(message);
+
+  if (event.type === "turn_end" && Array.isArray(event.toolResults)) return event.toolResults.length === 0;
+  return false;
+}
+
 export function extractTextContent(value: unknown): string {
   const record = readRecord(value);
   const content = record?.content;
@@ -180,20 +217,25 @@ export function getPiTabStatusForEvent(event: PiRpcEvent): TabStatus | null | un
   switch (event.type) {
     case "agent_start":
     case "message_start":
-    case "message_update":
+    case "message_update": {
+      const assistantEvent = event.type === "message_update" ? getAssistantEvent(event) : null;
+      if (assistantEvent?.type === "error") return null;
+      return assistantEvent?.type === "done" && isFinalPiCompletionEvent(event) ? null : "thinking";
+    }
     case "tool_execution_start":
     case "tool_execution_update":
     case "compaction_start":
     case "auto_retry_start":
       return "thinking";
     case "agent_end":
-    case "turn_end":
-    case "message_end":
-    case "tool_execution_end":
     case "process_exit":
+    case "process_error":
     case "compaction_end":
     case "auto_retry_end":
       return null;
+    case "message_end":
+    case "turn_end":
+      return isFinalPiCompletionEvent(event) ? null : undefined;
     case "response":
       return event.success === false ? null : undefined;
     default:
