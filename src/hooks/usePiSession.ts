@@ -13,6 +13,7 @@ interface UsePiSessionOptions {
 
 interface UsePiSessionResult {
   ready: boolean;
+  backendId: string | null;
   sendMessage: (message: string) => Promise<void>;
   sendCommand: <T = unknown>(command: PiRpcCommand) => Promise<T>;
   interrupt: () => Promise<void>;
@@ -27,6 +28,7 @@ export function usePiSession({ tabId, projectPath, title = "pi chat" }: UsePiSes
   const backendIdRef = useRef<string | null>(null);
   const pendingCommandsRef = useRef(new Map<string, PendingCommand>());
   const [ready, setReady] = useState(false);
+  const [backendId, setBackendId] = useState<string | null>(null);
 
   const appendEvent = usePiChatStore((state) => state.appendEvent);
   const appendError = usePiChatStore((state) => state.appendError);
@@ -38,6 +40,7 @@ export function usePiSession({ tabId, projectPath, title = "pi chat" }: UsePiSes
   useEffect(() => {
     let cleanedUp = false;
     setReady(false);
+    setBackendId(null);
     setSessionTitle(tabId, title);
 
     const channel = new Channel<PiRpcEvent>();
@@ -70,6 +73,7 @@ export function usePiSession({ tabId, projectPath, title = "pi chat" }: UsePiSes
           return;
         }
         backendIdRef.current = backendId;
+        setBackendId(backendId);
         updateSessionPtyId(tabId, backendId);
         setReady(true);
       })
@@ -84,6 +88,7 @@ export function usePiSession({ tabId, projectPath, title = "pi chat" }: UsePiSes
       setReady(false);
       const backendId = backendIdRef.current;
       backendIdRef.current = null;
+      setBackendId(null);
       for (const pending of pendingCommandsRef.current.values()) {
         pending.reject(new Error("pi session closed"));
       }
@@ -130,5 +135,5 @@ export function usePiSession({ tabId, projectPath, title = "pi chat" }: UsePiSes
     await abortPiSession(backendId);
   }, []);
 
-  return { ready, sendMessage, sendCommand, interrupt };
+  return { ready, backendId, sendMessage, sendCommand, interrupt };
 }

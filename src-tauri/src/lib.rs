@@ -76,6 +76,7 @@ pub fn run() {
             commands::send_pi_message,
             commands::abort_pi_session,
             commands::send_pi_command,
+            commands::save_pi_chat_settings,
             commands::destroy_pi_session,
             commands::load_projects,
             commands::save_projects,

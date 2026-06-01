@@ -2,6 +2,7 @@
   --pi-chat-col: 760px;
   --pi-chat-block-padding-x: 16px;
   --pi-chat-block-padding-y: 6px;
+  --pi-chat-inner-gap: 8px;
   --pi-chat-danger: #e0705e;
   --pi-chat-danger-hover: #ec8170;
   display: flex;
@@ -215,9 +216,21 @@
 .pi-chat-tool-arg {
   min-width: 0;
   overflow: hidden;
-  color: var(--text-primary);
+  color: var(--pi-chat-project-highlight, var(--accent-text));
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.pi-chat-tool-additions {
+  color: var(--git-added);
+}
+
+.pi-chat-tool-removals {
+  color: var(--git-deleted);
+}
+
+.pi-chat-tool--with-output {
+  padding-bottom: var(--pi-chat-block-padding-y);
 }
 
 .pi-chat-tool-detail {
@@ -238,13 +251,18 @@
 .pi-chat-tool-output {
   max-height: 160px;
   overflow: auto;
-  margin: 4px 0 2px 2.2ch;
-  padding: 6px 0 6px 10px;
-  border-left: 1px solid rgba(248, 81, 73, 0.35);
+  margin: var(--pi-chat-block-padding-y) 0 0 2.2ch;
+  padding: 0 0 0 10px;
+  border-left: 1px solid color-mix(in srgb, var(--pi-chat-project-highlight, var(--accent-text)) 35%, transparent);
   background: transparent;
-  color: var(--git-deleted);
+  color: var(--text-secondary);
   font-size: 12px;
   line-height: 1.5;
+}
+
+.pi-chat-tool-output--error {
+  border-left-color: rgba(248, 81, 73, 0.35);
+  color: var(--git-deleted);
 }
 
 .pi-chat-error {
@@ -270,19 +288,7 @@
   background: var(--bg-surface);
   border: 1px solid var(--border-visible);
   border-radius: 4px;
-  transition: border-color 0.1s, box-shadow 0.1s;
-}
-
-.pi-chat-composer:focus-within {
-  border-color: color-mix(in srgb, var(--pi-chat-project-accent, var(--accent)) 60%, var(--border-visible));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--pi-chat-project-accent, var(--accent)) 14%, transparent),
-    0 0 8px color-mix(in srgb, var(--pi-chat-project-accent, var(--accent)) 18%, transparent);
-}
-
-.pi-chat-composer--running,
-.pi-chat-composer--running:focus-within {
-  border-color: color-mix(in srgb, var(--pi-chat-project-accent, var(--accent)) 65%, var(--border-visible));
-  box-shadow: 0 0 8px color-mix(in srgb, var(--pi-chat-project-accent, var(--accent)) 22%, transparent);
+  transition: border-color 0.1s;
 }
 
 .pi-chat-composer-main {

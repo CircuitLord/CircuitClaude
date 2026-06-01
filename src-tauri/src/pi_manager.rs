@@ -1,7 +1,10 @@
+use crate::config::PiChatSettingsConfig;
 use serde::Serialize;
-use serde_json::json;
+use serde_json::{json, Map, Value};
 use std::collections::HashMap;
+use std::fs;
 use std::io::{BufRead, BufReader, Write};
+use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
 use tauri::ipc::Channel;
@@ -22,6 +25,7 @@ enum PiCommand {
 struct PiSession {
     child: Option<Child>,
     stdin: Option<std::process::ChildStdin>,
+    normal_settings_snapshot: Option<Map<String, Value>>,
 }
 
 impl PiSession {
@@ -122,6 +126,70 @@ fn terminate_child(child: &mut Child) {
     let _ = child.wait();
 }
 
+fn normal_pi_settings_path() -> Option<PathBuf> {
+    std::env::var_os("PI_CODING_AGENT_DIR")
+        .map(PathBuf::from)
+        .or_else(|| dirs::home_dir().map(|home| home.join(".pi").join("agent")))
+        .map(|dir| dir.join("settings.json"))
+}
+
+fn read_settings_object(path: &PathBuf) -> Option<Map<String, Value>> {
+    let contents = fs::read_to_string(path).ok()?;
+    serde_json::from_str::<Value>(&contents).ok()?.as_object().cloned()
+}
+
+fn restore_field(
+    current: &mut Map<String, Value>,
+    snapshot: &Map<String, Value>,
+    key: &str,
+    selected_value: Option<&String>,
+) -> bool {
+    let Some(selected_value) = selected_value else {
+        return false;
+    };
+    if current.get(key).and_then(Value::as_str) != Some(selected_value.as_str()) {
+        return false;
+    }
+
+    match snapshot.get(key) {
+        Some(original) if current.get(key) != Some(original) => {
+            current.insert(key.to_string(), original.clone());
+            true
+        }
+        Some(_) => false,
+        None => current.remove(key).is_some(),
+    }
+}
+
+fn capture_normal_pi_settings() -> Option<Map<String, Value>> {
+    let path = normal_pi_settings_path()?;
+    Some(read_settings_object(&path).unwrap_or_default())
+}
+
+fn restore_normal_pi_defaults(
+    snapshot: &Map<String, Value>,
+    selected: &PiChatSettingsConfig,
+) -> Result<(), String> {
+    let Some(path) = normal_pi_settings_path() else {
+        return Ok(());
+    };
+    let Some(mut current) = read_settings_object(&path) else {
+        return Ok(());
+    };
+
+    let mut changed = false;
+    changed |= restore_field(&mut current, snapshot, "defaultProvider", selected.provider.as_ref());
+    changed |= restore_field(&mut current, snapshot, "defaultModel", selected.model.as_ref());
+    changed |= restore_field(&mut current, snapshot, "defaultThinkingLevel", selected.thinking_level.as_ref());
+
+    if changed {
+        let json = serde_json::to_string_pretty(&Value::Object(current)).map_err(|e| e.to_string())?;
+        fs::write(path, json).map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
+}
+
 impl PiManager {
     pub fn new() -> Self {
         Self {
@@ -133,11 +201,21 @@ impl PiManager {
         &self,
         project_path: &str,
         on_event: Channel<PiRpcEvent>,
+        chat_settings: Option<PiChatSettingsConfig>,
     ) -> Result<String, String> {
         let session_id = uuid::Uuid::new_v4().to_string();
+        let normal_settings_snapshot = capture_normal_pi_settings();
 
         let mut cmd = build_pi_command()?;
         cmd.arg("--mode").arg("rpc").arg("--no-session");
+        if let Some(settings) = &chat_settings {
+            if let (Some(provider), Some(model)) = (&settings.provider, &settings.model) {
+                cmd.arg("--model").arg(format!("{}/{}", provider, model));
+            }
+            if let Some(thinking_level) = &settings.thinking_level {
+                cmd.arg("--thinking").arg(thinking_level);
+            }
+        }
         cmd.current_dir(project_path);
         cmd.stdout(Stdio::piped());
         cmd.stderr(Stdio::piped());
@@ -162,6 +240,7 @@ impl PiManager {
             PiSession {
                 child: Some(child),
                 stdin: Some(stdin),
+                normal_settings_snapshot,
             },
         );
 
@@ -263,6 +342,21 @@ impl PiManager {
             .get_mut(session_id)
             .ok_or_else(|| format!("pi session not found: {}", session_id))?;
         session.write_json_command(command)
+    }
+
+    pub fn restore_normal_defaults(
+        &self,
+        session_id: &str,
+        selected: &PiChatSettingsConfig,
+    ) -> Result<(), String> {
+        let sessions = self.sessions.lock().unwrap();
+        let session = sessions
+            .get(session_id)
+            .ok_or_else(|| format!("pi session not found: {}", session_id))?;
+        if let Some(snapshot) = &session.normal_settings_snapshot {
+            restore_normal_pi_defaults(snapshot, selected)?;
+        }
+        Ok(())
     }
 
     pub fn destroy_session(&self, session_id: &str) -> Result<(), String> {

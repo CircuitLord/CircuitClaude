@@ -114,6 +114,84 @@ function plural(count: number, one: string, many: string): string {
   return count === 1 ? one : many;
 }
 
+function textLinesForDiff(text: string): string[] {
+  if (text.length === 0) return [];
+  const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+  if (lines[lines.length - 1] === "") lines.pop();
+  return lines;
+}
+
+function lcsLength(a: string[], b: string[]): number {
+  if (a.length === 0 || b.length === 0) return 0;
+
+  const [shorter, longer] = a.length <= b.length ? [a, b] : [b, a];
+  let previous = new Array(shorter.length + 1).fill(0);
+  let current = new Array(shorter.length + 1).fill(0);
+
+  for (const longerLine of longer) {
+    for (let i = 1; i <= shorter.length; i += 1) {
+      current[i] = longerLine === shorter[i - 1]
+        ? previous[i - 1] + 1
+        : Math.max(previous[i], current[i - 1]);
+    }
+    [previous, current] = [current, previous];
+    current.fill(0);
+  }
+
+  return previous[shorter.length];
+}
+
+function changedLineStats(oldText: string, newText: string): { additions: number; removals: number } {
+  const oldLines = textLinesForDiff(oldText);
+  const newLines = textLinesForDiff(newText);
+  const shared = lcsLength(oldLines, newLines);
+  return {
+    additions: newLines.length - shared,
+    removals: oldLines.length - shared,
+  };
+}
+
+function readText(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function editStatFromRecord(record: Record<string, unknown>): { additions: number; removals: number } | undefined {
+  const oldText = readText(record.oldText ?? record.old_text);
+  const newText = readText(record.newText ?? record.new_text);
+  return oldText === undefined || newText === undefined ? undefined : changedLineStats(oldText, newText);
+}
+
+function updateToolStats(name: string, args: Record<string, unknown>): { additions: number; removals: number } | undefined {
+  if (name === "write") {
+    const content = readText(args.content ?? args.contents);
+    return content === undefined ? undefined : { additions: textLinesForDiff(content).length, removals: 0 };
+  }
+
+  if (name !== "edit") return undefined;
+
+  const edits = Array.isArray(args.edits) ? args.edits : [args];
+  let additions = 0;
+  let removals = 0;
+  let found = false;
+
+  for (const edit of edits) {
+    const stat = editStatFromRecord(asRecord(edit));
+    if (!stat) continue;
+    additions += stat.additions;
+    removals += stat.removals;
+    found = true;
+  }
+
+  return found ? { additions, removals } : undefined;
+}
+
+function summarizeUpdateToolArgs(name: string, args: Record<string, unknown>): string {
+  const path = shortToolPath(args.path ?? args.file_path);
+  const stats = updateToolStats(name, args);
+  const suffix = stats ? ` +${stats.additions} -${stats.removals}` : "";
+  return `${clampToolText(path, MAX_ARG_LENGTH - suffix.length)}${suffix}`;
+}
+
 export function aggregateToolLabel(aggregate: PiToolAggregate): string {
   const readCount = aggregateCount(aggregate, "read");
   const listCount = aggregateCount(aggregate, "list");
@@ -182,7 +260,7 @@ export function summarizeToolArgs(name: string, rawArgs: unknown): string {
       return clampToolText(shortToolPath(args.path, "."));
     case "edit":
     case "write":
-      return clampToolText(shortToolPath(args.path ?? args.file_path));
+      return summarizeUpdateToolArgs(name, args);
     default: {
       const preferred = args.path ?? args.filePath ?? args.file_path ?? args.destinationPath ?? args.url ?? args.command;
       if (typeof preferred === "string" && preferred.length > 0) return clampToolText(preferred);
@@ -194,13 +272,39 @@ export function summarizeToolArgs(name: string, rawArgs: unknown): string {
   }
 }
 
-export function compactToolOutputPreview(output: string, maxLines = 3): string[] {
-  return output
-    .replace(/\r\n/g, "\n")
-    .replace(/\r/g, "\n")
-    .replace(/\n$/, "")
-    .split("\n")
-    .map((line) => line.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "").replace(/\t/g, "    ").trimEnd())
-    .filter((line) => line.trim().length > 0)
-    .slice(-maxLines);
+export interface CompactToolOutputPreview {
+  lines: string[];
+  hiddenCount: number;
+}
+
+function stripAnsi(text: string): string {
+  return text
+    .replace(/\x1b\][^\x07]*(?:\x07|\x1b\\)/g, "")
+    .replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "")
+    .replace(/\x1b[ -/]*[@-~]/g, "");
+}
+
+function sanitizePreviewLine(line: string): string {
+  return stripAnsi(line)
+    .replace(/\x08+/g, "")
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
+    .replace(/\t/g, "    ")
+    .trimEnd();
+}
+
+function isPreviewNoiseLine(line: string): boolean {
+  const trimmed = line.trim();
+  return trimmed.length === 0 || /^[\^~_\-=|/\\.*·•]+$/.test(trimmed);
+}
+
+export function compactToolOutputPreview(output: string, maxLines = 3): CompactToolOutputPreview {
+  const normalized = output.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n$/, "");
+  const lines = (normalized ? normalized.split("\n") : [])
+    .map(sanitizePreviewLine)
+    .filter((line) => !isPreviewNoiseLine(line));
+  const hiddenCount = Math.max(0, lines.length - maxLines);
+  return {
+    lines: lines.slice(-maxLines),
+    hiddenCount,
+  };
 }

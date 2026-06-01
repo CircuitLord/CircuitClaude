@@ -71,17 +71,21 @@ function PiToolBlockView({ block }: { block: Extract<PiChatBlock, { type: "tool"
     ? aggregate.finalized ? finalizedAggregateToolLabel(aggregate) : aggregateToolLabel(aggregate)
     : toolDisplayLabel(block.name);
   const args = aggregate ? undefined : summarizeToolArgs(block.name, block.args);
-  const outputPreview = block.status === "error" ? compactToolOutputPreview(block.output) : [];
+  const outputPreview = !aggregate && (block.name === "bash" || block.status === "error")
+    ? compactToolOutputPreview(block.output)
+    : undefined;
+  const hasOutputPreview = outputPreview !== undefined
+    && (outputPreview.lines.length > 0 || block.name === "bash" || block.status === "error");
 
   return (
-    <div className={`pi-chat-tool pi-chat-tool--${block.status}${aggregate ? " pi-chat-tool--aggregate" : ""}`}>
+    <div className={`pi-chat-tool pi-chat-tool--${block.status}${aggregate ? " pi-chat-tool--aggregate" : ""}${hasOutputPreview ? " pi-chat-tool--with-output" : ""}`}>
       <div className="pi-chat-tool-line">
         <span className="pi-chat-tool-dot" aria-hidden="true" />
         <span className="pi-chat-tool-title">{title}</span>
         {args !== undefined && (
           <>
             <span className="pi-chat-tool-paren">(</span>
-            <span className="pi-chat-tool-arg">{args}</span>
+            <span className="pi-chat-tool-arg">{renderToolArg(block.name, args)}</span>
             <span className="pi-chat-tool-paren">)</span>
           </>
         )}
@@ -92,10 +96,39 @@ function PiToolBlockView({ block }: { block: Extract<PiChatBlock, { type: "tool"
           <span className="pi-chat-tool-target">{activeItem.target}</span>
         </div>
       )}
-      {outputPreview.length > 0 && (
-        <pre className="pi-chat-tool-output">{outputPreview.join("\n")}</pre>
+      {hasOutputPreview && outputPreview && (
+        <pre className={`pi-chat-tool-output${block.status === "error" ? " pi-chat-tool-output--error" : ""}`}>
+          {renderToolOutputPreview(outputPreview, getToolOutputEmptyText(block))}
+        </pre>
       )}
     </div>
+  );
+}
+
+function getToolOutputEmptyText(block: Extract<PiChatBlock, { type: "tool" }>): string {
+  if (block.name !== "bash") return "Tool failed with no output";
+  if (block.status === "pending" || block.status === "running") return "Running…";
+  return block.status === "error" ? "Command failed with no output" : "No output";
+}
+
+function renderToolOutputPreview(preview: ReturnType<typeof compactToolOutputPreview>, emptyText: string): string {
+  const rows = preview.lines.length > 0 ? [...preview.lines] : [`⎿ ${emptyText}`];
+  if (preview.hiddenCount > 0) rows.push(`… ${preview.hiddenCount} earlier ${preview.hiddenCount === 1 ? "line" : "lines"} hidden`);
+  return rows.join("\n");
+}
+
+function renderToolArg(name: string, args: string) {
+  if (name !== "edit" && name !== "write") return args;
+
+  const match = args.match(/^(.*?)( \+\d+)( -\d+)$/);
+  if (!match) return args;
+
+  return (
+    <>
+      {match[1]}
+      <span className="pi-chat-tool-additions">{match[2]}</span>
+      <span className="pi-chat-tool-removals">{match[3]}</span>
+    </>
   );
 }
 

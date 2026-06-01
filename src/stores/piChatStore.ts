@@ -5,6 +5,7 @@ import {
   type PiToolAggregate,
 } from "../lib/piToolDisplay";
 import {
+  extractTextContent,
   extractToolCall,
   getAssistantEvent,
   getContentIndex,
@@ -39,6 +40,8 @@ interface PiChatState {
   chats: Map<string, PiChatMessage[]>;
   streamingTabs: Set<string>;
   permissionModes: Map<string, PiPermissionMode>;
+  queuedSteering: Map<string, string[]>;
+  queuedFollowUp: Map<string, string[]>;
   toolCallArgs: Map<string, Map<string, PiToolSnapshot>>;
   addUserMessage: (tabId: string, text: string) => void;
   appendEvent: (tabId: string, event: PiRpcEvent) => void;
@@ -67,15 +70,20 @@ function createAssistantMessage(messages: PiChatMessage[]): PiChatMessage[] {
   ];
 }
 
+function findLastStreamingAssistantIndex(messages: PiChatMessage[]): number {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message?.role === "assistant" && message.streaming) return index;
+  }
+  return -1;
+}
+
 function ensureAssistantMessage(messages: PiChatMessage[]): PiChatMessage[] {
-  const last = messages[messages.length - 1];
-  return last?.role === "assistant" && last.streaming ? messages : createAssistantMessage(messages);
+  return findLastStreamingAssistantIndex(messages) !== -1 ? messages : createAssistantMessage(messages);
 }
 
 function startAssistantMessage(messages: PiChatMessage[]): PiChatMessage[] {
-  const last = messages[messages.length - 1];
-  if (last?.role === "assistant" && last.streaming && last.blocks.length === 0) return messages;
-  return createAssistantMessage(messages);
+  return findLastStreamingAssistantIndex(messages) !== -1 ? messages : createAssistantMessage(messages);
 }
 
 function updateAssistantBlocks(
@@ -83,9 +91,14 @@ function updateAssistantBlocks(
   updater: (blocks: PiChatBlock[]) => PiChatBlock[],
 ): PiChatMessage[] {
   const ensured = ensureAssistantMessage(messages);
-  const last = ensured[ensured.length - 1];
-  if (!last || last.role !== "assistant") return ensured;
-  return [...ensured.slice(0, -1), { ...last, blocks: updater(last.blocks) }];
+  const index = findLastStreamingAssistantIndex(ensured);
+  const message = ensured[index];
+  if (!message || message.role !== "assistant") return ensured;
+  return [
+    ...ensured.slice(0, index),
+    { ...message, blocks: updater(message.blocks) },
+    ...ensured.slice(index + 1),
+  ];
 }
 
 function blockHasToolId(block: PiChatBlock, id: string): boolean {
@@ -426,10 +439,15 @@ function finalizeAggregateBoundaries(messages: PiChatMessage[]): PiChatMessage[]
 }
 
 function closeAssistantMessage(messages: PiChatMessage[]): PiChatMessage[] {
-  const last = messages[messages.length - 1];
-  if (!last || last.role !== "assistant") return messages;
-  if (!last.blocks.some(blockIsVisible)) return messages.slice(0, -1);
-  return [...messages.slice(0, -1), { ...last, streaming: false }];
+  const index = findLastStreamingAssistantIndex(messages);
+  const message = messages[index];
+  if (!message || message.role !== "assistant") return messages;
+  if (!message.blocks.some(blockIsVisible)) return [...messages.slice(0, index), ...messages.slice(index + 1)];
+  return [
+    ...messages.slice(0, index),
+    { ...message, streaming: false },
+    ...messages.slice(index + 1),
+  ];
 }
 
 function finishAssistant(messages: PiChatMessage[]): PiChatMessage[] {
@@ -465,6 +483,17 @@ function isRenderableTool(tool: PiToolSnapshot): boolean {
 
 function upsertRenderableTool(messages: PiChatMessage[], tool: PiToolSnapshot): PiChatMessage[] {
   return isRenderableTool(tool) ? upsertTool(messages, tool) : ensureAssistantMessage(messages);
+}
+
+function readQueueTexts(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item) => {
+      if (typeof item === "string") return item;
+      return extractTextContent(item);
+    })
+    .filter(Boolean);
 }
 
 function reducePiEvent(
@@ -640,6 +669,8 @@ export const usePiChatStore = create<PiChatState>((set) => ({
   chats: new Map(),
   streamingTabs: new Set(),
   permissionModes: new Map(),
+  queuedSteering: new Map(),
+  queuedFollowUp: new Map(),
   toolCallArgs: new Map(),
 
   addUserMessage: (tabId, text) =>
@@ -668,6 +699,15 @@ export const usePiChatStore = create<PiChatState>((set) => ({
         streamingTabs: updateStreamingTabs(state.streamingTabs, tabId, event),
         toolCallArgs,
       };
+
+      if (event.type === "queue_update") {
+        const queuedSteering = new Map(state.queuedSteering);
+        const queuedFollowUp = new Map(state.queuedFollowUp);
+        queuedSteering.set(tabId, readQueueTexts(event.steering ?? event.steer));
+        queuedFollowUp.set(tabId, readQueueTexts(event.followUp));
+        nextState.queuedSteering = queuedSteering;
+        nextState.queuedFollowUp = queuedFollowUp;
+      }
 
       if (event.type === "extension_ui_request" && event.method === "setStatus" && event.statusKey === "permissions") {
         const mode = getPermissionModeFromStatus(event.statusText);
@@ -699,8 +739,12 @@ export const usePiChatStore = create<PiChatState>((set) => ({
       streamingTabs.delete(tabId);
       const permissionModes = new Map(state.permissionModes);
       permissionModes.delete(tabId);
+      const queuedSteering = new Map(state.queuedSteering);
+      queuedSteering.delete(tabId);
+      const queuedFollowUp = new Map(state.queuedFollowUp);
+      queuedFollowUp.delete(tabId);
       const toolCallArgs = new Map(state.toolCallArgs);
       toolCallArgs.delete(tabId);
-      return { chats, streamingTabs, permissionModes, toolCallArgs };
+      return { chats, streamingTabs, permissionModes, queuedSteering, queuedFollowUp, toolCallArgs };
     }),
 }));

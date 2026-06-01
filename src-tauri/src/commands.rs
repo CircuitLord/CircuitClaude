@@ -1,5 +1,5 @@
 use crate::claude_manager::{ClaudeEvent, ClaudeManager};
-use crate::config::{self, PinnedFileConfig, ProjectConfig, SettingsConfig};
+use crate::config::{self, PiChatSettingsConfig, PinnedFileConfig, ProjectConfig, SettingsConfig};
 use crate::conversation;
 use crate::git;
 use crate::pty_manager::{AttachStreamResult, PtyManager, PtyOutputEvent, PtySessionInfo};
@@ -369,11 +369,13 @@ pub fn destroy_claude_session(
 
 #[tauri::command]
 pub fn create_pi_session(
+    app_handle: tauri::AppHandle,
     pi_manager: State<'_, PiManager>,
     project_path: String,
     on_event: Channel<PiRpcEvent>,
 ) -> Result<String, String> {
-    pi_manager.create_session(&project_path, on_event)
+    let settings = config::load_pi_chat_settings(&app_handle);
+    pi_manager.create_session(&project_path, on_event, Some(settings))
 }
 
 #[tauri::command]
@@ -400,6 +402,17 @@ pub fn send_pi_command(
     command: serde_json::Value,
 ) -> Result<(), String> {
     pi_manager.send_command(&session_id, &command)
+}
+
+#[tauri::command]
+pub fn save_pi_chat_settings(
+    app_handle: tauri::AppHandle,
+    pi_manager: State<'_, PiManager>,
+    session_id: String,
+    settings: PiChatSettingsConfig,
+) -> Result<(), String> {
+    config::save_pi_chat_settings(&app_handle, &settings)?;
+    pi_manager.restore_normal_defaults(&session_id, &settings)
 }
 
 #[tauri::command]

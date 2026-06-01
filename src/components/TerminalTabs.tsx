@@ -601,8 +601,9 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
     return (
       <div
         key={session.id}
-        className={`terminal-tabs-panel${isFocusedPane !== undefined ? " terminal-tabs-panel--pane" : ""}${isFocusedPane ? " terminal-tabs-panel--focused" : ""}`}
+        className={`terminal-tabs-panel${session.sessionType === "pi-chat" ? " terminal-tabs-panel--pi-chat" : ""}${isFocusedPane !== undefined ? " terminal-tabs-panel--pane" : ""}${isFocusedPane ? " terminal-tabs-panel--focused" : ""}`}
         style={{ display: visible ? "flex" : "none" }}
+        data-active={visible ? "true" : undefined}
         onMouseDown={onPaneClick}
       >
         {session.sessionType === "editor" && session.filePath ? (

@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
 import { usePiSession } from "../hooks/usePiSession";
+import { savePiChatSettings } from "../lib/pi";
 import { THEMES } from "../lib/themes";
 import { usePiChatStore } from "../stores/piChatStore";
 import { useProjectStore } from "../stores/projectStore";
@@ -62,7 +63,11 @@ function modeCommand(mode: PiPermissionMode): string {
 }
 
 function isInteractiveTarget(target: EventTarget | null): boolean {
-  return target instanceof Element && Boolean(target.closest("button, textarea, input, select, summary, a, [role='button']"));
+  return target instanceof Element && Boolean(target.closest("button, textarea, input, select, summary, a, [role='button'], [contenteditable='true'], [contenteditable=''], [contenteditable='plaintext-only']"));
+}
+
+function isSelectableChatTarget(target: EventTarget | null): boolean {
+  return target instanceof Element && Boolean(target.closest(".pi-chat-message, .pi-chat-empty, .pi-chat-working"));
 }
 
 function PiChatSelect<T extends string>({
@@ -148,8 +153,11 @@ function PiChatSelect<T extends string>({
 }
 
 export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
+  const viewRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const keyboardCaptureRef = useRef(false);
+  const pendingInputSelectionRef = useRef<{ start: number; end: number } | null>(null);
   const [inputValue, setInputValue] = useState("");
   const [permissionMode, setPermissionMode] = useState<PiPermissionMode>("default");
   const [availableModels, setAvailableModels] = useState<PiModel[]>([]);
@@ -171,7 +179,7 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
   const setTabStatus = useSessionStore((state) => state.setTabStatus);
   const activeSessionId = useSessionStore((state) => state.activeSessionId);
   const projectTheme = useProjectStore((state) => state.projects.find((project) => project.path === projectPath)?.theme ?? "midnight");
-  const { ready, sendMessage, sendCommand, interrupt } = usePiSession({ tabId, projectPath });
+  const { ready, backendId, sendMessage, sendCommand, interrupt } = usePiSession({ tabId, projectPath });
 
   const preferredModels = availableModels.filter(isPreferredModel);
   const modelOptions = currentModel && !preferredModels.some((model) => modelKey(model) === modelKey(currentModel))
@@ -183,7 +191,6 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
   const effortValue = effortLevels.includes(thinkingLevel) ? thinkingLevel : (effortLevels[0] ?? "off");
   const chatTheme = THEMES[projectTheme] ?? THEMES.midnight;
   const chatStyle = {
-    "--pi-chat-project-accent": chatTheme.css["--accent"],
     "--pi-chat-project-highlight": chatTheme.css["--accent-text"],
   } as CSSProperties;
 
@@ -197,10 +204,23 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
   }, [messages, isStreaming]);
 
   useEffect(() => {
-    if (activeSessionId === tabId && ready && !isStreaming) {
+    if (activeSessionId === tabId && ready) {
+      keyboardCaptureRef.current = true;
       inputRef.current?.focus();
     }
-  }, [activeSessionId, isStreaming, ready, tabId]);
+  }, [activeSessionId, ready, tabId]);
+
+  useLayoutEffect(() => {
+    const selection = pendingInputSelectionRef.current;
+    if (!selection || !ready) return;
+
+    pendingInputSelectionRef.current = null;
+    const input = inputRef.current;
+    if (!input) return;
+
+    input.focus({ preventScroll: true });
+    input.setSelectionRange(selection.start, selection.end);
+  }, [inputValue, ready]);
 
   useEffect(() => {
     if (!ready) {
@@ -240,9 +260,20 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
 
   const handleSend = useCallback(async () => {
     const text = inputValue.trim();
-    if (!text || !ready || isStreaming) return;
+    if (!text || !ready) return;
 
     setInputValue("");
+
+    if (isStreaming) {
+      addUserMessage(tabId, text);
+      try {
+        await sendCommand({ type: "prompt", message: text, streamingBehavior: "steer" });
+      } catch (err) {
+        appendError(tabId, String(err));
+      }
+      return;
+    }
+
     addUserMessage(tabId, text);
     setTabStatus(tabId, "thinking");
 
@@ -252,7 +283,7 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
       appendError(tabId, String(err));
       setTabStatus(tabId, null);
     }
-  }, [addUserMessage, appendError, inputValue, isStreaming, ready, sendMessage, setTabStatus, tabId]);
+  }, [addUserMessage, appendError, inputValue, isStreaming, ready, sendCommand, sendMessage, setTabStatus, tabId]);
 
   const handleInterrupt = useCallback(async () => {
     try {
@@ -292,13 +323,21 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
       setCurrentModel(selectedModel);
       // pi clamps the thinking level to the new model's capabilities, so re-read it.
       const state = await sendCommand<PiStateResponse>({ type: "get_state" });
+      const selectedThinkingLevel = state.thinkingLevel ?? thinkingLevel;
       if (state.thinkingLevel) setThinkingLevel(state.thinkingLevel);
+      if (backendId) {
+        savePiChatSettings(backendId, {
+          provider: selectedModel.provider,
+          model: selectedModel.id,
+          thinkingLevel: selectedThinkingLevel,
+        }).catch((err) => appendError(tabId, String(err)));
+      }
       setToolbarError(null);
     } catch (err) {
       setCurrentModel(previousModel);
       appendError(tabId, String(err));
     }
-  }, [appendError, currentModel, modelOptions, sendCommand, tabId]);
+  }, [appendError, backendId, currentModel, modelOptions, sendCommand, tabId, thinkingLevel]);
 
   const handleEffortChange = useCallback(async (nextLevel: PiThinkingLevel) => {
     const previousLevel = thinkingLevel;
@@ -306,26 +345,148 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
 
     try {
       await sendCommand({ type: "set_thinking_level", level: nextLevel });
+      if (backendId) {
+        savePiChatSettings(backendId, {
+          provider: currentModel?.provider,
+          model: currentModel?.id,
+          thinkingLevel: nextLevel,
+        }).catch((err) => appendError(tabId, String(err)));
+      }
       setToolbarError(null);
     } catch (err) {
       setThinkingLevel(previousLevel);
       appendError(tabId, String(err));
     }
-  }, [appendError, sendCommand, tabId, thinkingLevel]);
+  }, [appendError, backendId, currentModel, sendCommand, tabId, thinkingLevel]);
 
   const focusInput = useCallback(() => {
-    if (!ready || isStreaming) return;
+    if (!ready) return;
     inputRef.current?.focus({ preventScroll: true });
-  }, [isStreaming, ready]);
+  }, [ready]);
+
+  const setInputValueWithSelection = useCallback((nextValue: string, start: number, end = start) => {
+    pendingInputSelectionRef.current = { start, end };
+    setInputValue(nextValue);
+  }, []);
+
+  const replaceInputSelection = useCallback((replacement: string) => {
+    const input = inputRef.current;
+    const start = input?.selectionStart ?? inputValue.length;
+    const end = input?.selectionEnd ?? inputValue.length;
+    const nextValue = inputValue.slice(0, start) + replacement + inputValue.slice(end);
+    const nextCursor = start + replacement.length;
+    setInputValueWithSelection(nextValue, nextCursor);
+  }, [inputValue, setInputValueWithSelection]);
+
+  const deleteInputSelection = useCallback((direction: "backward" | "forward") => {
+    const input = inputRef.current;
+    const start = input?.selectionStart ?? inputValue.length;
+    const end = input?.selectionEnd ?? inputValue.length;
+
+    if (start !== end) {
+      setInputValueWithSelection(inputValue.slice(0, start) + inputValue.slice(end), start);
+      return;
+    }
+
+    if (direction === "backward" && start > 0) {
+      setInputValueWithSelection(inputValue.slice(0, start - 1) + inputValue.slice(end), start - 1);
+      return;
+    }
+
+    if (direction === "forward" && end < inputValue.length) {
+      setInputValueWithSelection(inputValue.slice(0, start) + inputValue.slice(end + 1), start);
+      return;
+    }
+
+    focusInput();
+  }, [focusInput, inputValue, setInputValueWithSelection]);
+
+  const routeKeyToInput = useCallback((event: KeyboardEvent): boolean => {
+    if (!ready || event.defaultPrevented || event.isComposing) return false;
+    if (event.ctrlKey || event.metaKey || event.altKey) return false;
+
+    if (event.key === "Enter") {
+      if (event.shiftKey) {
+        replaceInputSelection("\n");
+      } else if (inputValue.trim()) {
+        void handleSend();
+      } else {
+        focusInput();
+      }
+      return true;
+    }
+
+    if (event.key === "Backspace") {
+      deleteInputSelection("backward");
+      return true;
+    }
+
+    if (event.key === "Delete") {
+      deleteInputSelection("forward");
+      return true;
+    }
+
+    if (event.key.length === 1) {
+      replaceInputSelection(event.key);
+      return true;
+    }
+
+    return false;
+  }, [deleteInputSelection, focusInput, handleSend, inputValue, ready, replaceInputSelection]);
+
+  useEffect(() => {
+    if (activeSessionId !== tabId) {
+      keyboardCaptureRef.current = false;
+      return;
+    }
+
+    function handleDocumentPointerDown(event: PointerEvent) {
+      keyboardCaptureRef.current = Boolean(viewRef.current?.contains(event.target as Node));
+    }
+
+    function handleDocumentKeyDown(event: KeyboardEvent) {
+      if (!keyboardCaptureRef.current || isInteractiveTarget(event.target)) return;
+      if (!routeKeyToInput(event)) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+    }
+
+    function handleDocumentPaste(event: ClipboardEvent) {
+      if (!keyboardCaptureRef.current || isInteractiveTarget(event.target) || !ready) return;
+
+      const text = event.clipboardData?.getData("text/plain");
+      if (!text) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      replaceInputSelection(text);
+    }
+
+    document.addEventListener("pointerdown", handleDocumentPointerDown, true);
+    document.addEventListener("keydown", handleDocumentKeyDown, true);
+    document.addEventListener("paste", handleDocumentPaste, true);
+    return () => {
+      document.removeEventListener("pointerdown", handleDocumentPointerDown, true);
+      document.removeEventListener("keydown", handleDocumentKeyDown, true);
+      document.removeEventListener("paste", handleDocumentPaste, true);
+    };
+  }, [activeSessionId, ready, replaceInputSelection, routeKeyToInput, tabId]);
 
   const handleViewMouseDown = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
-    if (isInteractiveTarget(event.target)) return;
+    if (event.button !== 0 || isInteractiveTarget(event.target)) return;
 
-    event.preventDefault();
+    keyboardCaptureRef.current = true;
+    if (!isSelectableChatTarget(event.target)) event.preventDefault();
     focusInput();
   }, [focusInput]);
 
-  const handleViewClick = useCallback(() => {
+  const handleViewMouseUp = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
+    if (isInteractiveTarget(event.target)) return;
+
+    keyboardCaptureRef.current = true;
+    if (window.getSelection()?.toString()) return;
+
     requestAnimationFrame(focusInput);
   }, [focusInput]);
 
@@ -337,7 +498,7 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
   }, [handleSend]);
 
   return (
-    <div className="pi-chat-view" onMouseDown={handleViewMouseDown} onClick={handleViewClick} style={chatStyle}>
+    <div ref={viewRef} className="pi-chat-view" onMouseDown={handleViewMouseDown} onMouseUp={handleViewMouseUp} style={chatStyle}>
       <div className="pi-chat-log" ref={scrollRef}>
         {messages.length === 0 ? (
           <div className="pi-chat-empty">{ready ? "send a message to pi..." : "starting pi..."}</div>
@@ -350,6 +511,7 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
             <span>Working...</span>
           </div>
         )}
+
       </div>
 
       <div className="pi-chat-input-shell">
@@ -361,9 +523,9 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
               value={inputValue}
               onChange={(event) => setInputValue(event.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={ready ? "type a message..." : "starting pi..."}
+              placeholder={ready ? (isStreaming ? "type a steering message..." : "type a message...") : "starting pi..."}
               rows={2}
-              disabled={!ready || isStreaming}
+              disabled={!ready}
             />
           </div>
 

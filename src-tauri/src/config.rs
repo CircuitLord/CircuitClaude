@@ -72,6 +72,17 @@ pub struct PinnedFileConfig {
     pub group: Option<String>,
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PiChatSettingsConfig {
+    #[serde(default)]
+    pub provider: Option<String>,
+    #[serde(default)]
+    pub model: Option<String>,
+    #[serde(default)]
+    pub thinking_level: Option<String>,
+}
+
 fn pinned_files_path(app_handle: &tauri::AppHandle) -> PathBuf {
     config_dir(app_handle).join("pinned_files.json")
 }
@@ -90,6 +101,27 @@ pub fn save_pinned_files(
 ) -> Result<(), String> {
     let path = pinned_files_path(app_handle);
     let json = serde_json::to_string_pretty(pins).map_err(|e| e.to_string())?;
+    fs::write(&path, json).map_err(|e| e.to_string())
+}
+
+fn pi_chat_settings_path(app_handle: &tauri::AppHandle) -> PathBuf {
+    config_dir(app_handle).join("pi_chat_settings.json")
+}
+
+pub fn load_pi_chat_settings(app_handle: &tauri::AppHandle) -> PiChatSettingsConfig {
+    let path = pi_chat_settings_path(app_handle);
+    match fs::read_to_string(&path) {
+        Ok(contents) => serde_json::from_str(&contents).unwrap_or_default(),
+        Err(_) => PiChatSettingsConfig::default(),
+    }
+}
+
+pub fn save_pi_chat_settings(
+    app_handle: &tauri::AppHandle,
+    settings: &PiChatSettingsConfig,
+) -> Result<(), String> {
+    let path = pi_chat_settings_path(app_handle);
+    let json = serde_json::to_string_pretty(settings).map_err(|e| e.to_string())?;
     fs::write(&path, json).map_err(|e| e.to_string())
 }
 
