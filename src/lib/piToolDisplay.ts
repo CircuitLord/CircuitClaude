@@ -275,6 +275,7 @@ export function summarizeToolArgs(name: string, rawArgs: unknown): string {
 export interface CompactToolOutputPreview {
   lines: string[];
   hiddenCount: number;
+  totalLines: number;
 }
 
 function stripAnsi(text: string): string {
@@ -306,5 +307,16 @@ export function compactToolOutputPreview(output: string, maxLines = 3): CompactT
   return {
     lines: lines.slice(-maxLines),
     hiddenCount,
+    totalLines: lines.length,
   };
+}
+
+export function formatToolDuration(durationMs: number | undefined): string | undefined {
+  if (durationMs === undefined || !Number.isFinite(durationMs) || durationMs < 0) return undefined;
+  if (durationMs < 1000) return `${Math.round(durationMs)}ms`;
+  const seconds = durationMs / 1000;
+  if (seconds < 60) return `${seconds.toFixed(seconds < 10 ? 1 : 0)}s`;
+  const minutes = Math.floor(seconds / 60);
+  const rest = Math.round(seconds % 60);
+  return `${minutes}m ${rest}s`;
 }

@@ -30,11 +30,16 @@ interface SettingsDialogProps {
   onClose: () => void;
 }
 
-const FONT_OPTIONS = [
+const TERMINAL_FONT_OPTIONS = [
   { label: "Cascadia Code", value: "'Cascadia Code', 'Consolas', 'Monaco', monospace" },
   { label: "Consolas", value: "'Consolas', 'Monaco', monospace" },
   { label: "Fira Code", value: "'Fira Code', 'Consolas', monospace" },
   { label: "JetBrains Mono", value: "'JetBrains Mono', 'Consolas', monospace" },
+];
+
+const PI_CHAT_FONT_OPTIONS = [
+  { label: "Inter", value: "'Inter', -apple-system, system-ui, sans-serif" },
+  ...TERMINAL_FONT_OPTIONS,
 ];
 
 const DEFAULT_MIC_OPTIONS = [{ label: "system default", value: "default" }];
@@ -455,11 +460,11 @@ function SettingsMainPage({
         <div className="settings-section-title">~font</div>
         <div className="settings-row">
           <div className="settings-row-label">
-            <span className="settings-row-name">font-family</span>
+            <span className="settings-row-name">terminal-font-family</span>
           </div>
           <CustomSelect
             value={settings.terminalFontFamily}
-            options={FONT_OPTIONS}
+            options={TERMINAL_FONT_OPTIONS}
             renderOption={(opt) => (
               <span style={{ fontFamily: opt.value }}>{opt.label}</span>
             )}
@@ -468,7 +473,20 @@ function SettingsMainPage({
         </div>
         <div className="settings-row">
           <div className="settings-row-label">
-            <span className="settings-row-name">font-size</span>
+            <span className="settings-row-name">pi-chat-font-family</span>
+          </div>
+          <CustomSelect
+            value={settings.piChatFontFamily}
+            options={PI_CHAT_FONT_OPTIONS}
+            renderOption={(opt) => (
+              <span style={{ fontFamily: opt.value }}>{opt.label}</span>
+            )}
+            onChange={(v) => update({ piChatFontFamily: v })}
+          />
+        </div>
+        <div className="settings-row">
+          <div className="settings-row-label">
+            <span className="settings-row-name">terminal-font-size</span>
           </div>
           <Stepper
             value={settings.terminalFontSize}
@@ -476,6 +494,18 @@ function SettingsMainPage({
             max={24}
             suffix="px"
             onChange={(v) => update({ terminalFontSize: v })}
+          />
+        </div>
+        <div className="settings-row">
+          <div className="settings-row-label">
+            <span className="settings-row-name">pi-chat-font-size</span>
+          </div>
+          <Stepper
+            value={settings.piChatFontSize}
+            min={10}
+            max={24}
+            suffix="px"
+            onChange={(v) => update({ piChatFontSize: v })}
           />
         </div>
       </div>

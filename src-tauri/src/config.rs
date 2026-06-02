@@ -137,6 +137,14 @@ fn default_font_size() -> f64 {
     15.0
 }
 
+fn default_pi_chat_font_size() -> f64 {
+    15.0
+}
+
+fn default_pi_chat_font_family() -> String {
+    "'Inter', -apple-system, system-ui, sans-serif".to_string()
+}
+
 fn default_font_family() -> String {
     "'Cascadia Code', 'Consolas', 'Monaco', monospace".to_string()
 }
@@ -184,6 +192,10 @@ pub struct SettingsConfig {
     pub terminal_font_size: f64,
     #[serde(default = "default_font_family")]
     pub terminal_font_family: String,
+    #[serde(default = "default_pi_chat_font_family")]
+    pub pi_chat_font_family: String,
+    #[serde(default = "default_pi_chat_font_size")]
+    pub pi_chat_font_size: f64,
     #[serde(default = "default_git_view_mode")]
     pub git_view_mode: String,
     #[serde(default = "default_sidebar_panel_mode")]

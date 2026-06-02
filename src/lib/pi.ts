@@ -7,6 +7,15 @@ export interface PiChatSettings {
   thinkingLevel?: PiThinkingLevel;
 }
 
+export interface PiSessionInfo {
+  path: string;
+  id: string;
+  name?: string;
+  firstMessage?: string;
+  modified: number;
+  messageCount: number;
+}
+
 export function createPiSession(
   projectPath: string,
   onEvent: Channel<PiRpcEvent>,
@@ -15,6 +24,10 @@ export function createPiSession(
     projectPath,
     onEvent,
   });
+}
+
+export function listPiSessions(projectPath: string): Promise<PiSessionInfo[]> {
+  return invoke<PiSessionInfo[]>("list_pi_sessions", { projectPath });
 }
 
 export function sendPiMessage(sessionId: string, message: string): Promise<void> {

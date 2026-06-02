@@ -7,11 +7,23 @@ use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
+use std::time::SystemTime;
 use tauri::ipc::Channel;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(transparent)]
 pub struct PiRpcEvent(pub serde_json::Value);
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PiSessionInfo {
+    pub path: String,
+    pub id: String,
+    pub name: Option<String>,
+    pub first_message: Option<String>,
+    pub modified: i64,
+    pub message_count: usize,
+}
 
 #[derive(Serialize)]
 #[serde(tag = "type")]
@@ -76,13 +88,26 @@ fn resolve_node_exe() -> Option<std::path::PathBuf> {
     let mut candidates = Vec::new();
 
     if let Some(program_files) = std::env::var_os("ProgramFiles") {
-        candidates.push(std::path::PathBuf::from(program_files).join("nodejs").join("node.exe"));
+        candidates.push(
+            std::path::PathBuf::from(program_files)
+                .join("nodejs")
+                .join("node.exe"),
+        );
     }
     if let Some(program_files_x86) = std::env::var_os("ProgramFiles(x86)") {
-        candidates.push(std::path::PathBuf::from(program_files_x86).join("nodejs").join("node.exe"));
+        candidates.push(
+            std::path::PathBuf::from(program_files_x86)
+                .join("nodejs")
+                .join("node.exe"),
+        );
     }
     if let Some(local_app_data) = std::env::var_os("LOCALAPPDATA") {
-        candidates.push(std::path::PathBuf::from(local_app_data).join("Programs").join("nodejs").join("node.exe"));
+        candidates.push(
+            std::path::PathBuf::from(local_app_data)
+                .join("Programs")
+                .join("nodejs")
+                .join("node.exe"),
+        );
     }
 
     if let Some(path) = std::env::var_os("PATH").or_else(|| std::env::var_os("Path")) {
@@ -105,7 +130,14 @@ fn resolve_pi_cli() -> Option<std::path::PathBuf> {
 
     candidates
         .into_iter()
-        .map(|npm_dir| npm_dir.join("node_modules").join("@earendil-works").join("pi-coding-agent").join("dist").join("cli.js"))
+        .map(|npm_dir| {
+            npm_dir
+                .join("node_modules")
+                .join("@earendil-works")
+                .join("pi-coding-agent")
+                .join("dist")
+                .join("cli.js")
+        })
         .find(|path| path.exists())
 }
 
@@ -126,16 +158,22 @@ fn terminate_child(child: &mut Child) {
     let _ = child.wait();
 }
 
-fn normal_pi_settings_path() -> Option<PathBuf> {
+fn pi_agent_dir() -> Option<PathBuf> {
     std::env::var_os("PI_CODING_AGENT_DIR")
         .map(PathBuf::from)
         .or_else(|| dirs::home_dir().map(|home| home.join(".pi").join("agent")))
-        .map(|dir| dir.join("settings.json"))
+}
+
+fn normal_pi_settings_path() -> Option<PathBuf> {
+    pi_agent_dir().map(|dir| dir.join("settings.json"))
 }
 
 fn read_settings_object(path: &PathBuf) -> Option<Map<String, Value>> {
     let contents = fs::read_to_string(path).ok()?;
-    serde_json::from_str::<Value>(&contents).ok()?.as_object().cloned()
+    serde_json::from_str::<Value>(&contents)
+        .ok()?
+        .as_object()
+        .cloned()
 }
 
 fn restore_field(
@@ -166,6 +204,125 @@ fn capture_normal_pi_settings() -> Option<Map<String, Value>> {
     Some(read_settings_object(&path).unwrap_or_default())
 }
 
+fn resolve_path_for_pi(path: &str) -> PathBuf {
+    let path = PathBuf::from(path);
+    if path.is_absolute() {
+        path
+    } else {
+        std::env::current_dir()
+            .unwrap_or_else(|_| PathBuf::from("."))
+            .join(path)
+    }
+}
+
+fn default_session_dir_for_project(project_path: &str) -> Option<PathBuf> {
+    let agent_dir = pi_agent_dir()?;
+    let resolved = resolve_path_for_pi(project_path)
+        .to_string_lossy()
+        .to_string();
+    let trimmed = resolved.trim_start_matches(['/', '\\']);
+    let safe_path: String = trimmed
+        .chars()
+        .map(|ch| match ch {
+            '/' | '\\' | ':' => '-',
+            _ => ch,
+        })
+        .collect();
+    Some(
+        agent_dir
+            .join("sessions")
+            .join(format!("--{}--", safe_path)),
+    )
+}
+
+fn system_time_millis(value: SystemTime) -> i64 {
+    value
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map(|duration| duration.as_millis() as i64)
+        .unwrap_or(0)
+}
+
+fn text_from_content(content: &Value) -> Option<String> {
+    if let Some(text) = content.as_str() {
+        let text = text.trim();
+        return (!text.is_empty()).then(|| text.to_string());
+    }
+
+    let text = content
+        .as_array()?
+        .iter()
+        .filter_map(|item| item.as_object())
+        .filter_map(|item| {
+            item.get("text")
+                .or_else(|| item.get("content"))
+                .and_then(Value::as_str)
+        })
+        .map(str::trim)
+        .filter(|text| !text.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ");
+    (!text.is_empty()).then_some(text)
+}
+
+fn read_pi_session_info(path: PathBuf) -> Option<PiSessionInfo> {
+    let contents = fs::read_to_string(&path).ok()?;
+    let mut id = None;
+    let mut name = None;
+    let mut first_message = None;
+    let mut message_count = 0;
+
+    for line in contents.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        let Ok(entry) = serde_json::from_str::<Value>(trimmed) else {
+            continue;
+        };
+        match entry.get("type").and_then(Value::as_str) {
+            Some("session") => {
+                id = entry.get("id").and_then(Value::as_str).map(ToString::to_string);
+            }
+            Some("session_info") => {
+                name = entry
+                    .get("name")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(ToString::to_string);
+            }
+            Some("message") => {
+                message_count += 1;
+                if first_message.is_none() {
+                    if let Some(message) = entry.get("message").and_then(Value::as_object) {
+                        if message.get("role").and_then(Value::as_str) == Some("user") {
+                            if let Some(content) = message.get("content") {
+                                first_message = text_from_content(content);
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let modified = fs::metadata(&path)
+        .and_then(|metadata| metadata.modified())
+        .map(system_time_millis)
+        .unwrap_or(0);
+
+    Some(PiSessionInfo {
+        path: path.to_string_lossy().to_string(),
+        id: id?,
+        name,
+        first_message,
+        modified,
+        message_count,
+    })
+}
+
 fn restore_normal_pi_defaults(
     snapshot: &Map<String, Value>,
     selected: &PiChatSettingsConfig,
@@ -178,12 +335,28 @@ fn restore_normal_pi_defaults(
     };
 
     let mut changed = false;
-    changed |= restore_field(&mut current, snapshot, "defaultProvider", selected.provider.as_ref());
-    changed |= restore_field(&mut current, snapshot, "defaultModel", selected.model.as_ref());
-    changed |= restore_field(&mut current, snapshot, "defaultThinkingLevel", selected.thinking_level.as_ref());
+    changed |= restore_field(
+        &mut current,
+        snapshot,
+        "defaultProvider",
+        selected.provider.as_ref(),
+    );
+    changed |= restore_field(
+        &mut current,
+        snapshot,
+        "defaultModel",
+        selected.model.as_ref(),
+    );
+    changed |= restore_field(
+        &mut current,
+        snapshot,
+        "defaultThinkingLevel",
+        selected.thinking_level.as_ref(),
+    );
 
     if changed {
-        let json = serde_json::to_string_pretty(&Value::Object(current)).map_err(|e| e.to_string())?;
+        let json =
+            serde_json::to_string_pretty(&Value::Object(current)).map_err(|e| e.to_string())?;
         fs::write(path, json).map_err(|e| e.to_string())?;
     }
 
@@ -207,7 +380,8 @@ impl PiManager {
         let normal_settings_snapshot = capture_normal_pi_settings();
 
         let mut cmd = build_pi_command()?;
-        cmd.arg("--mode").arg("rpc").arg("--no-session");
+        cmd.arg("--mode").arg("rpc");
+        // Fresh pichat tabs should be resumable, so do not pass --no-session.
         if let Some(settings) = &chat_settings {
             if let (Some(provider), Some(model)) = (&settings.provider, &settings.model) {
                 cmd.arg("--model").arg(format!("{}/{}", provider, model));
@@ -318,6 +492,31 @@ impl PiManager {
         Ok(session_id)
     }
 
+    pub fn list_project_sessions(&self, project_path: &str) -> Result<Vec<PiSessionInfo>, String> {
+        let Some(dir) = default_session_dir_for_project(project_path) else {
+            return Ok(Vec::new());
+        };
+        if !dir.exists() {
+            return Ok(Vec::new());
+        }
+
+        let mut sessions = Vec::new();
+        let entries =
+            fs::read_dir(&dir).map_err(|e| format!("Failed to read pi sessions: {}", e))?;
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|ext| ext.to_str()) != Some("jsonl") {
+                continue;
+            }
+            if let Some(info) = read_pi_session_info(path) {
+                sessions.push(info);
+            }
+        }
+
+        sessions.sort_by(|a, b| b.modified.cmp(&a.modified));
+        Ok(sessions)
+    }
+
     pub fn send_message(&self, session_id: &str, message: &str) -> Result<(), String> {
         let mut sessions = self.sessions.lock().unwrap();
         let session = sessions
@@ -336,7 +535,11 @@ impl PiManager {
         session.write_command(&PiCommand::Abort)
     }
 
-    pub fn send_command(&self, session_id: &str, command: &serde_json::Value) -> Result<(), String> {
+    pub fn send_command(
+        &self,
+        session_id: &str,
+        command: &serde_json::Value,
+    ) -> Result<(), String> {
         let mut sessions = self.sessions.lock().unwrap();
         let session = sessions
             .get_mut(session_id)

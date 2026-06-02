@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
 import { usePiSession } from "../hooks/usePiSession";
-import { savePiChatSettings } from "../lib/pi";
+import { listPiSessions, savePiChatSettings, type PiSessionInfo } from "../lib/pi";
 import { THEMES } from "../lib/themes";
 import { usePiChatStore } from "../stores/piChatStore";
 import { useProjectStore } from "../stores/projectStore";
 import { useSessionStore } from "../stores/sessionStore";
+import { useSettingsStore } from "../stores/settingsStore";
 import type { PiModel, PiPermissionMode, PiThinkingLevel } from "../lib/piRpc";
 import { getSupportedThinkingLevels } from "../lib/piRpc";
 import { PiChatMessageView } from "./PiChatBlocks";
@@ -22,6 +23,15 @@ interface AvailableModelsResponse {
 interface PiStateResponse {
   model?: PiModel | null;
   thinkingLevel?: PiThinkingLevel;
+  sessionName?: string;
+}
+
+interface PiMessagesResponse {
+  messages?: unknown[];
+}
+
+interface PiSwitchSessionResponse {
+  cancelled?: boolean;
 }
 
 const EMPTY_MESSAGES = [] as const;
@@ -68,6 +78,20 @@ function isInteractiveTarget(target: EventTarget | null): boolean {
 
 function isSelectableChatTarget(target: EventTarget | null): boolean {
   return target instanceof Element && Boolean(target.closest(".pi-chat-message, .pi-chat-empty, .pi-chat-working"));
+}
+
+function sessionDisplayName(session: PiSessionInfo): string {
+  return session.name || session.firstMessage || session.id;
+}
+
+function formatSessionAge(timestamp: number): string {
+  if (!timestamp) return "old";
+  const ageMs = Date.now() - timestamp;
+  const minutes = Math.max(0, Math.floor(ageMs / 60_000));
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 48) return `${hours}h`;
+  return `${Math.floor(hours / 24)}d`;
 }
 
 function PiChatSelect<T extends string>({
@@ -156,6 +180,7 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
   const viewRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const loadMenuRef = useRef<HTMLDivElement>(null);
   const keyboardCaptureRef = useRef(false);
   const pendingInputSelectionRef = useRef<{ start: number; end: number } | null>(null);
   const [inputValue, setInputValue] = useState("");
@@ -163,6 +188,10 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
   const [availableModels, setAvailableModels] = useState<PiModel[]>([]);
   const [currentModel, setCurrentModel] = useState<PiModel | null>(null);
   const [thinkingLevel, setThinkingLevel] = useState<PiThinkingLevel>("off");
+  const [loadMenuOpen, setLoadMenuOpen] = useState(false);
+  const [loadSessions, setLoadSessions] = useState<PiSessionInfo[]>([]);
+  const [loadSessionsLoading, setLoadSessionsLoading] = useState(false);
+  const [loadSessionsError, setLoadSessionsError] = useState<string | null>(null);
   const [, setToolbarError] = useState<string | null>(null);
 
   const messages = usePiChatStore(
@@ -174,10 +203,14 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
   const syncedPermissionMode = usePiChatStore(
     useCallback((state) => state.permissionModes.get(tabId) ?? "default", [tabId]),
   );
+  const setMessagesFromPi = usePiChatStore((state) => state.setMessagesFromPi);
   const addUserMessage = usePiChatStore((state) => state.addUserMessage);
   const appendError = usePiChatStore((state) => state.appendError);
   const setTabStatus = useSessionStore((state) => state.setTabStatus);
+  const setSessionTitle = useSessionStore((state) => state.setSessionTitle);
   const activeSessionId = useSessionStore((state) => state.activeSessionId);
+  const piChatFontFamily = useSettingsStore((state) => state.settings.piChatFontFamily);
+  const piChatFontSize = useSettingsStore((state) => state.settings.piChatFontSize);
   const projectTheme = useProjectStore((state) => state.projects.find((project) => project.path === projectPath)?.theme ?? "midnight");
   const { ready, backendId, sendMessage, sendCommand, interrupt } = usePiSession({ tabId, projectPath });
 
@@ -192,6 +225,8 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
   const chatTheme = THEMES[projectTheme] ?? THEMES.midnight;
   const chatStyle = {
     "--pi-chat-project-highlight": chatTheme.css["--accent-text"],
+    "--pi-chat-font-family": piChatFontFamily,
+    "--pi-chat-font-size": `${piChatFontSize}px`,
   } as CSSProperties;
 
   useEffect(() => {
@@ -257,6 +292,78 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
       cancelled = true;
     };
   }, [ready, sendCommand]);
+
+  useEffect(() => {
+    if (!loadMenuOpen) return;
+
+    function handleClick(event: MouseEvent) {
+      if (loadMenuRef.current && !loadMenuRef.current.contains(event.target as Node)) {
+        setLoadMenuOpen(false);
+      }
+    }
+
+    function handleKey(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        setLoadMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClick);
+    window.addEventListener("keydown", handleKey, true);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      window.removeEventListener("keydown", handleKey, true);
+    };
+  }, [loadMenuOpen]);
+
+  const loadCurrentMessages = useCallback(async () => {
+    const response = await sendCommand<PiMessagesResponse>({ type: "get_messages" });
+    setMessagesFromPi(tabId, Array.isArray(response.messages) ? response.messages : []);
+  }, [sendCommand, setMessagesFromPi, tabId]);
+
+  const refreshLoadSessions = useCallback(async () => {
+    setLoadSessionsLoading(true);
+    setLoadSessionsError(null);
+    try {
+      setLoadSessions(await listPiSessions(projectPath));
+    } catch (err) {
+      setLoadSessions([]);
+      setLoadSessionsError(String(err));
+    } finally {
+      setLoadSessionsLoading(false);
+    }
+  }, [projectPath]);
+
+  const handleLoadMenuToggle = useCallback(() => {
+    if (!ready || isStreaming) return;
+    setLoadMenuOpen((current) => {
+      const next = !current;
+      if (next) void refreshLoadSessions();
+      return next;
+    });
+  }, [isStreaming, ready, refreshLoadSessions]);
+
+  const handleLoadSession = useCallback(async (session: PiSessionInfo) => {
+    if (!ready || isStreaming) return;
+    setLoadMenuOpen(false);
+    setTabStatus(tabId, "thinking");
+
+    try {
+      const result = await sendCommand<PiSwitchSessionResponse>({ type: "switch_session", sessionPath: session.path });
+      if (result.cancelled) return;
+      await loadCurrentMessages();
+      const state = await sendCommand<PiStateResponse>({ type: "get_state" });
+      if (state.model) setCurrentModel(state.model);
+      if (state.thinkingLevel) setThinkingLevel(state.thinkingLevel);
+      setSessionTitle(tabId, `pi: ${sessionDisplayName(session)}`);
+      setToolbarError(null);
+    } catch (err) {
+      appendError(tabId, String(err));
+    } finally {
+      setTabStatus(tabId, null);
+    }
+  }, [appendError, isStreaming, loadCurrentMessages, ready, sendCommand, setSessionTitle, setTabStatus, tabId]);
 
   const handleSend = useCallback(async () => {
     const text = inputValue.trim();
@@ -499,6 +606,40 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
 
   return (
     <div ref={viewRef} className="pi-chat-view" onMouseDown={handleViewMouseDown} onMouseUp={handleViewMouseUp} style={chatStyle}>
+      <div className="pi-chat-top-actions" ref={loadMenuRef}>
+        <button
+          type="button"
+          className="pi-chat-load-trigger"
+          onClick={handleLoadMenuToggle}
+          disabled={!ready || isStreaming}
+        >
+          :load
+        </button>
+        {loadMenuOpen && (
+          <div className="pi-chat-load-dropdown">
+            {loadSessionsLoading && <div className="pi-chat-load-empty">loading sessions...</div>}
+            {loadSessionsError && <div className="pi-chat-load-empty">error: {loadSessionsError}</div>}
+            {!loadSessionsLoading && !loadSessionsError && loadSessions.length === 0 && (
+              <div className="pi-chat-load-empty">no pi sessions for this project</div>
+            )}
+            {!loadSessionsLoading && loadSessions.map((session) => (
+              <button
+                type="button"
+                key={session.path}
+                className="pi-chat-load-option"
+                onClick={() => handleLoadSession(session)}
+                title={session.path}
+              >
+                <span className="pi-chat-load-marker">{">"}</span>
+                <span className="pi-chat-load-main">
+                  <span className="pi-chat-load-name">{sessionDisplayName(session)}</span>
+                  <span className="pi-chat-load-meta">{session.messageCount} msg · {formatSessionAge(session.modified)} ago</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
       <div className="pi-chat-log" ref={scrollRef}>
         {messages.length === 0 ? (
           <div className="pi-chat-empty">{ready ? "send a message to pi..." : "starting pi..."}</div>

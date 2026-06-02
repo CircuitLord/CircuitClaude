@@ -1,10 +1,10 @@
 use crate::claude_manager::{ClaudeEvent, ClaudeManager};
 use crate::config::{self, PiChatSettingsConfig, PinnedFileConfig, ProjectConfig, SettingsConfig};
 use crate::conversation;
-use crate::git;
-use crate::pty_manager::{AttachStreamResult, PtyManager, PtyOutputEvent, PtySessionInfo};
-use crate::pi_manager::{PiManager, PiRpcEvent};
 use crate::file_watcher::FileWatcherManager;
+use crate::git;
+use crate::pi_manager::{PiManager, PiRpcEvent, PiSessionInfo};
+use crate::pty_manager::{AttachStreamResult, PtyManager, PtyOutputEvent, PtySessionInfo};
 use crate::whisper_manager::{DownloadProgress, ModelInfo, WhisperEvent, WhisperManager};
 use tauri::ipc::Channel;
 use tauri::State;
@@ -379,6 +379,14 @@ pub fn create_pi_session(
 }
 
 #[tauri::command]
+pub fn list_pi_sessions(
+    pi_manager: State<'_, PiManager>,
+    project_path: String,
+) -> Result<Vec<PiSessionInfo>, String> {
+    pi_manager.list_project_sessions(&project_path)
+}
+
+#[tauri::command]
 pub fn send_pi_message(
     pi_manager: State<'_, PiManager>,
     session_id: String,
@@ -724,9 +732,7 @@ pub async fn whisper_load_model(
 }
 
 #[tauri::command]
-pub fn whisper_get_available_models(
-    whisper_manager: State<'_, WhisperManager>,
-) -> Vec<ModelInfo> {
+pub fn whisper_get_available_models(whisper_manager: State<'_, WhisperManager>) -> Vec<ModelInfo> {
     whisper_manager.get_available_models()
 }
 

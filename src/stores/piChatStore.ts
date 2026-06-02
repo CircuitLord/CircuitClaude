@@ -12,6 +12,8 @@ import {
   getPermissionModeFromStatus,
   isFinalPiCompletionEvent,
   normalizePiError,
+  readNumber,
+  readRecord,
   readString,
   toolSnapshotFromExecutionEvent,
   type PiPermissionMode,
@@ -25,7 +27,7 @@ export type { PiRpcEvent } from "../lib/piRpc";
 export type PiChatBlock =
   | { type: "text"; content: string; contentIndex?: number }
   | { type: "thinking"; content: string; contentIndex?: number }
-  | { type: "tool"; id: string; name: string; args: unknown; output: string; status: PiToolStatus; aggregate?: PiToolAggregate; contentIndex?: number; hidden?: boolean }
+  | { type: "tool"; id: string; name: string; args: unknown; output: string; status: PiToolStatus; aggregate?: PiToolAggregate; contentIndex?: number; hidden?: boolean; startedAt?: number; durationMs?: number }
   | { type: "error"; content: string };
 
 export interface PiChatMessage {
@@ -43,6 +45,7 @@ interface PiChatState {
   queuedSteering: Map<string, string[]>;
   queuedFollowUp: Map<string, string[]>;
   toolCallArgs: Map<string, Map<string, PiToolSnapshot>>;
+  setMessagesFromPi: (tabId: string, rawMessages: unknown[]) => void;
   addUserMessage: (tabId: string, text: string) => void;
   appendEvent: (tabId: string, event: PiRpcEvent) => void;
   appendError: (tabId: string, message: string) => void;
@@ -373,11 +376,15 @@ function upsertNormalTool(messages: PiChatMessage[], tool: PiToolSnapshot, id: s
     const index = next.findIndex((block) => block.type === "tool" && !block.aggregate && block.id === id);
 
     if (index === -1) {
-      return insertBlockInStreamOrder(next, { type: "tool", ...tool, id });
+      return insertBlockInStreamOrder(next, { type: "tool", ...tool, id, startedAt: Date.now() });
     }
 
     const existing = next[index];
     if (existing.type === "tool") {
+      const isTerminal = tool.status === "done" || tool.status === "error";
+      const durationMs = isTerminal && existing.durationMs === undefined && existing.startedAt !== undefined
+        ? Date.now() - existing.startedAt
+        : existing.durationMs;
       next[index] = {
         ...existing,
         name: tool.name || existing.name,
@@ -385,6 +392,7 @@ function upsertNormalTool(messages: PiChatMessage[], tool: PiToolSnapshot, id: s
         output: tool.output || existing.output,
         status: tool.status,
         hidden: false,
+        durationMs,
       };
     }
     return next;
@@ -627,6 +635,125 @@ function updateToolCallArgs(
   return next;
 }
 
+function timestampFromMessage(message: Record<string, unknown>): number {
+  return readNumber(message.timestamp) ?? Date.now();
+}
+
+function blocksFromPiContent(content: unknown): PiChatBlock[] {
+  if (typeof content === "string") return content ? [{ type: "text", content }] : [];
+  if (!Array.isArray(content)) return [];
+
+  return content.flatMap((part): PiChatBlock[] => {
+    const item = readRecord(part);
+    if (!item) return [];
+
+    switch (readString(item.type)) {
+      case "text": {
+        const text = readString(item.text) || readString(item.content);
+        return text ? [{ type: "text", content: text }] : [];
+      }
+      case "thinking": {
+        const thinking = readString(item.thinking) || readString(item.text) || readString(item.content);
+        return thinking ? [{ type: "thinking", content: thinking }] : [];
+      }
+      case "toolCall": {
+        const id = readString(item.id) || crypto.randomUUID();
+        return [{
+          type: "tool",
+          id,
+          name: readString(item.name) || "tool",
+          args: item.arguments ?? item.args ?? null,
+          output: "",
+          status: "done",
+        }];
+      }
+      default:
+        return [];
+    }
+  });
+}
+
+function piRawMessagesToChatMessages(rawMessages: unknown[]): PiChatMessage[] {
+  let messages: PiChatMessage[] = [];
+
+  for (const rawMessage of rawMessages) {
+    const message = readRecord(rawMessage);
+    if (!message) continue;
+
+    const timestamp = timestampFromMessage(message);
+    switch (readString(message.role)) {
+      case "user": {
+        const content = extractTextContent(message);
+        messages = [...messages, {
+          id: crypto.randomUUID(),
+          role: "user",
+          blocks: content ? [{ type: "text", content }] : [],
+          timestamp,
+        }];
+        break;
+      }
+      case "assistant": {
+        const blocks = blocksFromPiContent(message.content);
+        const error = readString(message.errorMessage);
+        messages = [...messages, {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          blocks: error ? [...blocks, { type: "error", content: error }] : blocks,
+          timestamp,
+        }];
+        break;
+      }
+      case "toolResult": {
+        const id = readString(message.toolCallId) || crypto.randomUUID();
+        messages = upsertTool(messages, {
+          id,
+          name: readString(message.toolName) || "tool",
+          args: null,
+          output: extractTextContent(message),
+          status: message.isError === true ? "error" : "done",
+        });
+        break;
+      }
+      case "bashExecution": {
+        messages = upsertTool(messages, {
+          id: crypto.randomUUID(),
+          name: "bash",
+          args: { command: readString(message.command) },
+          output: readString(message.output),
+          status: message.cancelled === true || (readNumber(message.exitCode) !== undefined && readNumber(message.exitCode) !== 0) ? "error" : "done",
+        });
+        break;
+      }
+      case "custom": {
+        if (message.display === false) break;
+        const content = extractTextContent(message);
+        if (!content) break;
+        messages = [...messages, {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          blocks: [{ type: "text", content }],
+          timestamp,
+        }];
+        break;
+      }
+      case "branchSummary":
+      case "compactionSummary": {
+        const summary = readString(message.summary);
+        if (!summary) break;
+        messages = [...messages, {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          blocks: [{ type: "text", content: summary }],
+          timestamp,
+        }];
+        break;
+      }
+    }
+  }
+
+  return messages.map((message) => ({ ...message, streaming: false }));
+}
+
 function updateStreamingTabs(streamingTabs: Set<string>, tabId: string, event: PiRpcEvent): Set<string> {
   const next = new Set(streamingTabs);
   switch (event.type) {
@@ -672,6 +799,17 @@ export const usePiChatStore = create<PiChatState>((set) => ({
   queuedSteering: new Map(),
   queuedFollowUp: new Map(),
   toolCallArgs: new Map(),
+
+  setMessagesFromPi: (tabId, rawMessages) =>
+    set((state) => {
+      const chats = new Map(state.chats);
+      chats.set(tabId, piRawMessagesToChatMessages(rawMessages));
+      const streamingTabs = new Set(state.streamingTabs);
+      streamingTabs.delete(tabId);
+      const toolCallArgs = new Map(state.toolCallArgs);
+      toolCallArgs.delete(tabId);
+      return { chats, streamingTabs, toolCallArgs };
+    }),
 
   addUserMessage: (tabId, text) =>
     set((state) => {

@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>pi-chat · bash tool style directions</title>
+<style>
+  :root {
+    --bg-base:      #0a0a0e;
+    --bg-elevated:  #16161b;
+    --border-subtle:  #1c1c23;
+    --border-visible: #26262e;
+    --text-primary:   #e4e4ee;
+    --text-secondary: #9898a6;
+    --text-tertiary:  #7e7e8e;
+    --accent:         #7c3aed;
+    --accent-text:    #a78bfa;
+    --accent-muted:   rgba(124, 58, 237, 0.15);
+    --git-added:      #3fb950;
+    --git-deleted:    #f85149;
+    --font-mono:      'Cascadia Code', 'Consolas', 'Monaco', monospace;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(1100px 600px at 80% -10%, rgba(124,58,237,0.08), transparent 60%),
+      var(--bg-base);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.5;
+    padding: 48px 0 96px;
+  }
+
+  .col { max-width: 760px; margin: 0 auto; padding: 0 24px; }
+
+  h1 {
+    font-size: 13px; font-weight: 400; color: var(--text-tertiary);
+    letter-spacing: 0; margin: 0 0 4px;
+  }
+  h1 b { color: var(--accent-text); font-weight: 400; }
+  .sub { color: var(--text-tertiary); font-size: 12px; margin: 0 0 40px; }
+
+  .variant { margin: 0 0 44px; }
+  .variant > .tag {
+    color: var(--text-tertiary); font-size: 12px;
+    padding: 0 0 10px; display: flex; gap: 10px; align-items: baseline;
+  }
+  .variant > .tag b { color: var(--text-secondary); font-weight: 400; }
+  .variant > .tag .pick { color: var(--accent-text); }
+  .note { color: var(--text-tertiary); font-size: 11.5px; margin: 8px 0 0 1px; }
+
+  pre { margin: 0; font-family: var(--font-mono); white-space: pre-wrap; word-break: break-word; }
+
+  /* ============ shared base (current) ============ */
+  .tool { padding: 6px 0; color: var(--text-tertiary); }
+  .tool-line { display: flex; align-items: baseline; gap: 0; min-width: 0; }
+  .dot { width: 1ch; flex: 0 0 1ch; margin-right: 7px; }
+  .dot.ok::before  { content: "●"; color: var(--git-added); }
+  .dot.err::before { content: "●"; color: var(--git-deleted); }
+  .dot.run::before { content: "●"; color: var(--text-tertiary); animation: cyc 2.4s steps(1) infinite; }
+  @keyframes cyc { 0%{color:var(--text-tertiary)} 33%{color:var(--accent-text)} 66%{color:var(--accent)} 100%{color:var(--accent-text)} }
+  .title { color: var(--text-secondary); flex-shrink: 0; }
+  .paren { color: var(--text-tertiary); }
+  .arg   { color: var(--accent-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .out {
+    max-height: 160px; overflow: auto; margin: 6px 0 0 2.2ch; padding: 0 0 0 10px;
+    border-left: 1px solid color-mix(in srgb, var(--accent-text) 35%, transparent);
+    color: var(--text-secondary); font-size: 12px; line-height: 1.5;
+  }
+  .out.err { border-left-color: rgba(248,81,73,0.35); color: var(--git-deleted); }
+
+  /* ============ A. shell prompt ============ */
+  .a .prompt { display: flex; align-items: baseline; gap: 0; }
+  .a .sigil { width: 1ch; flex: 0 0 1ch; margin-right: 8px; color: var(--accent-text); }
+  .a .sigil.run::after { content: "▌"; color: var(--accent-text); animation: blink 1.1s steps(1) infinite; }
+  @keyframes blink { 0%,50%{opacity:1} 51%,100%{opacity:0} }
+  .a .cmd { color: var(--text-primary); }
+  .a .exit { margin-left: auto; padding-left: 12px; font-size: 11.5px; white-space: nowrap; }
+  .a .exit.ok  { color: var(--text-tertiary); }
+  .a .exit.ok b { color: var(--git-added); font-weight: 400; }
+  .a .exit.err { color: var(--git-deleted); }
+  .a .out { margin-left: 1ch; }
+
+  /* ============ B. metadata tags (minimal) ============ */
+  .b .meta { margin-left: auto; padding-left: 12px; display: flex; gap: 10px; font-size: 11px; color: var(--text-tertiary); }
+  .b .meta .code { color: var(--git-added); }
+  .b .meta .code.bad { color: var(--git-deleted); }
+
+  /* ============ C. framed terminal block ============ */
+  .c .term {
+    margin: 4px 0; border-radius: 5px; overflow: hidden;
+    border: 1px solid var(--border-subtle); background: rgba(0,0,0,0.25);
+  }
+  .c .bar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 10px; background: var(--bg-elevated);
+    border-bottom: 1px solid var(--border-subtle);
+    color: var(--text-tertiary); font-size: 11px;
+  }
+  .c .bar .dot2 { width: 6px; height: 6px; border-radius: 50%; background: var(--git-added); }
+  .c .bar .dot2.err { background: var(--git-deleted); }
+  .c .bar .dot2.run { background: var(--accent-text); animation: blink 1.1s steps(1) infinite; }
+  .c .bar .name { color: var(--text-secondary); }
+  .c .bar .spacer { margin-left: auto; }
+  .c .bar .ok  { color: var(--git-added); }
+  .c .bar .bad { color: var(--git-deleted); }
+  .c .body { padding: 8px 12px; }
+  .c .body .cmd { color: var(--text-primary); }
+  .c .body .cmd .sig { color: var(--accent-text); margin-right: 8px; }
+  .c .body .res { margin: 6px 0 0; color: var(--text-secondary); font-size: 12px; }
+  .c .body .res.err { color: var(--git-deleted); }
+</style>
+</head>
+<body>
+<div class="col">
+  <h1>pi-chat · <b>bash tool</b> style directions</h1>
+  <p class="sub">all use the live theme vars + TUI guide (mono, ascii, flat, step-end). compare, then pick.</p>
+
+  <!-- CURRENT -->
+  <div class="variant">
+    <div class="tag"><b>current</b> — looks like every other tool; bash output is the only tell</div>
+    <div class="tool">
+      <div class="tool-line"><span class="dot ok"></span><span class="title">bash</span><span class="paren">(</span><span class="arg">npm run build</span><span class="paren">)</span></div>
+      <pre class="out">⎿ vite v5.4.2 building for production...
+✓ 142 modules transformed.
+dist/index.html  0.46 kB</pre>
+    </div>
+  </div>
+
+  <!-- A -->
+  <div class="variant a">
+    <div class="tag"><b>A · shell prompt</b> <span class="pick">recommended</span> — command IS the content. drop the <code>bash(...)</code> wrapper, echo it like a real prompt + exit code</div>
+    <div class="tool">
+      <div class="prompt"><span class="sigil">$</span><span class="cmd">npm run build</span><span class="exit ok">exit <b>0</b> · 1.4s</span></div>
+      <pre class="out">⎿ vite v5.4.2 building for production...
+✓ 142 modules transformed.
+dist/index.html  0.46 kB</pre>
+    </div>
+    <div class="tool">
+      <div class="prompt"><span class="sigil">$</span><span class="cmd">cargo check</span><span class="exit err">exit 101 · 0.9s</span></div>
+      <pre class="out err">⎿ error[E0277]: `PtyManager` cannot be shared between threads safely
+   --> src/commands.rs:88:14</pre>
+    </div>
+    <div class="tool">
+      <div class="prompt"><span class="sigil run"></span><span class="cmd">npm run dev</span></div>
+      <pre class="out">⎿ VITE v5.4.2  ready in 312 ms</pre>
+    </div>
+    <p class="note">sigil <code>$</code> in accent · running shows a blinking block cursor (xterm-style) instead of <code>$</code> · exit code right-aligned, green/red</p>
+  </div>
+
+  <!-- B -->
+  <div class="variant b">
+    <div class="tag"><b>B · metadata tags</b> — smallest change. keep dot+title, add exit code + duration right-aligned</div>
+    <div class="tool">
+      <div class="tool-line"><span class="dot ok"></span><span class="title">bash</span><span class="paren">(</span><span class="arg">npm run build</span><span class="paren">)</span><span class="meta"><span>1.4s</span><span class="code">0</span></span></div>
+      <pre class="out">⎿ ✓ 142 modules transformed.</pre>
+    </div>
+    <div class="tool">
+      <div class="tool-line"><span class="dot err"></span><span class="title">bash</span><span class="paren">(</span><span class="arg">cargo check</span><span class="paren">)</span><span class="meta"><span>0.9s</span><span class="code bad">101</span></span></div>
+      <pre class="out err">⎿ error[E0277]: cannot be shared between threads safely</pre>
+    </div>
+    <p class="note">non-destructive — fits cleanly on top of current markup. less terminal-flavored than A</p>
+  </div>
+
+  <!-- C -->
+  <div class="variant c">
+    <div class="tag"><b>C · framed terminal block</b> <span class="pick">SHIPPED</span> — ✓/✗ glyph + duration (no numeric exit code, not tracked)</div>
+    <div class="tool">
+      <div class="term">
+        <div class="bar"><span class="dot2"></span><span class="name">bash</span><span class="spacer"></span><span class="ok">✓</span><span>1.4s</span></div>
+        <div class="body">
+          <div class="cmd"><span class="sig">$</span>npm run build</div>
+          <pre class="res">vite v5.4.2 building for production...
+✓ 142 modules transformed.</pre>
+        </div>
+      </div>
+    </div>
+    <div class="tool">
+      <div class="term">
+        <div class="bar"><span class="dot2 err"></span><span class="name">bash</span><span class="spacer"></span><span class="bad">✗</span><span>0.9s</span></div>
+        <div class="body">
+          <div class="cmd"><span class="sig">$</span>cargo check</div>
+          <pre class="res err">error[E0277]: cannot be shared between threads safely</pre>
+        </div>
+      </div>
+    </div>
+    <div class="tool">
+      <div class="term">
+        <div class="bar"><span class="dot2 run"></span><span class="name">bash</span><span class="spacer"></span></div>
+        <div class="body">
+          <div class="cmd"><span class="sig">$</span>npm run dev</div>
+          <pre class="res">Running…</pre>
+        </div>
+      </div>
+    </div>
+    <p class="note">running → blinking accent dot in the bar, no glyph/duration yet · duration formats ms / s / m s · note: cards conflict with the flat-row TUI principle in system.md</p>
+  </div>
+
+  <!-- ===================== HIDDEN-LINE TREATMENTS ===================== -->
+  <h1 style="margin-top:64px">hidden-line <b>indicator</b></h1>
+  <p class="sub">current: <code>… 9 earlier lines hidden</code> — a prose sentence inside the output. three terser options.</p>
+
+  <!-- H0 current -->
+  <div class="variant c">
+    <div class="tag"><b>current</b> — full sentence, consumes a line, has plural logic</div>
+    <div class="tool"><div class="term">
+      <div class="bar"><span class="dot2"></span><span class="name">bash</span><span class="spacer"></span><span class="ok">✓</span><span>0.4s</span></div>
+      <div class="body">
+        <div class="cmd"><span class="sig">$</span>npm test</div>
+        <pre class="res" style="color:var(--text-tertiary)">… 9 earlier lines hidden
+<span style="color:var(--text-secondary)">PASS  src/lib/piToolDisplay.test.ts
+PASS  src/stores/piChatStore.test.ts
+Tests: 24 passed, 24 total</span></pre>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- H1 count in bar -->
+  <div class="variant c">
+    <div class="tag"><b>1 · count in title bar</b> <span class="pick">recommended</span> — total line count as metadata, output shows the tail</div>
+    <div class="tool"><div class="term">
+      <div class="bar"><span class="dot2"></span><span class="name">bash</span><span class="spacer"></span><span style="color:var(--text-tertiary)">12 lines</span><span class="ok">✓</span><span>0.4s</span></div>
+      <div class="body">
+        <div class="cmd"><span class="sig">$</span>npm test</div>
+        <pre class="res">PASS  src/lib/piToolDisplay.test.ts
+PASS  src/stores/piChatStore.test.ts
+Tests: 24 passed, 24 total</pre>
+      </div>
+    </div></div>
+    <p class="note">no prose, no extra row · count is total output length, hidden lines implied by showing only the tail</p>
+  </div>
+
+  <!-- H2 fade mask -->
+  <div class="variant c">
+    <div class="tag"><b>2 · top fade mask + marker</b> — fade the top edge → "more above" without words</div>
+    <div class="tool"><div class="term">
+      <div class="bar"><span class="dot2"></span><span class="name">bash</span><span class="spacer"></span><span class="ok">✓</span><span>0.4s</span></div>
+      <div class="body" style="position:relative">
+        <div class="cmd"><span class="sig">$</span>npm test</div>
+        <pre class="res" style="-webkit-mask-image:linear-gradient(180deg,transparent 0,#000 22px);mask-image:linear-gradient(180deg,transparent 0,#000 22px)">PASS  src/components/PiChatBlocks.test.tsx
+PASS  src/lib/piToolDisplay.test.ts
+PASS  src/stores/piChatStore.test.ts
+Tests: 24 passed, 24 total</pre>
+        <span style="position:absolute;top:6px;right:0;font-size:11px;color:var(--text-tertiary)">⋯9</span>
+      </div>
+    </div></div>
+    <p class="note">purely visual · dim <code>⋯9</code> pinned top-right · pairs well with option 1</p>
+  </div>
+
+  <!-- H3 expandable -->
+  <div class="variant c">
+    <div class="tag"><b>3 · expandable fold</b> — collapsed shows tail + <code>⋯ 9 more</code>; click expands. reuses thinking-fold</div>
+    <div class="tool"><div class="term">
+      <div class="bar"><span class="dot2"></span><span class="name">bash</span><span class="spacer"></span><span class="ok">✓</span><span>0.4s</span></div>
+      <div class="body">
+        <div class="cmd"><span class="sig">$</span>npm test</div>
+        <pre class="res"><span style="color:var(--accent-text);cursor:pointer">⋯ 9 more</span>
+PASS  src/stores/piChatStore.test.ts
+Tests: 24 passed, 24 total</pre>
+      </div>
+    </div></div>
+    <p class="note">only option that lets users actually read the hidden lines · <code>⋯ N more</code> in accent = clickable affordance (matches the <code>:</code>-prefix convention)</p>
+  </div>
+
+</div>
+</body>
+</html>

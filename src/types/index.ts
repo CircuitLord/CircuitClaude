@@ -109,6 +109,8 @@ export interface Settings {
   syntaxTheme: SyntaxThemeName;
   terminalFontSize: number;
   terminalFontFamily: string;
+  piChatFontFamily: string;
+  piChatFontSize: number;
   gitViewMode: "file" | "tree";
   sidebarPanelMode: "source" | "files";
   notesPanelOpen: boolean;
@@ -126,6 +128,8 @@ export const DEFAULT_SETTINGS: Settings = {
   syntaxTheme: "github-dark",
   terminalFontSize: 15,
   terminalFontFamily: "'Cascadia Code', 'Consolas', 'Monaco', monospace",
+  piChatFontFamily: "'Inter', -apple-system, system-ui, sans-serif",
+  piChatFontSize: 15,
   gitViewMode: "file",
   sidebarPanelMode: "source",
   notesPanelOpen: false,

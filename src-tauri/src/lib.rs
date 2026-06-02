@@ -6,8 +6,8 @@ mod config;
 mod conversation;
 mod file_watcher;
 mod git;
-mod pty_manager;
 mod pi_manager;
+mod pty_manager;
 mod whisper_manager;
 
 fn resolve_bridge_path(app: &tauri::App) -> String {
@@ -73,6 +73,7 @@ pub fn run() {
             commands::interrupt_claude_session,
             commands::destroy_claude_session,
             commands::create_pi_session,
+            commands::list_pi_sessions,
             commands::send_pi_message,
             commands::abort_pi_session,
             commands::send_pi_command,
