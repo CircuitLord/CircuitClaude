@@ -27,6 +27,7 @@ interface PendingCommand {
 export function usePiSession({ tabId, projectPath, title = "pi chat" }: UsePiSessionOptions): UsePiSessionResult {
   const backendIdRef = useRef<string | null>(null);
   const pendingCommandsRef = useRef(new Map<string, PendingCommand>());
+  const statusClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [ready, setReady] = useState(false);
   const [backendId, setBackendId] = useState<string | null>(null);
 
@@ -62,7 +63,18 @@ export function usePiSession({ tabId, projectPath, title = "pi chat" }: UsePiSes
       appendEvent(tabId, event);
       const status = getPiTabStatusForEvent(event);
       if (status !== undefined) {
-        setTabStatus(tabId, status);
+        if (statusClearTimerRef.current) {
+          clearTimeout(statusClearTimerRef.current);
+          statusClearTimerRef.current = null;
+        }
+        if (status === null) {
+          statusClearTimerRef.current = setTimeout(() => {
+            statusClearTimerRef.current = null;
+            setTabStatus(tabId, null);
+          }, 450);
+        } else {
+          setTabStatus(tabId, status);
+        }
       }
     };
 
@@ -86,6 +98,10 @@ export function usePiSession({ tabId, projectPath, title = "pi chat" }: UsePiSes
     return () => {
       cleanedUp = true;
       setReady(false);
+      if (statusClearTimerRef.current) {
+        clearTimeout(statusClearTimerRef.current);
+        statusClearTimerRef.current = null;
+      }
       const backendId = backendIdRef.current;
       backendIdRef.current = null;
       setBackendId(null);

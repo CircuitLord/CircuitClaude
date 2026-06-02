@@ -2608,6 +2608,40 @@ body,
   flex-shrink: 0;
 }
 
+.diff-scope-toggle {
+  display: inline-flex;
+  flex-shrink: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-visible);
+  border-radius: 7px;
+  background: var(--bg-base);
+}
+
+.diff-scope-option {
+  padding: 4px 9px;
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--border-subtle);
+  color: var(--text-tertiary);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.diff-scope-option:last-child {
+  border-right: none;
+}
+
+.diff-scope-option:hover {
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+}
+
+.diff-scope-option--active {
+  color: var(--accent-text);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
 .diff-close-btn {
   flex-shrink: 0;
   background: transparent;

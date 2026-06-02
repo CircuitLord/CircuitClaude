@@ -1,5 +1,5 @@
-import { useEffect, useCallback, useMemo } from "react";
-import { useGitStore } from "../stores/gitStore";
+import { useEffect, useCallback, useMemo, useState } from "react";
+import { useGitStore, type DiffViewerMode } from "../stores/gitStore";
 import { statusColor } from "./GitSection";
 import { highlightCode, detectLanguage } from "../lib/highlight";
 
@@ -45,7 +45,8 @@ function parseLines(raw: string): DiffLine[] {
 }
 
 export function DiffViewer() {
-  const { diffFile, diffContent, diffLoading, closeDiff } = useGitStore();
+  const { diffFile, diffContent, diffLoading, scopedDiffContent, closeDiff } = useGitStore();
+  const [mode, setMode] = useState<DiffViewerMode>("turn");
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -60,14 +61,27 @@ export function DiffViewer() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [diffFile, handleKeyDown]);
 
+  useEffect(() => {
+    setMode(scopedDiffContent?.defaultMode ?? "turn");
+  }, [diffFile, scopedDiffContent]);
+
   const language = diffFile ? detectLanguage(diffFile.path) : undefined;
+  const hasScopedModes = scopedDiffContent !== null;
+  const activeContent = hasScopedModes
+    ? mode === "turn"
+      ? scopedDiffContent.turnContent ?? ""
+      : mode === "session"
+        ? scopedDiffContent.sessionContent ?? ""
+        : diffContent
+    : diffContent;
+  const activeLoading = hasScopedModes && mode !== "file" ? false : diffLoading;
 
   const lines = useMemo(() => {
-    if (!diffContent) return [];
-    return parseLines(diffContent);
-  }, [diffContent]);
+    if (!activeContent) return [];
+    return parseLines(activeContent);
+  }, [activeContent]);
 
-  const isEmpty = diffContent !== null && diffContent.trim() === "";
+  const isEmpty = activeContent !== null && activeContent.trim() === "";
 
   if (!diffFile) return null;
 
@@ -79,6 +93,20 @@ export function DiffViewer() {
             {diffFile.status}
           </span>
           <span className="diff-header-path">{diffFile.path}</span>
+          {hasScopedModes && (
+            <div className="diff-scope-toggle" aria-label="diff scope">
+              {(["turn", "session", "file"] as DiffViewerMode[]).map((option) => (
+                <button
+                  type="button"
+                  key={option}
+                  className={`diff-scope-option${mode === option ? " diff-scope-option--active" : ""}`}
+                  onClick={() => setMode(option)}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+          )}
           <button className="diff-close-btn" onClick={closeDiff}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
               <path d="M3 3l8 8M11 3l-8 8" />
@@ -86,7 +114,7 @@ export function DiffViewer() {
           </button>
         </div>
         <div className="diff-body">
-          {diffLoading ? (
+          {activeLoading ? (
             <div className="diff-empty">Loading...</div>
           ) : isEmpty ? (
             <div className="diff-empty">No changes</div>

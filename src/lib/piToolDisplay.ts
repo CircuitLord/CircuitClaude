@@ -155,34 +155,274 @@ function readText(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
-function editStatFromRecord(record: Record<string, unknown>): { additions: number; removals: number } | undefined {
-  const oldText = readText(record.oldText ?? record.old_text);
-  const newText = readText(record.newText ?? record.new_text);
-  return oldText === undefined || newText === undefined ? undefined : changedLineStats(oldText, newText);
+function readToolPath(args: Record<string, unknown>): string | undefined {
+  const path = args.path ?? args.filePath ?? args.file_path;
+  return typeof path === "string" && path.length > 0 ? path : undefined;
+}
+
+export interface UpdateToolFileStat {
+  path: string;
+  additions: number;
+  removals: number;
+}
+
+export interface UpdateToolPatchHunk {
+  oldText: string;
+  newText: string;
+  label: string;
+}
+
+export interface UpdateToolFilePatch extends UpdateToolFileStat {
+  diff: string;
+  hunks: UpdateToolPatchHunk[];
+}
+
+function normalizeText(text: string): string {
+  return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+}
+
+function lineNumberAtIndex(text: string, index: number): number {
+  return normalizeText(text.slice(0, Math.max(0, index))).split("\n").length;
+}
+
+function unifiedRange(start: number, lineCount: number): string {
+  if (lineCount === 0) return `${Math.max(0, start - 1)},0`;
+  return lineCount === 1 ? String(Math.max(1, start)) : `${Math.max(1, start)},${lineCount}`;
+}
+
+function unifiedHunk(oldText: string, newText: string, label: string, oldStart = 1, newStart = 1): string {
+  const oldLines = textLinesForDiff(oldText);
+  const newLines = textLinesForDiff(newText);
+  const lines = [`@@ -${unifiedRange(oldStart, oldLines.length)} +${unifiedRange(newStart, newLines.length)} @@ ${label}`];
+  lines.push(...oldLines.map((line) => `-${line}`));
+  lines.push(...newLines.map((line) => `+${line}`));
+  return `${lines.join("\n")}\n`;
+}
+
+interface LineDiffOp {
+  type: "context" | "add" | "del";
+  line: string;
+  oldNum: number | null;
+  newNum: number | null;
+  oldCursor: number;
+  newCursor: number;
+}
+
+function lineDiffOps(oldLines: string[], newLines: string[]): LineDiffOp[] {
+  const dp = Array.from({ length: oldLines.length + 1 }, () => new Uint32Array(newLines.length + 1));
+
+  for (let i = oldLines.length - 1; i >= 0; i -= 1) {
+    for (let j = newLines.length - 1; j >= 0; j -= 1) {
+      dp[i][j] = oldLines[i] === newLines[j]
+        ? dp[i + 1][j + 1] + 1
+        : Math.max(dp[i + 1][j], dp[i][j + 1]);
+    }
+  }
+
+  const ops: LineDiffOp[] = [];
+  let i = 0;
+  let j = 0;
+  while (i < oldLines.length || j < newLines.length) {
+    const oldCursor = i + 1;
+    const newCursor = j + 1;
+    if (i < oldLines.length && j < newLines.length && oldLines[i] === newLines[j]) {
+      ops.push({ type: "context", line: oldLines[i], oldNum: oldCursor, newNum: newCursor, oldCursor, newCursor });
+      i += 1;
+    j += 1;
+    } else if (j < newLines.length && (i === oldLines.length || dp[i][j + 1] >= dp[i + 1][j])) {
+      ops.push({ type: "add", line: newLines[j], oldNum: null, newNum: newCursor, oldCursor, newCursor });
+      j += 1;
+    } else if (i < oldLines.length) {
+      ops.push({ type: "del", line: oldLines[i], oldNum: oldCursor, newNum: null, oldCursor, newCursor });
+      i += 1;
+    }
+  }
+
+  return ops;
+}
+
+function hunkStart(ops: LineDiffOp[], side: "old" | "new"): number {
+  const key = side === "old" ? "oldNum" : "newNum";
+  const cursorKey = side === "old" ? "oldCursor" : "newCursor";
+  const firstNumbered = ops.find((op) => op[key] !== null)?.[key];
+  return firstNumbered ?? ops[0]?.[cursorKey] ?? 1;
+}
+
+function unifiedDiffFromTexts(path: string, oldText: string, newText: string): string {
+  const oldLines = textLinesForDiff(oldText);
+  const newLines = textLinesForDiff(newText);
+  const ops = lineDiffOps(oldLines, newLines);
+  const context = 3;
+  const hunks: string[] = [];
+  let index = 0;
+
+  while (index < ops.length) {
+    while (index < ops.length && ops[index].type === "context") index += 1;
+    if (index >= ops.length) break;
+
+    const start = Math.max(0, index - context);
+    let end = index;
+    let lastChange = index;
+
+    while (end < ops.length) {
+      if (ops[end].type !== "context") lastChange = end;
+      if (end - lastChange >= context) break;
+      end += 1;
+    }
+
+    const hunkOps = ops.slice(start, Math.min(ops.length, lastChange + context + 1));
+    const oldCount = hunkOps.filter((op) => op.oldNum !== null).length;
+    const newCount = hunkOps.filter((op) => op.newNum !== null).length;
+    const oldStart = hunkStart(hunkOps, "old");
+    const newStart = hunkStart(hunkOps, "new");
+    const lines = [`@@ -${unifiedRange(oldStart, oldCount)} +${unifiedRange(newStart, newCount)} @@`];
+    for (const op of hunkOps) {
+      lines.push(`${op.type === "add" ? "+" : op.type === "del" ? "-" : " "}${op.line}`);
+    }
+    hunks.push(`${lines.join("\n")}\n`);
+    index = Math.min(ops.length, lastChange + context + 1);
+  }
+
+  return `--- a/${shortToolPath(path)}\n+++ b/${shortToolPath(path)}\n${hunks.join("")}`;
+}
+
+function reverseApplyHunks(currentText: string, hunks: UpdateToolPatchHunk[]): { text: string; complete: boolean } {
+  let text = normalizeText(currentText);
+  let complete = true;
+
+  for (let index = hunks.length - 1; index >= 0; index -= 1) {
+    const hunk = hunks[index];
+    const newText = normalizeText(hunk.newText);
+    const oldText = normalizeText(hunk.oldText);
+    if (!newText) {
+      complete = false;
+      continue;
+    }
+
+    const at = text.lastIndexOf(newText);
+    if (at === -1) {
+      complete = false;
+      continue;
+    }
+    text = `${text.slice(0, at)}${oldText}${text.slice(at + newText.length)}`;
+  }
+
+  return { text, complete };
+}
+
+function fallbackHunkStats(hunks: UpdateToolPatchHunk[]): { additions: number; removals: number } {
+  return hunks.reduce(
+    (total, hunk) => {
+      const stats = changedLineStats(hunk.oldText, hunk.newText);
+      return {
+        additions: total.additions + stats.additions,
+        removals: total.removals + stats.removals,
+      };
+    },
+    { additions: 0, removals: 0 },
+  );
+}
+
+export function combinedUpdateToolPatchStats(hunks: UpdateToolPatchHunk[], currentText = ""): { additions: number; removals: number } {
+  if (hunks.length === 0) return { additions: 0, removals: 0 };
+  const previous = reverseApplyHunks(currentText, hunks);
+  return previous.complete
+    ? changedLineStats(previous.text, normalizeText(currentText))
+    : fallbackHunkStats(hunks);
+}
+
+export function renderCombinedUpdateToolPatchDiff(path: string, hunks: UpdateToolPatchHunk[], currentText = ""): string {
+  if (hunks.length === 0) return "";
+  const previous = reverseApplyHunks(currentText, hunks);
+  const combined = unifiedDiffFromTexts(path, previous.text, normalizeText(currentText));
+  return previous.complete && combined.trim() !== `--- a/${shortToolPath(path)}\n+++ b/${shortToolPath(path)}`
+    ? combined
+    : renderUpdateToolPatchDiff(path, hunks, currentText);
+}
+
+export function renderUpdateToolPatchDiff(path: string, hunks: UpdateToolPatchHunk[], currentText = ""): string {
+  const normalizedCurrent = normalizeText(currentText);
+  let searchFrom = 0;
+  let cumulativeDelta = 0;
+  let fallbackStart = 1;
+  const rendered: string[] = [];
+
+  for (const hunk of hunks) {
+    const newNeedle = normalizeText(hunk.newText);
+    const oldNeedle = normalizeText(hunk.oldText);
+    const needle = newNeedle || oldNeedle;
+    const foundAt = needle ? normalizedCurrent.indexOf(needle, searchFrom) : -1;
+    const newStart = foundAt === -1 ? fallbackStart : lineNumberAtIndex(normalizedCurrent, foundAt);
+    const oldStart = Math.max(1, newStart - cumulativeDelta);
+    const oldLineCount = textLinesForDiff(hunk.oldText).length;
+    const newLineCount = textLinesForDiff(hunk.newText).length;
+
+    rendered.push(unifiedHunk(hunk.oldText, hunk.newText, hunk.label, oldStart, newStart));
+    cumulativeDelta += newLineCount - oldLineCount;
+    fallbackStart = Math.max(1, newStart + Math.max(1, newLineCount));
+    if (foundAt !== -1) searchFrom = foundAt + needle.length;
+  }
+
+  return `--- a/${shortToolPath(path)}\n+++ b/${shortToolPath(path)}\n${rendered.join("")}`;
+}
+
+export function updateToolFilePatches(name: string, rawArgs: unknown): UpdateToolFilePatch[] {
+  const args = asRecord(rawArgs);
+  const path = readToolPath(args);
+  if (!path) return [];
+
+  if (name === "write") {
+    const content = readText(args.content ?? args.contents);
+    if (content === undefined) return [];
+    const stats = changedLineStats("", content);
+    const hunks = [{ oldText: "", newText: content, label: "write" }];
+    return [{
+      path,
+      additions: stats.additions,
+      removals: stats.removals,
+      diff: renderUpdateToolPatchDiff(path, hunks, content),
+      hunks,
+    }];
+  }
+
+  if (name !== "edit") return [];
+
+  const edits = Array.isArray(args.edits) ? args.edits : [args];
+  const hunks: UpdateToolPatchHunk[] = [];
+  let additions = 0;
+  let removals = 0;
+
+  for (const [index, edit] of edits.entries()) {
+    const record = asRecord(edit);
+    const oldText = readText(record.oldText ?? record.old_text);
+    const newText = readText(record.newText ?? record.new_text);
+    if (oldText === undefined || newText === undefined) continue;
+
+    const stat = changedLineStats(oldText, newText);
+    additions += stat.additions;
+    removals += stat.removals;
+    hunks.push({ oldText, newText, label: edits.length > 1 ? `edit ${index + 1}` : "edit" });
+  }
+
+  return hunks.length > 0
+    ? [{ path, additions, removals, diff: renderUpdateToolPatchDiff(path, hunks), hunks }]
+    : [];
+}
+
+export function updateToolFileStats(name: string, rawArgs: unknown): UpdateToolFileStat[] {
+  return updateToolFilePatches(name, rawArgs).map(({ path, additions, removals }) => ({ path, additions, removals }));
 }
 
 function updateToolStats(name: string, args: Record<string, unknown>): { additions: number; removals: number } | undefined {
-  if (name === "write") {
-    const content = readText(args.content ?? args.contents);
-    return content === undefined ? undefined : { additions: textLinesForDiff(content).length, removals: 0 };
-  }
-
-  if (name !== "edit") return undefined;
-
-  const edits = Array.isArray(args.edits) ? args.edits : [args];
-  let additions = 0;
-  let removals = 0;
-  let found = false;
-
-  for (const edit of edits) {
-    const stat = editStatFromRecord(asRecord(edit));
-    if (!stat) continue;
-    additions += stat.additions;
-    removals += stat.removals;
-    found = true;
-  }
-
-  return found ? { additions, removals } : undefined;
+  const stats = updateToolFileStats(name, args);
+  if (stats.length === 0) return undefined;
+  return stats.reduce(
+    (total, stat) => ({
+      additions: total.additions + stat.additions,
+      removals: total.removals + stat.removals,
+    }),
+    { additions: 0, removals: 0 },
+  );
 }
 
 function summarizeUpdateToolArgs(name: string, args: Record<string, unknown>): string {

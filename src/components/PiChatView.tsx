@@ -1,15 +1,38 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { usePiSession } from "../hooks/usePiSession";
 import { listPiSessions, savePiChatSettings, type PiSessionInfo } from "../lib/pi";
 import { THEMES } from "../lib/themes";
-import { usePiChatStore } from "../stores/piChatStore";
+import { usePiChatStore, type PiChatMessage } from "../stores/piChatStore";
 import { useProjectStore } from "../stores/projectStore";
 import { useSessionStore } from "../stores/sessionStore";
 import { useSettingsStore } from "../stores/settingsStore";
+import { useVoiceStore } from "../stores/voiceStore";
 import type { PiModel, PiPermissionMode, PiThinkingLevel } from "../lib/piRpc";
 import { getSupportedThinkingLevels } from "../lib/piRpc";
-import { PiChatMessageView } from "./PiChatBlocks";
+import { changedFilesForMessages, PiChatMessageView, type ChangedFilesBundle } from "./PiChatBlocks";
+import { VoiceTranscriptBox } from "./VoiceTranscriptBox";
 import "./PiChatView.css";
+
+const MicIcon = (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="9" y="3" width="6" height="11" rx="3" />
+    <path d="M5 11a7 7 0 0 0 14 0" />
+    <line x1="12" y1="18" x2="12" y2="21" />
+  </svg>
+);
+
+const SendIcon = (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <line x1="12" y1="19" x2="12" y2="6" />
+    <polyline points="6 12 12 6 18 12" />
+  </svg>
+);
+
+const StopIcon = (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <rect x="5" y="5" width="14" height="14" rx="2" />
+  </svg>
+);
 
 interface PiChatViewProps {
   tabId: string;
@@ -94,6 +117,55 @@ function formatSessionAge(timestamp: number): string {
   return `${Math.floor(hours / 24)}d`;
 }
 
+function useSettledStreaming(isStreaming: boolean, delayMs = 450): boolean {
+  const [settledStreaming, setSettledStreaming] = useState(isStreaming);
+
+  useEffect(() => {
+    if (isStreaming) {
+      setSettledStreaming(true);
+      return;
+    }
+
+    const timer = setTimeout(() => setSettledStreaming(false), delayMs);
+    return () => clearTimeout(timer);
+  }, [delayMs, isStreaming]);
+
+  return settledStreaming;
+}
+
+function buildTurnChangeSummaries(messages: readonly PiChatMessage[], projectPath: string, isStreaming: boolean): Map<string, ChangedFilesBundle> {
+  const summaries = new Map<string, ChangedFilesBundle>();
+  const sessionChanges = changedFilesForMessages([...messages], projectPath);
+  let turnStart = -1;
+
+  for (let index = 0; index <= messages.length; index += 1) {
+    const message = messages[index];
+    const isBoundary = index === messages.length || message?.role === "user";
+    if (!isBoundary) continue;
+
+    const start = turnStart + 1;
+    const end = index;
+    const isCurrentTurn = end === messages.length;
+
+    if (end > start && !(isStreaming && isCurrentTurn)) {
+      const turnMessages = messages.slice(start, end);
+      const lastAssistant = [...turnMessages].reverse().find((candidate) => candidate.role === "assistant");
+      const turnChanges = changedFilesForMessages(turnMessages, projectPath);
+      if (lastAssistant && turnChanges.files.length > 0) {
+        summaries.set(lastAssistant.id, {
+          files: turnChanges.files,
+          turnHunks: turnChanges.hunks,
+          sessionHunks: sessionChanges.hunks,
+        });
+      }
+    }
+
+    turnStart = index;
+  }
+
+  return summaries;
+}
+
 function PiChatSelect<T extends string>({
   ariaLabel,
   className,
@@ -102,6 +174,7 @@ function PiChatSelect<T extends string>({
   value,
   onChange,
   triggerPrefix,
+  triggerIcon,
 }: {
   ariaLabel: string;
   className?: string;
@@ -110,6 +183,7 @@ function PiChatSelect<T extends string>({
   value: T;
   onChange: (value: T) => void;
   triggerPrefix?: string;
+  triggerIcon?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -149,6 +223,7 @@ function PiChatSelect<T extends string>({
         aria-label={ariaLabel}
       >
         <span className="pi-chat-select-chevron">{">"}</span>
+        {triggerIcon && <span className="pi-chat-select-icon">{triggerIcon}</span>}
         {triggerPrefix && <span className="pi-chat-select-prefix">{triggerPrefix}</span>}
         <span className="pi-chat-select-label">{selectedLabel}</span>
       </button>
@@ -200,6 +275,10 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
   const isStreaming = usePiChatStore(
     useCallback((state) => state.streamingTabs.has(tabId), [tabId]),
   );
+  const showStreamingUi = useSettledStreaming(isStreaming);
+  const voiceActive = useVoiceStore(
+    useCallback((state) => state.isListening && state.targetTabId === tabId, [tabId]),
+  );
   const syncedPermissionMode = usePiChatStore(
     useCallback((state) => state.permissionModes.get(tabId) ?? "default", [tabId]),
   );
@@ -213,6 +292,8 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
   const piChatFontSize = useSettingsStore((state) => state.settings.piChatFontSize);
   const projectTheme = useProjectStore((state) => state.projects.find((project) => project.path === projectPath)?.theme ?? "midnight");
   const { ready, backendId, sendMessage, sendCommand, interrupt } = usePiSession({ tabId, projectPath });
+
+  const changeSummaries = buildTurnChangeSummaries(messages, projectPath, showStreamingUi);
 
   const preferredModels = availableModels.filter(isPreferredModel);
   const modelOptions = currentModel && !preferredModels.some((model) => modelKey(model) === modelKey(currentModel))
@@ -400,6 +481,12 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
       setTabStatus(tabId, null);
     }
   }, [appendError, interrupt, setTabStatus, tabId]);
+
+  // Reuse the global Ctrl+Space voice flow, which targets the active session (this pi tab).
+  const handleMicToggle = useCallback(() => {
+    if (!ready) return;
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: "Space", key: " ", ctrlKey: true, bubbles: true }));
+  }, [ready]);
 
   const handlePermissionModeChange = useCallback(async (nextMode: PiPermissionMode) => {
     const previousMode = permissionMode;
@@ -644,9 +731,16 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
         {messages.length === 0 ? (
           <div className="pi-chat-empty">{ready ? "send a message to pi..." : "starting pi..."}</div>
         ) : (
-          messages.map((message) => <PiChatMessageView message={message} key={message.id} />)
+          messages.map((message) => (
+            <PiChatMessageView
+              message={message}
+              projectPath={projectPath}
+              changeSummary={changeSummaries.get(message.id)}
+              key={message.id}
+            />
+          ))
         )}
-        {isStreaming && (
+        {showStreamingUi && (
           <div className="pi-chat-working">
             <span className="pi-chat-working-mark" aria-hidden="true" />
             <span>Working...</span>
@@ -656,6 +750,13 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
       </div>
 
       <div className="pi-chat-input-shell">
+        <VoiceTranscriptBox
+          tabId={tabId}
+          onSubmit={(text) => {
+            setInputValue((prev) => (prev ? `${prev} ${text}` : text));
+            focusInput();
+          }}
+        />
         <div className={`pi-chat-composer${isStreaming ? " pi-chat-composer--running" : ""}`}>
           <div className="pi-chat-composer-main">
             <textarea
@@ -677,18 +778,12 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
               value={permissionMode}
               onChange={handlePermissionModeChange}
               disabled={!ready}
-              triggerPrefix="permissions: "
+              triggerIcon={permissionMode === "bypassPermissions" ? "⚠" : "✓"}
               options={[
                 { value: "default", label: "default" },
                 { value: "bypassPermissions", label: "bypass" },
               ]}
             />
-
-            {isStreaming && (
-              <button className="pi-chat-command" onClick={handleInterrupt}>
-                :interrupt
-              </button>
-            )}
 
             <div className="pi-chat-controls-right">
               <PiChatSelect
@@ -711,6 +806,28 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
                   ? [{ value: "", label: "model" }]
                   : modelOptions.map((model) => ({ value: modelKey(model), label: modelOptionLabel(model, duplicateModelIds) }))}
               />
+
+              <button
+                type="button"
+                className={`pi-chat-mic-btn${voiceActive ? " pi-chat-mic-btn--active" : ""}`}
+                onClick={handleMicToggle}
+                disabled={!ready}
+                aria-label={voiceActive ? "stop voice input" : "start voice input"}
+                title={voiceActive ? "stop voice input" : "voice input (ctrl+space)"}
+              >
+                {MicIcon}
+              </button>
+
+              <button
+                type="button"
+                className={`pi-chat-send-btn${isStreaming ? " pi-chat-send-btn--stop" : ""}`}
+                onClick={isStreaming ? handleInterrupt : handleSend}
+                disabled={isStreaming ? !ready : (!ready || !inputValue.trim())}
+                aria-label={isStreaming ? "stop" : "send"}
+                title={isStreaming ? "stop" : "send"}
+              >
+                {isStreaming ? StopIcon : SendIcon}
+              </button>
             </div>
           </div>
         </div>

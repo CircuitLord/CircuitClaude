@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   activeAggregateToolItem,
   aggregateToolLabel,
@@ -7,14 +7,48 @@ import {
   formatToolDuration,
   summarizeToolArgs,
   toolDisplayLabel,
+  updateToolFilePatches,
+  combinedUpdateToolPatchStats,
+  renderCombinedUpdateToolPatchDiff,
+  renderUpdateToolPatchDiff,
+  type UpdateToolPatchHunk,
 } from "../lib/piToolDisplay";
+import { readFile } from "../lib/files";
+import { useGitStore } from "../stores/gitStore";
 import type { PiChatBlock, PiChatMessage } from "../stores/piChatStore";
 
 interface PiChatMessageViewProps {
   message: PiChatMessage;
+  projectPath: string;
+  changeSummary?: ChangedFilesBundle;
 }
 
-export function PiChatMessageView({ message }: PiChatMessageViewProps) {
+export interface ChangedFileSummary {
+  path: string;
+  additions: number;
+  removals: number;
+}
+
+export interface ChangedFilesCollection {
+  files: ChangedFileSummary[];
+  hunks: Record<string, UpdateToolPatchHunk[]>;
+}
+
+export interface ChangedFilesBundle {
+  files: ChangedFileSummary[];
+  turnHunks: Record<string, UpdateToolPatchHunk[]>;
+  sessionHunks: Record<string, UpdateToolPatchHunk[]>;
+}
+
+const ChangedFilesIcon = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 5v14" />
+    <path d="M5 12h14" />
+    <rect x="4" y="4" width="16" height="16" rx="3" />
+  </svg>
+);
+
+export function PiChatMessageView({ message, projectPath, changeSummary }: PiChatMessageViewProps) {
   if (message.role === "user") {
     return (
       <div className="pi-chat-message pi-chat-message--user">
@@ -30,6 +64,108 @@ export function PiChatMessageView({ message }: PiChatMessageViewProps) {
       {message.blocks.map((block, index) => (
         <PiBlockView block={block} key={getBlockKey(block, index)} />
       ))}
+      {changeSummary && changeSummary.files.length > 0 && <PiChangedFilesCard summary={changeSummary} projectPath={projectPath} />}
+    </div>
+  );
+}
+
+function joinProjectPath(projectPath: string, filePath: string): string {
+  return `${projectPath.replace(/[\\/]+$/, "")}/${filePath.replace(/^[\\/]+/, "")}`;
+}
+
+function PiChangedFilesCard({ summary, projectPath }: { summary: ChangedFilesBundle; projectPath: string }) {
+  const fetchStatus = useGitStore((state) => state.fetchStatus);
+  const openDiff = useGitStore((state) => state.openDiff);
+  const files = summary.files;
+  const fileKey = useMemo(() => files.map((file) => file.path).join("\0"), [files]);
+  const hunkKey = useMemo(
+    () => files.map((file) => `${file.path}:${(summary.turnHunks[file.path] ?? []).map((hunk) => `${hunk.oldText.length}/${hunk.newText.length}`).join(",")}`).join("\0"),
+    [files, summary.turnHunks],
+  );
+  const [turnStats, setTurnStats] = useState<ChangedFileSummary[] | null>(null);
+  const displayFiles = turnStats ?? files;
+  const totalAdditions = turnStats?.reduce((sum, file) => sum + file.additions, 0);
+  const totalRemovals = turnStats?.reduce((sum, file) => sum + file.removals, 0);
+
+  useEffect(() => {
+    let cancelled = false;
+    setTurnStats(null);
+
+    async function loadTurnStats() {
+      const stats = await Promise.all(files.map(async (file) => {
+        const currentText = await readFile(joinProjectPath(projectPath, file.path)).catch(() => "");
+        const fileStats = combinedUpdateToolPatchStats(summary.turnHunks[file.path] ?? [], currentText);
+        return { path: file.path, additions: fileStats.additions, removals: fileStats.removals };
+      }));
+      if (!cancelled) setTurnStats(stats);
+    }
+
+    loadTurnStats().catch(() => {
+      if (!cancelled) setTurnStats(files.map((file) => ({ path: file.path, additions: file.additions, removals: file.removals })));
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fileKey, hunkKey, projectPath]);
+
+  const openFileDiff = async (file: ChangedFileSummary) => {
+    await fetchStatus(projectPath);
+    const status = useGitStore.getState().statuses[projectPath];
+    const fileKey = file.path.toLowerCase();
+    const entry = status?.files.find((candidate) => normalizeGitPath(candidate.path).toLowerCase() === fileKey);
+    const currentText = await readFile(joinProjectPath(projectPath, file.path)).catch(() => "");
+    await openDiff(projectPath, entry ?? { path: file.path, status: "M" }, {
+      defaultMode: "turn",
+      turnContent: renderUpdateToolPatchDiff(file.path, summary.turnHunks[file.path] ?? [], currentText),
+      sessionContent: renderCombinedUpdateToolPatchDiff(file.path, summary.sessionHunks[file.path] ?? [], currentText),
+    });
+  };
+
+  return (
+    <div className="pi-chat-changes-card">
+      <div className="pi-chat-changes-header">
+        <div className="pi-chat-changes-icon">{ChangedFilesIcon}</div>
+        <div className="pi-chat-changes-title">
+          <span>Edited {files.length} {files.length === 1 ? "file" : "files"}</span>
+          <span className="pi-chat-changes-total">
+            {turnStats ? (
+              <>
+                <span className="pi-chat-change-add">+{totalAdditions}</span>
+                <span className="pi-chat-change-del"> -{totalRemovals}</span>
+              </>
+            ) : (
+              <span className="pi-chat-change-loading">checking diff…</span>
+            )}
+          </span>
+        </div>
+        <button type="button" className="pi-chat-changes-review" onClick={() => openFileDiff(files[0])}>
+          Review
+        </button>
+      </div>
+      <div className="pi-chat-changes-files">
+        {displayFiles.map((file) => (
+          <button
+            type="button"
+            className="pi-chat-changes-file"
+            key={file.path}
+            title={`Open diff for ${file.path}`}
+            onClick={() => openFileDiff(file)}
+          >
+            <span className="pi-chat-changes-path">{file.path}</span>
+            <span className="pi-chat-changes-stat">
+              {turnStats ? (
+                <>
+                  <span className="pi-chat-change-add">+{file.additions}</span>
+                  <span className="pi-chat-change-del">-{file.removals}</span>
+                </>
+              ) : (
+                <span className="pi-chat-change-loading">…</span>
+              )}
+            </span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -286,6 +422,50 @@ function renderPiInlineText(text: string, keyPrefix = "pi-text"): ReactNode[] {
 function getMessageText(blocks: PiChatBlock[]): string {
   const first = blocks[0];
   return first?.type === "text" ? first.content : "";
+}
+
+function normalizeGitPath(path: string): string {
+  return path.replace(/\\/g, "/").replace(/^\.\//, "");
+}
+
+function normalizeChangedPath(path: string, projectPath: string): string {
+  const normalizedPath = normalizeGitPath(path);
+  const normalizedProject = normalizeGitPath(projectPath).replace(/\/+$/, "");
+  const lowerPath = normalizedPath.toLowerCase();
+  const lowerProject = normalizedProject.toLowerCase();
+
+  if (lowerPath.startsWith(`${lowerProject}/`)) {
+    return normalizedPath.slice(normalizedProject.length + 1);
+  }
+
+  return normalizedPath;
+}
+
+export function changedFilesForMessages(messages: PiChatMessage[], projectPath: string): ChangedFilesCollection {
+  const changedFiles = new Map<string, ChangedFileSummary>();
+  const hunks: Record<string, UpdateToolPatchHunk[]> = {};
+
+  for (const message of messages) {
+    if (message.role !== "assistant") continue;
+
+    for (const block of message.blocks) {
+      if (block.type !== "tool" || block.aggregate || block.status !== "done") continue;
+
+      for (const patch of updateToolFilePatches(block.name, block.args)) {
+        const path = normalizeChangedPath(patch.path, projectPath);
+        const existing = changedFiles.get(path);
+        if (existing) {
+          existing.additions += patch.additions;
+          existing.removals += patch.removals;
+        } else {
+          changedFiles.set(path, { path, additions: patch.additions, removals: patch.removals });
+        }
+        hunks[path] = [...(hunks[path] ?? []), ...patch.hunks];
+      }
+    }
+  }
+
+  return { files: [...changedFiles.values()], hunks };
 }
 
 function getBlockKey(block: PiChatBlock, index: number): string {

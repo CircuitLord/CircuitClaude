@@ -7,14 +7,24 @@ export function fileKey(file: GitFileEntry): string {
   return file.path;
 }
 
+export type DiffViewerMode = "turn" | "session" | "file";
+
+export interface ScopedDiffContent {
+  defaultMode?: DiffViewerMode;
+  turnContent?: string;
+  sessionContent?: string;
+}
+
 interface GitStore {
   statuses: Record<string, GitStatus>;
   loading: Record<string, boolean>;
   collapsedGroups: Record<string, boolean>;
   viewMode: "file" | "tree";
+  diffProjectPath: string | null;
   diffFile: GitFileEntry | null;
   diffContent: string | null;
   diffLoading: boolean;
+  scopedDiffContent: ScopedDiffContent | null;
   selectedFiles: Record<string, boolean>;
   commitMessage: string;
   committing: boolean;
@@ -28,7 +38,7 @@ interface GitStore {
   fetchStatus: (projectPath: string) => Promise<void>;
   toggleGroup: (group: string) => void;
   setViewMode: (mode: "file" | "tree") => void;
-  openDiff: (projectPath: string, file: GitFileEntry) => Promise<void>;
+  openDiff: (projectPath: string, file: GitFileEntry, scopedContent?: ScopedDiffContent) => Promise<void>;
   closeDiff: () => void;
   toggleFileSelection: (file: GitFileEntry) => void;
   selectAllInGroup: (files: GitFileEntry[]) => void;
@@ -57,9 +67,11 @@ export const useGitStore = create<GitStore>((set, get) => ({
   loading: {},
   collapsedGroups: {},
   viewMode: "file",
+  diffProjectPath: null,
   diffFile: null,
   diffContent: null,
   diffLoading: false,
+  scopedDiffContent: null,
   selectedFiles: {},
   commitMessage: "",
   committing: false,
@@ -112,8 +124,8 @@ export const useGitStore = create<GitStore>((set, get) => ({
     useSettingsStore.getState().update({ gitViewMode: mode });
   },
 
-  openDiff: async (projectPath: string, file: GitFileEntry) => {
-    set({ diffFile: file, diffContent: null, diffLoading: true });
+  openDiff: async (projectPath: string, file: GitFileEntry, scopedContent?: ScopedDiffContent) => {
+    set({ diffProjectPath: projectPath, diffFile: file, diffContent: null, diffLoading: true, scopedDiffContent: scopedContent ?? null });
     try {
       const content = await getGitDiff(projectPath, file.path, file.status);
       set({ diffContent: content, diffLoading: false });
@@ -122,7 +134,7 @@ export const useGitStore = create<GitStore>((set, get) => ({
     }
   },
 
-  closeDiff: () => set({ diffFile: null, diffContent: null, diffLoading: false }),
+  closeDiff: () => set({ diffProjectPath: null, diffFile: null, diffContent: null, diffLoading: false, scopedDiffContent: null }),
 
   toggleFileSelection: (file: GitFileEntry) =>
     set((state) => {
