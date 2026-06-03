@@ -439,10 +439,11 @@
 .pi-chat-changes-card {
   margin: 10px var(--pi-chat-block-padding-x) 14px;
   overflow: hidden;
-  background: color-mix(in srgb, var(--bg-surface) 82%, #000);
+  background: var(--bg-surface);
   border: 1px solid var(--border-visible);
   border-radius: 8px;
   color: var(--text-primary);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
 }
 
 .pi-chat-changes-header {
@@ -450,7 +451,8 @@
   align-items: center;
   gap: 12px;
   padding: 10px 12px;
-  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border-visible);
 }
 
 .pi-chat-changes-icon {
@@ -536,11 +538,23 @@
 }
 
 .pi-chat-changes-path {
+  display: flex;
+  align-items: baseline;
   min-width: 0;
   flex: 1;
+  white-space: nowrap;
+}
+
+.pi-chat-changes-dir {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  color: var(--text-tertiary);
+  font-size: var(--pi-chat-font-size-xs, 11px);
+}
+
+.pi-chat-changes-name {
+  flex: 0 0 auto;
 }
 
 .pi-chat-changes-stat {

@@ -1,7 +1,7 @@
 import type { PiToolStatus } from "./piRpc";
 import { readRecord } from "./piRpc";
 
-export type PiToolAggregateKind = "read" | "list" | "search";
+export type PiToolAggregateKind = "read" | "list" | "search" | "create" | "edit";
 
 export interface PiToolAggregateMeta {
   kind: PiToolAggregateKind;
@@ -12,6 +12,8 @@ export interface PiToolAggregateMeta {
 export interface PiToolAggregateItem extends PiToolAggregateMeta {
   id: string;
   status: PiToolStatus;
+  toolName?: string;
+  args?: unknown;
 }
 
 export interface PiToolAggregate {
@@ -93,6 +95,14 @@ export function aggregateToolMeta(name: string, rawArgs: unknown, toolCallId = "
     const path = typeof args.path === "string" ? args.path : ".";
     return { kind: "list", key: `list:${path}`, target: shortToolPath(path, ".") };
   }
+  if (name === "write") {
+    const path = readToolPath(args);
+    return { kind: "create", key: path ? `create:${path}` : `pending-write:${toolCallId}`, target: shortToolPath(path) };
+  }
+  if (name === "edit") {
+    const path = readToolPath(args);
+    return { kind: "edit", key: path ? `edit:${path}` : `pending-edit:${toolCallId}`, target: shortToolPath(path) };
+  }
   if (name === "bash") {
     const target = simpleListCommandTarget(args.command);
     if (target !== undefined) return { kind: "list", key: `list:${target}`, target: shortToolPath(target, ".") };
@@ -112,6 +122,19 @@ function aggregateCount(aggregate: PiToolAggregate, kind: PiToolAggregateKind): 
 
 function plural(count: number, one: string, many: string): string {
   return count === 1 ? one : many;
+}
+
+function isMutationAggregateKind(kind: PiToolAggregateKind): boolean {
+  return kind === "create" || kind === "edit";
+}
+
+function hasMutationItems(aggregate: PiToolAggregate): boolean {
+  return aggregate.items.some((item) => isMutationAggregateKind(item.kind));
+}
+
+export function canMergeAggregateTool(aggregate: PiToolAggregate, meta: PiToolAggregateMeta): boolean {
+  const incomingIsMutation = isMutationAggregateKind(meta.kind);
+  return aggregate.items.every((item) => isMutationAggregateKind(item.kind) === incomingIsMutation);
 }
 
 function textLinesForDiff(text: string): string[] {
@@ -409,6 +432,13 @@ export function updateToolFilePatches(name: string, rawArgs: unknown): UpdateToo
     : [];
 }
 
+export function aggregateUpdateToolFilePatches(aggregate: PiToolAggregate): UpdateToolFilePatch[] {
+  return aggregate.items.flatMap((item) => {
+    if (item.status !== "done" || !item.toolName) return [];
+    return updateToolFilePatches(item.toolName, item.args);
+  });
+}
+
 export function updateToolFileStats(name: string, rawArgs: unknown): UpdateToolFileStat[] {
   return updateToolFilePatches(name, rawArgs).map(({ path, additions, removals }) => ({ path, additions, removals }));
 }
@@ -432,7 +462,29 @@ function summarizeUpdateToolArgs(name: string, args: Record<string, unknown>): s
   return `${clampToolText(path, MAX_ARG_LENGTH - suffix.length)}${suffix}`;
 }
 
+function successfulAggregateCount(aggregate: PiToolAggregate, kind: PiToolAggregateKind): number {
+  return new Set(aggregate.items.filter((item) => item.kind === kind && item.status === "done").map((item) => item.key)).size;
+}
+
+function mutationProgressLabel(aggregate: PiToolAggregate): string {
+  const active = activeAggregateToolItem(aggregate);
+  if (!active) return "Updating files";
+  const verb = active.kind === "create" ? "Creating" : "Editing";
+  return `${verb} ${clampToolText(active.target)}`;
+}
+
+function mutationFinalLabel(aggregate: PiToolAggregate): string {
+  const createdCount = successfulAggregateCount(aggregate, "create");
+  const editedCount = successfulAggregateCount(aggregate, "edit");
+  const parts: string[] = [];
+  if (createdCount > 0) parts.push(`Created ${createdCount} ${plural(createdCount, "file", "files")}`);
+  if (editedCount > 0) parts.push(`${parts.length > 0 ? "edited" : "Edited"} ${editedCount} ${plural(editedCount, "file", "files")}`);
+  return parts.join(", ") || "No files changed";
+}
+
 export function aggregateToolLabel(aggregate: PiToolAggregate): string {
+  if (hasMutationItems(aggregate)) return mutationProgressLabel(aggregate);
+
   const readCount = aggregateCount(aggregate, "read");
   const listCount = aggregateCount(aggregate, "list");
   const searchCount = aggregateCount(aggregate, "search");
@@ -444,6 +496,8 @@ export function aggregateToolLabel(aggregate: PiToolAggregate): string {
 }
 
 export function finalizedAggregateToolLabel(aggregate: PiToolAggregate): string {
+  if (hasMutationItems(aggregate)) return mutationFinalLabel(aggregate);
+
   const readCount = aggregateCount(aggregate, "read");
   const listCount = aggregateCount(aggregate, "list");
   const searchCount = aggregateCount(aggregate, "search");

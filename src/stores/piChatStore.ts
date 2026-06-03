@@ -2,7 +2,9 @@ import { create } from "zustand";
 import {
   aggregateToolMeta,
   aggregateToolStatus,
+  canMergeAggregateTool,
   type PiToolAggregate,
+  type PiToolAggregateMeta,
 } from "../lib/piToolDisplay";
 import {
   extractTextContent,
@@ -112,7 +114,7 @@ function blockHasAggregateToolId(block: PiChatBlock, id: string): boolean {
   return block.type === "tool" && block.aggregate?.items.some((item) => item.id === id) === true;
 }
 
-function blockIsOpenAggregate(block: PiChatBlock): boolean {
+function blockIsOpenAggregate(block: PiChatBlock): block is Extract<PiChatBlock, { type: "tool" }> & { aggregate: PiToolAggregate } {
   return block.type === "tool" && block.aggregate !== undefined && !block.aggregate.finalized;
 }
 
@@ -240,7 +242,8 @@ function appendContent(
 ): PiChatMessage[] {
   if (!content && mode === "append") return ensureAssistantMessage(messages);
 
-  return updateAssistantBlocks(messages, (blocks) => {
+  const baseMessages = type === "text" && content ? finalizeToolGroups(messages) : messages;
+  return updateAssistantBlocks(baseMessages, (blocks) => {
     const next = [...blocks];
     const index = findContentBlockIndex(next, type, contentIndex);
 
@@ -301,7 +304,7 @@ function finalizeOpenAggregates(blocks: PiChatBlock[]): PiChatBlock[] {
   return changed ? next : blocks;
 }
 
-function findAggregateBlockIndex(blocks: PiChatBlock[], toolId: string): number {
+function findAggregateBlockIndex(blocks: PiChatBlock[], toolId: string, meta: PiToolAggregateMeta): number {
   const existingIndex = blocks.findIndex(
     (block) => block.type === "tool" && block.aggregate?.items.some((item) => item.id === toolId),
   );
@@ -313,7 +316,9 @@ function findAggregateBlockIndex(blocks: PiChatBlock[], toolId: string): number 
 
   for (let index = startIndex; index >= 0; index -= 1) {
     const block = blocks[index];
-    if (blockIsOpenAggregate(block) && !boundarySeen) return index;
+    if (blockIsOpenAggregate(block) && !boundarySeen) {
+      return block.aggregate && canMergeAggregateTool(block.aggregate, meta) ? index : hiddenSlotIndex;
+    }
     if (blockIsAggregateBoundary(block)) boundarySeen = true;
   }
 
@@ -325,11 +330,21 @@ function upsertAggregateTool(messages: PiChatMessage[], tool: PiToolSnapshot, id
   if (!meta) return upsertNormalTool(messages, tool, id);
 
   return updateAggregateToolBlocks(messages, id, (blocks) => {
-    const next = [...blocks];
-    const index = findAggregateBlockIndex(next, id);
+    let next = [...blocks];
+    const index = findAggregateBlockIndex(next, id, meta);
+
+    const itemFromPrevious = (previous?: PiToolAggregate["items"][number]) => ({
+      ...(previous ?? {}),
+      id,
+      status: tool.status,
+      ...meta,
+      toolName: tool.name || previous?.toolName,
+      args: tool.args ?? previous?.args,
+    });
 
     if (index === -1) {
-      const item = { id, status: tool.status, ...meta };
+      next = finalizeOpenAggregates(next);
+      const item = itemFromPrevious();
       return insertBlockInStreamOrder(next, {
         type: "tool",
         id: `aggregate-${id}`,
@@ -341,6 +356,10 @@ function upsertAggregateTool(messages: PiChatMessage[], tool: PiToolSnapshot, id
       });
     }
 
+    if (next[index]?.type === "tool" && !next[index].aggregate) {
+      next = finalizeOpenAggregates(next);
+    }
+
     const existing = next[index];
     if (existing.type !== "tool") return next;
     const aggregate = existing.aggregate ?? { items: [], activeId: id };
@@ -348,7 +367,7 @@ function upsertAggregateTool(messages: PiChatMessage[], tool: PiToolSnapshot, id
     const itemIndex = aggregate.items.findIndex((item) => item.id === id);
     const items = [...aggregate.items];
     const previous = itemIndex === -1 ? undefined : items[itemIndex];
-    const item = { ...(previous ?? {}), id, status: tool.status, ...meta };
+    const item = itemFromPrevious(previous);
     if (itemIndex === -1) items.push(item);
     else items[itemIndex] = item;
 
@@ -372,12 +391,12 @@ function upsertAggregateTool(messages: PiChatMessage[], tool: PiToolSnapshot, id
 }
 
 function upsertNormalTool(messages: PiChatMessage[], tool: PiToolSnapshot, id: string): PiChatMessage[] {
-  return updateToolBlocks(messages, id, (blocks) => {
+  return updateToolBlocks(finalizeToolGroups(messages), id, (blocks) => {
     const next = [...blocks];
     const index = next.findIndex((block) => block.type === "tool" && !block.aggregate && block.id === id);
 
     if (index === -1) {
-      return insertBlockInStreamOrder(next, { type: "tool", ...tool, id, startedAt: Date.now() });
+      return insertBlockInStreamOrder(finalizeOpenAggregates(next), { type: "tool", ...tool, id, startedAt: Date.now() });
     }
 
     const existing = next[index];

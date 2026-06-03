@@ -8,12 +8,13 @@ import {
   summarizeToolArgs,
   toolDisplayLabel,
   updateToolFilePatches,
+  aggregateUpdateToolFilePatches,
   combinedUpdateToolPatchStats,
   renderCombinedUpdateToolPatchDiff,
   renderUpdateToolPatchDiff,
   type UpdateToolPatchHunk,
 } from "../lib/piToolDisplay";
-import { readFile } from "../lib/files";
+import { readFile, fileColorClass } from "../lib/files";
 import { useGitStore } from "../stores/gitStore";
 import type { PiChatBlock, PiChatMessage } from "../stores/piChatStore";
 
@@ -152,7 +153,19 @@ function PiChangedFilesCard({ summary, projectPath }: { summary: ChangedFilesBun
             title={`Open diff for ${file.path}`}
             onClick={() => openFileDiff(file)}
           >
-            <span className="pi-chat-changes-path">{file.path}</span>
+            <span className="pi-chat-changes-path">
+              {(() => {
+                const slash = Math.max(file.path.lastIndexOf("/"), file.path.lastIndexOf("\\"));
+                const dir = slash >= 0 ? file.path.slice(0, slash + 1) : "";
+                const name = slash >= 0 ? file.path.slice(slash + 1) : file.path;
+                return (
+                  <>
+                    {dir && <span className="pi-chat-changes-dir">{dir}</span>}
+                    <span className={`pi-chat-changes-name ${fileColorClass(name)}`}>{name}</span>
+                  </>
+                );
+              })()}
+            </span>
             <span className="pi-chat-changes-stat">
               {turnStats ? (
                 <>
@@ -200,6 +213,9 @@ function PiToolBlockView({ block }: { block: Extract<PiChatBlock, { type: "tool"
 
   const aggregate = block.aggregate;
   const activeItem = aggregate ? activeAggregateToolItem(aggregate) : undefined;
+  const activeDetail = activeItem && !aggregate?.finalized && activeItem.kind !== "create" && activeItem.kind !== "edit"
+    ? activeItem.target
+    : undefined;
   const title = aggregate
     ? aggregate.finalized ? finalizedAggregateToolLabel(aggregate) : aggregateToolLabel(aggregate)
     : toolDisplayLabel(block.name);
@@ -223,10 +239,10 @@ function PiToolBlockView({ block }: { block: Extract<PiChatBlock, { type: "tool"
           </>
         )}
       </div>
-      {activeItem && !aggregate?.finalized && (
+      {activeDetail && (
         <div className="pi-chat-tool-detail">
           <span className="pi-chat-tool-caret">⎿</span>
-          <span className="pi-chat-tool-target">{activeItem.target}</span>
+          <span className="pi-chat-tool-target">{activeDetail}</span>
         </div>
       )}
       {hasOutputPreview && outputPreview && (
@@ -442,9 +458,13 @@ export function changedFilesForMessages(messages: PiChatMessage[], projectPath: 
     if (message.role !== "assistant") continue;
 
     for (const block of message.blocks) {
-      if (block.type !== "tool" || block.aggregate || block.status !== "done") continue;
+      if (block.type !== "tool") continue;
 
-      for (const patch of updateToolFilePatches(block.name, block.args)) {
+      const patches = block.aggregate
+        ? aggregateUpdateToolFilePatches(block.aggregate)
+        : block.status === "done" ? updateToolFilePatches(block.name, block.args) : [];
+
+      for (const patch of patches) {
         const path = normalizeChangedPath(patch.path, projectPath);
         const existing = changedFiles.get(path);
         if (existing) {
