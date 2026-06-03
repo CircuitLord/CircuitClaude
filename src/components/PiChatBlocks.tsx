@@ -171,6 +171,7 @@ function PiChangedFilesCard({ summary, projectPath }: { summary: ChangedFilesBun
 }
 
 function isVisibleBlock(block: PiChatBlock): boolean {
+  if (block.type === "thinking") return false;
   return block.type !== "tool" || block.hidden !== true;
 }
 
@@ -180,15 +181,7 @@ export function PiBlockView({ block }: { block: PiChatBlock }) {
       return <div className="pi-chat-text">{renderPiMarkdownBlocks(block.content, `pi-text-${block.contentIndex ?? 0}`)}</div>;
 
     case "thinking":
-      return (
-        <details className="pi-chat-fold">
-          <summary className="pi-chat-fold-title">
-            <span className="pi-chat-fold-marker">~</span>
-            <span>thinking</span>
-          </summary>
-          <pre className="pi-chat-thinking">{block.content}</pre>
-        </details>
-      );
+      return null;
 
     case "tool":
       return block.hidden ? null : <PiToolBlockView block={block} />;

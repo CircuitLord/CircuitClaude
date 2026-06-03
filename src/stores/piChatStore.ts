@@ -121,6 +121,7 @@ function blockIsHiddenToolSlot(block: PiChatBlock, id: string): boolean {
 }
 
 function blockIsVisible(block: PiChatBlock): boolean {
+  if (block.type === "thinking") return false;
   return block.type !== "tool" || block.hidden !== true;
 }
 
@@ -567,13 +568,13 @@ function reduceAssistantEvent(
       return appendContent(messages, "text", readString(assistantEvent.delta), contentIndex);
 
     case "thinking_delta":
-      return appendContent(messages, "thinking", readString(assistantEvent.delta), contentIndex);
+      return ensureAssistantMessage(messages);
 
     case "text_end":
       return appendContent(messages, "text", readString(assistantEvent.content), contentIndex, "replace");
 
     case "thinking_end":
-      return appendContent(messages, "thinking", readString(assistantEvent.content), contentIndex, "replace");
+      return ensureAssistantMessage(messages);
 
     case "toolcall_start":
     case "toolcall_delta":
@@ -639,7 +640,7 @@ function timestampFromMessage(message: Record<string, unknown>): number {
   return readNumber(message.timestamp) ?? Date.now();
 }
 
-function blocksFromPiContent(content: unknown): PiChatBlock[] {
+function blocksFromPiContent(content: unknown, toolCache?: Map<string, PiToolSnapshot>): PiChatBlock[] {
   if (typeof content === "string") return content ? [{ type: "text", content }] : [];
   if (!Array.isArray(content)) return [];
 
@@ -652,20 +653,19 @@ function blocksFromPiContent(content: unknown): PiChatBlock[] {
         const text = readString(item.text) || readString(item.content);
         return text ? [{ type: "text", content: text }] : [];
       }
-      case "thinking": {
-        const thinking = readString(item.thinking) || readString(item.text) || readString(item.content);
-        return thinking ? [{ type: "thinking", content: thinking }] : [];
-      }
+      case "thinking":
+        return [];
       case "toolCall": {
         const id = readString(item.id) || crypto.randomUUID();
-        return [{
-          type: "tool",
+        const tool: PiToolSnapshot = {
           id,
           name: readString(item.name) || "tool",
           args: item.arguments ?? item.args ?? null,
           output: "",
-          status: "done",
-        }];
+          status: "pending",
+        };
+        toolCache?.set(id, tool);
+        return [{ type: "tool", ...tool, hidden: true }];
       }
       default:
         return [];
@@ -673,8 +673,14 @@ function blocksFromPiContent(content: unknown): PiChatBlock[] {
   });
 }
 
+function isTurnChangeSummaryMessage(message: Record<string, unknown>): boolean {
+  return readString(message.customType) === "turn-change-summary"
+    || readString(message.custom_type) === "turn-change-summary";
+}
+
 function piRawMessagesToChatMessages(rawMessages: unknown[]): PiChatMessage[] {
   let messages: PiChatMessage[] = [];
+  const toolCache = new Map<string, PiToolSnapshot>();
 
   for (const rawMessage of rawMessages) {
     const message = readRecord(rawMessage);
@@ -693,7 +699,7 @@ function piRawMessagesToChatMessages(rawMessages: unknown[]): PiChatMessage[] {
         break;
       }
       case "assistant": {
-        const blocks = blocksFromPiContent(message.content);
+        const blocks = blocksFromPiContent(message.content, toolCache);
         const error = readString(message.errorMessage);
         messages = [...messages, {
           id: crypto.randomUUID(),
@@ -705,13 +711,13 @@ function piRawMessagesToChatMessages(rawMessages: unknown[]): PiChatMessage[] {
       }
       case "toolResult": {
         const id = readString(message.toolCallId) || crypto.randomUUID();
-        messages = upsertTool(messages, {
+        messages = upsertTool(messages, withCachedToolArgs({
           id,
           name: readString(message.toolName) || "tool",
           args: null,
           output: extractTextContent(message),
           status: message.isError === true ? "error" : "done",
-        });
+        }, toolCache));
         break;
       }
       case "bashExecution": {
@@ -725,6 +731,7 @@ function piRawMessagesToChatMessages(rawMessages: unknown[]): PiChatMessage[] {
         break;
       }
       case "custom": {
+        if (isTurnChangeSummaryMessage(message)) break;
         if (message.display === false) break;
         const content = extractTextContent(message);
         if (!content) break;
@@ -751,7 +758,7 @@ function piRawMessagesToChatMessages(rawMessages: unknown[]): PiChatMessage[] {
     }
   }
 
-  return messages.map((message) => ({ ...message, streaming: false }));
+  return finalizeToolGroups(messages).map((message) => ({ ...message, streaming: false }));
 }
 
 function updateStreamingTabs(streamingTabs: Set<string>, tabId: string, event: PiRpcEvent): Set<string> {

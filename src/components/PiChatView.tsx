@@ -133,6 +133,10 @@ function useSettledStreaming(isStreaming: boolean, delayMs = 450): boolean {
   return settledStreaming;
 }
 
+function workingStatusLabel(effort: PiThinkingLevel): string {
+  return effort === "off" ? "Working..." : `Working... (thinking with ${effort} effort)`;
+}
+
 function buildTurnChangeSummaries(messages: readonly PiChatMessage[], projectPath: string, isStreaming: boolean): Map<string, ChangedFilesBundle> {
   const summaries = new Map<string, ChangedFilesBundle>();
   const sessionChanges = changedFilesForMessages([...messages], projectPath);
@@ -743,7 +747,7 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
         {showStreamingUi && (
           <div className="pi-chat-working">
             <span className="pi-chat-working-mark" aria-hidden="true" />
-            <span>Working...</span>
+            <span>{workingStatusLabel(effortValue)}</span>
           </div>
         )}
 
