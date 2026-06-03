@@ -15,19 +15,12 @@ pub struct ProjectConfig {
     pub theme: String,
 }
 
-fn user_config_base_dir() -> PathBuf {
-    dirs::config_dir().unwrap_or_else(|| PathBuf::from("."))
-}
-
 pub fn config_dir(app_handle: &tauri::AppHandle) -> PathBuf {
-    let dir = if cfg!(debug_assertions) {
-        user_config_base_dir().join("com.circuit.circuitclaude.dev")
-    } else {
-        app_handle
-            .path()
-            .app_config_dir()
-            .unwrap_or_else(|_| user_config_base_dir().join("CircuitClaude"))
-    };
+    let dir = app_handle.path().app_config_dir().unwrap_or_else(|_| {
+        dirs::config_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join("CircuitClaude")
+    });
     fs::create_dir_all(&dir).ok();
     dir
 }
