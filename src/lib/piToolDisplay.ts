@@ -309,15 +309,33 @@ function unifiedDiffFromTexts(path: string, oldText: string, newText: string): s
   return `--- a/${shortToolPath(path)}\n+++ b/${shortToolPath(path)}\n${hunks.join("")}`;
 }
 
+function unifiedDiffHasChanges(diff: string): boolean {
+  let inHunk = false;
+  for (const line of diff.split("\n")) {
+    if (line.startsWith("@@")) {
+      inHunk = true;
+      continue;
+    }
+    if (inHunk && (line.startsWith("-") || line.startsWith("+"))) return true;
+  }
+  return false;
+}
+
 function reverseApplyHunks(currentText: string, hunks: UpdateToolPatchHunk[]): { text: string; complete: boolean } {
   let text = normalizeText(currentText);
   let complete = true;
+
+  if (text.length === 0 && hunks.length === 1) {
+    const oldText = normalizeText(hunks[0].oldText);
+    const newText = normalizeText(hunks[0].newText);
+    if (oldText.length > 0 && newText.length === 0) return { text: oldText, complete: true };
+  }
 
   for (let index = hunks.length - 1; index >= 0; index -= 1) {
     const hunk = hunks[index];
     const newText = normalizeText(hunk.newText);
     const oldText = normalizeText(hunk.oldText);
-    if (!newText) {
+    if (newText.length === 0) {
       complete = false;
       continue;
     }
@@ -357,13 +375,15 @@ export function combinedUpdateToolPatchStats(hunks: UpdateToolPatchHunk[], curre
 export function renderCombinedUpdateToolPatchDiff(path: string, hunks: UpdateToolPatchHunk[], currentText = ""): string {
   if (hunks.length === 0) return "";
   const previous = reverseApplyHunks(currentText, hunks);
-  const combined = unifiedDiffFromTexts(path, previous.text, normalizeText(currentText));
-  return previous.complete && combined.trim() !== `--- a/${shortToolPath(path)}\n+++ b/${shortToolPath(path)}`
-    ? combined
-    : renderUpdateToolPatchDiff(path, hunks, currentText);
+  if (previous.complete) {
+    const combined = unifiedDiffFromTexts(path, previous.text, normalizeText(currentText));
+    if (unifiedDiffHasChanges(combined)) return combined;
+  }
+  return renderUpdateToolPatchDiff(path, hunks, currentText);
 }
 
 export function renderUpdateToolPatchDiff(path: string, hunks: UpdateToolPatchHunk[], currentText = ""): string {
+  if (hunks.length === 0) return "";
   const normalizedCurrent = normalizeText(currentText);
   let searchFrom = 0;
   let cumulativeDelta = 0;

@@ -12,12 +12,26 @@ interface DiffLine {
   highlight: boolean;
 }
 
+function diffHasChanges(raw: string | null | undefined): boolean {
+  if (!raw) return false;
+  let inHunk = false;
+  for (const line of raw.split("\n")) {
+    if (line.startsWith("@@")) {
+      inHunk = true;
+      continue;
+    }
+    if (inHunk && (line.startsWith("-") || line.startsWith("+"))) return true;
+  }
+  return false;
+}
+
 function parseLines(raw: string): DiffLine[] {
   const result: DiffLine[] = [];
   let oldNum = 0;
   let newNum = 0;
+  const diffLines = raw.endsWith("\n") ? raw.slice(0, -1).split("\n") : raw.split("\n");
 
-  for (const line of raw.split("\n")) {
+  for (const line of diffLines) {
     if (line.startsWith("@@")) {
       const m = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
       if (m) {
@@ -67,21 +81,27 @@ export function DiffViewer() {
 
   const language = diffFile ? detectLanguage(diffFile.path) : undefined;
   const hasScopedModes = scopedDiffContent !== null;
-  const activeContent = hasScopedModes
+  const scopedContent = hasScopedModes
     ? mode === "turn"
       ? scopedDiffContent.turnContent ?? ""
       : mode === "session"
         ? scopedDiffContent.sessionContent ?? ""
-        : diffContent
+        : null
+    : null;
+  const scopedHasChanges = diffHasChanges(scopedContent);
+  const activeContent = hasScopedModes
+    ? mode === "file" || !scopedHasChanges
+      ? diffContent
+      : scopedContent
     : diffContent;
-  const activeLoading = hasScopedModes && mode !== "file" ? false : diffLoading;
+  const activeLoading = hasScopedModes && mode !== "file" ? !scopedHasChanges && diffLoading : diffLoading;
 
   const lines = useMemo(() => {
     if (!activeContent) return [];
     return parseLines(activeContent);
   }, [activeContent]);
 
-  const isEmpty = activeContent !== null && activeContent.trim() === "";
+  const isEmpty = activeContent === null || activeContent.trim() === "";
 
   if (!diffFile) return null;
 

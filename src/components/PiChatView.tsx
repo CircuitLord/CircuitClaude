@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { usePiSession } from "../hooks/usePiSession";
 import { listPiSessions, savePiChatSettings, type PiSessionInfo } from "../lib/pi";
 import { THEMES } from "../lib/themes";
@@ -55,6 +55,27 @@ interface PiMessagesResponse {
 
 interface PiSwitchSessionResponse {
   cancelled?: boolean;
+}
+
+interface PiForkMessagesResponse {
+  messages?: unknown[];
+}
+
+interface PiCommandsResponse {
+  commands?: unknown[];
+}
+
+interface PiForkMessage {
+  entryId: string;
+  text: string;
+}
+
+type RewindMode = "conversation" | "code";
+
+interface RewindDialogState {
+  entryId: string;
+  text: string;
+  files: string[];
 }
 
 const EMPTY_MESSAGES = [] as const;
@@ -135,6 +156,57 @@ function useSettledStreaming(isStreaming: boolean, delayMs = 450): boolean {
 
 function workingStatusLabel(effort: PiThinkingLevel): string {
   return effort === "off" ? "Working..." : `Working... (thinking with ${effort} effort)`;
+}
+
+function readObject(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+
+function readText(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function getPiChatMessageText(message: PiChatMessage): string {
+  const first = message.blocks[0];
+  return first?.type === "text" ? first.content : "";
+}
+
+function normalizeForkMessages(response: PiForkMessagesResponse): PiForkMessage[] {
+  if (!Array.isArray(response.messages)) return [];
+
+  return response.messages.flatMap((raw): PiForkMessage[] => {
+    const item = readObject(raw);
+    const entryId = readText(item?.entryId).trim();
+    const text = readText(item?.text);
+    return entryId ? [{ entryId, text }] : [];
+  });
+}
+
+function buildRewindTargetMap(messages: readonly PiChatMessage[], targets: readonly PiForkMessage[]): Map<string, string> {
+  const result = new Map<string, string>();
+  let targetIndex = 0;
+
+  for (const message of messages) {
+    if (message.role !== "user") continue;
+    const text = getPiChatMessageText(message);
+
+    for (let index = targetIndex; index < targets.length; index += 1) {
+      if (targets[index]?.text !== text) continue;
+      result.set(message.id, targets[index].entryId);
+      targetIndex = index + 1;
+      break;
+    }
+  }
+
+  return result;
+}
+
+function findRewindCommandName(response: PiCommandsResponse): string | null {
+  if (!Array.isArray(response.commands)) return null;
+  const names = response.commands
+    .map((raw) => readText(readObject(raw)?.name))
+    .filter(Boolean);
+  return names.find((name) => name === "rewind-to") ?? names.find((name) => name.startsWith("rewind-to:")) ?? null;
 }
 
 function buildTurnChangeSummaries(messages: readonly PiChatMessage[], projectPath: string, isStreaming: boolean): Map<string, ChangedFilesBundle> {
@@ -271,6 +343,9 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
   const [loadSessions, setLoadSessions] = useState<PiSessionInfo[]>([]);
   const [loadSessionsLoading, setLoadSessionsLoading] = useState(false);
   const [loadSessionsError, setLoadSessionsError] = useState<string | null>(null);
+  const [rewindTargets, setRewindTargets] = useState<PiForkMessage[]>([]);
+  const [rewindDialog, setRewindDialog] = useState<RewindDialogState | null>(null);
+  const [rewindBusy, setRewindBusy] = useState(false);
   const [, setToolbarError] = useState<string | null>(null);
 
   const messages = usePiChatStore(
@@ -298,6 +373,8 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
   const { ready, backendId, sendMessage, sendCommand, interrupt } = usePiSession({ tabId, projectPath });
 
   const changeSummaries = buildTurnChangeSummaries(messages, projectPath, showStreamingUi);
+  const userMessageCount = messages.filter((message) => message.role === "user").length;
+  const rewindEntryIds = useMemo(() => buildRewindTargetMap(messages, rewindTargets), [messages, rewindTargets]);
 
   const preferredModels = availableModels.filter(isPreferredModel);
   const modelOptions = currentModel && !preferredModels.some((model) => modelKey(model) === modelKey(currentModel))
@@ -403,9 +480,32 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
   }, [loadMenuOpen]);
 
   const loadCurrentMessages = useCallback(async () => {
-    const response = await sendCommand<PiMessagesResponse>({ type: "get_messages" });
-    setMessagesFromPi(tabId, Array.isArray(response.messages) ? response.messages : []);
+    const [messagesResponse, forkMessagesResponse] = await Promise.all([
+      sendCommand<PiMessagesResponse>({ type: "get_messages" }),
+      sendCommand<PiForkMessagesResponse>({ type: "get_fork_messages" }),
+    ]);
+    setMessagesFromPi(tabId, Array.isArray(messagesResponse.messages) ? messagesResponse.messages : []);
+    setRewindTargets(normalizeForkMessages(forkMessagesResponse));
   }, [sendCommand, setMessagesFromPi, tabId]);
+
+  const refreshRewindTargets = useCallback(async () => {
+    if (!ready) return;
+    try {
+      const response = await sendCommand<PiForkMessagesResponse>({ type: "get_fork_messages" });
+      setRewindTargets(normalizeForkMessages(response));
+    } catch {
+      setRewindTargets([]);
+    }
+  }, [ready, sendCommand]);
+
+  useEffect(() => {
+    if (!ready) {
+      setRewindTargets([]);
+      return;
+    }
+    if (isStreaming) return;
+    void refreshRewindTargets();
+  }, [isStreaming, ready, refreshRewindTargets, userMessageCount]);
 
   const refreshLoadSessions = useCallback(async () => {
     setLoadSessionsLoading(true);
@@ -567,6 +667,62 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
     setInputValue(nextValue);
   }, []);
 
+  const handleOpenRewindDialog = useCallback((message: PiChatMessage, index: number, entryId: string) => {
+    if (!ready || isStreaming || rewindBusy) return;
+    const changes = changedFilesForMessages(messages.slice(index + 1), projectPath);
+    setRewindDialog({
+      entryId,
+      text: getPiChatMessageText(message),
+      files: changes.files.map((file) => file.path),
+    });
+  }, [isStreaming, messages, projectPath, ready, rewindBusy]);
+
+  const handleCloseRewindDialog = useCallback(() => {
+    if (!rewindBusy) setRewindDialog(null);
+  }, [rewindBusy]);
+
+  const handleConfirmRewind = useCallback(async (mode: RewindMode) => {
+    const target = rewindDialog;
+    if (!target || !ready || isStreaming || rewindBusy) return;
+
+    setRewindBusy(true);
+    setTabStatus(tabId, "thinking");
+    try {
+      const commandName = findRewindCommandName(await sendCommand<PiCommandsResponse>({ type: "get_commands" }));
+      if (!commandName) {
+        throw new Error("Pi rewind command is not available. Reload Pi extensions and try again.");
+      }
+
+      await sendCommand({
+        type: "prompt",
+        message: `/${commandName} ${JSON.stringify({ entryId: target.entryId, mode })}`,
+      });
+      await loadCurrentMessages();
+      setInputValueWithSelection(target.text, target.text.length);
+      setRewindDialog(null);
+      setToolbarError(null);
+    } catch (err) {
+      appendError(tabId, String(err));
+    } finally {
+      setRewindBusy(false);
+      setTabStatus(tabId, null);
+    }
+  }, [appendError, isStreaming, loadCurrentMessages, ready, rewindBusy, rewindDialog, sendCommand, setInputValueWithSelection, setTabStatus, tabId]);
+
+  useEffect(() => {
+    if (!rewindDialog) return;
+
+    function handleKey(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      handleCloseRewindDialog();
+    }
+
+    window.addEventListener("keydown", handleKey, true);
+    return () => window.removeEventListener("keydown", handleKey, true);
+  }, [handleCloseRewindDialog, rewindDialog]);
+
   const replaceInputSelection = useCallback((replacement: string) => {
     const input = inputRef.current;
     const start = input?.selectionStart ?? inputValue.length;
@@ -643,7 +799,7 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
     }
 
     function handleDocumentKeyDown(event: KeyboardEvent) {
-      if (!keyboardCaptureRef.current || isInteractiveTarget(event.target)) return;
+      if (rewindDialog || !keyboardCaptureRef.current || isInteractiveTarget(event.target)) return;
       if (!routeKeyToInput(event)) return;
 
       event.preventDefault();
@@ -651,7 +807,7 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
     }
 
     function handleDocumentPaste(event: ClipboardEvent) {
-      if (!keyboardCaptureRef.current || isInteractiveTarget(event.target) || !ready) return;
+      if (rewindDialog || !keyboardCaptureRef.current || isInteractiveTarget(event.target) || !ready) return;
 
       const text = event.clipboardData?.getData("text/plain");
       if (!text) return;
@@ -669,7 +825,7 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
       document.removeEventListener("keydown", handleDocumentKeyDown, true);
       document.removeEventListener("paste", handleDocumentPaste, true);
     };
-  }, [activeSessionId, ready, replaceInputSelection, routeKeyToInput, tabId]);
+  }, [activeSessionId, ready, replaceInputSelection, rewindDialog, routeKeyToInput, tabId]);
 
   const handleViewMouseDown = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
     if (event.button !== 0 || isInteractiveTarget(event.target)) return;
@@ -735,14 +891,19 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
         {messages.length === 0 ? (
           <div className="pi-chat-empty">{ready ? "send a message to pi..." : "starting pi..."}</div>
         ) : (
-          messages.map((message) => (
-            <PiChatMessageView
-              message={message}
-              projectPath={projectPath}
-              changeSummary={changeSummaries.get(message.id)}
-              key={message.id}
-            />
-          ))
+          messages.map((message, index) => {
+            const rewindEntryId = message.role === "user" ? rewindEntryIds.get(message.id) : undefined;
+            return (
+              <PiChatMessageView
+                message={message}
+                projectPath={projectPath}
+                changeSummary={changeSummaries.get(message.id)}
+                onRewind={rewindEntryId ? () => handleOpenRewindDialog(message, index, rewindEntryId) : undefined}
+                rewindDisabled={!ready || isStreaming || rewindBusy}
+                key={message.id}
+              />
+            );
+          })
         )}
         {showStreamingUi && (
           <div className="pi-chat-working">
@@ -752,6 +913,62 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
         )}
 
       </div>
+
+      {rewindDialog && (
+        <div
+          className="pi-chat-rewind-backdrop"
+          onMouseDown={(event) => {
+            event.stopPropagation();
+            if (event.target === event.currentTarget) handleCloseRewindDialog();
+          }}
+        >
+          <div className="pi-chat-rewind-dialog" role="dialog" aria-modal="true" aria-label="rewind conversation">
+            <div className="pi-chat-rewind-title">rewind conversation</div>
+            <div className="pi-chat-rewind-preview">{rewindDialog.text || "(empty message)"}</div>
+            <div className="pi-chat-rewind-options">
+              <button
+                type="button"
+                className="pi-chat-rewind-option"
+                onClick={() => handleConfirmRewind("conversation")}
+                disabled={rewindBusy}
+              >
+                <span className="pi-chat-rewind-marker">{">"}</span>
+                <span className="pi-chat-rewind-option-main">
+                  <span>conversation only</span>
+                  <span className="pi-chat-rewind-option-meta">move pi back to this message and restore it to the editor</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                className="pi-chat-rewind-option"
+                onClick={() => handleConfirmRewind("code")}
+                disabled={rewindBusy || rewindDialog.files.length === 0}
+              >
+                <span className="pi-chat-rewind-marker">{">"}</span>
+                <span className="pi-chat-rewind-option-main">
+                  <span>conversation + code changes</span>
+                  <span className="pi-chat-rewind-option-meta">
+                    {rewindDialog.files.length > 0
+                      ? `also try to undo pi edits in ${rewindDialog.files.length} file${rewindDialog.files.length === 1 ? "" : "s"}`
+                      : "no code changes detected after this message"}
+                  </span>
+                </span>
+              </button>
+            </div>
+            {rewindDialog.files.length > 0 && (
+              <div className="pi-chat-rewind-files">
+                {rewindDialog.files.slice(0, 5).map((file) => <div key={file}>• {file}</div>)}
+                {rewindDialog.files.length > 5 && <div>• … {rewindDialog.files.length - 5} more</div>}
+              </div>
+            )}
+            <div className="pi-chat-rewind-footer">
+              <button type="button" className="pi-chat-rewind-cancel" onClick={handleCloseRewindDialog} disabled={rewindBusy}>
+                :cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="pi-chat-input-shell">
         <VoiceTranscriptBox

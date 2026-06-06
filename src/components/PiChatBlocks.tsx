@@ -11,7 +11,6 @@ import {
   aggregateUpdateToolFilePatches,
   combinedUpdateToolPatchStats,
   renderCombinedUpdateToolPatchDiff,
-  renderUpdateToolPatchDiff,
   type UpdateToolPatchHunk,
 } from "../lib/piToolDisplay";
 import { readFile, fileColorClass } from "../lib/files";
@@ -22,6 +21,8 @@ interface PiChatMessageViewProps {
   message: PiChatMessage;
   projectPath: string;
   changeSummary?: ChangedFilesBundle;
+  onRewind?: () => void;
+  rewindDisabled?: boolean;
 }
 
 export interface ChangedFileSummary {
@@ -49,11 +50,20 @@ const ChangedFilesIcon = (
   </svg>
 );
 
-export function PiChatMessageView({ message, projectPath, changeSummary }: PiChatMessageViewProps) {
+export function PiChatMessageView({ message, projectPath, changeSummary, onRewind, rewindDisabled }: PiChatMessageViewProps) {
   if (message.role === "user") {
     return (
       <div className="pi-chat-message pi-chat-message--user">
-        <div className="pi-chat-user-text">{renderPiMarkdownBlocks(getMessageText(message.blocks), "pi-user")}</div>
+        <div className="pi-chat-user-shell">
+          <div className="pi-chat-user-text">{renderPiMarkdownBlocks(getMessageText(message.blocks), "pi-user")}</div>
+          {onRewind && (
+            <div className="pi-chat-user-actions">
+              <button type="button" className="pi-chat-user-action" onClick={onRewind} disabled={rewindDisabled}>
+                :rewind
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     );
   }
@@ -118,7 +128,7 @@ function PiChangedFilesCard({ summary, projectPath }: { summary: ChangedFilesBun
     const currentText = await readFile(joinProjectPath(projectPath, file.path)).catch(() => "");
     await openDiff(projectPath, entry ?? { path: file.path, status: "M" }, {
       defaultMode: "turn",
-      turnContent: renderUpdateToolPatchDiff(file.path, summary.turnHunks[file.path] ?? [], currentText),
+      turnContent: renderCombinedUpdateToolPatchDiff(file.path, summary.turnHunks[file.path] ?? [], currentText),
       sessionContent: renderCombinedUpdateToolPatchDiff(file.path, summary.sessionHunks[file.path] ?? [], currentText),
     });
   };
