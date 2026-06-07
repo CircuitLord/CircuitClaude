@@ -2,13 +2,12 @@ import { useSessionStore } from "../stores/sessionStore";
 import { useProjectStore } from "../stores/projectStore";
 import { useNotesStore } from "../stores/notesStore";
 import { WindowControls } from "./WindowControls";
-import { NewSessionMenu } from "./NewSessionMenu";
 import { PinsDropdown } from "./PinsDropdown";
 import { readClaudeMd, readAgentsMd } from "../lib/config";
 import { openFileTab } from "../lib/sessions";
 
 export function ProjectHeader() {
-  const { activeProjectPath, sessions } = useSessionStore();
+  const activeProjectPath = useSessionStore((s) => s.activeProjectPath);
   const notesOpen = useNotesStore((s) => s.isOpen);
   const toggleNotes = useNotesStore((s) => s.toggle);
   const { projects } = useProjectStore();
@@ -17,10 +16,6 @@ export function ProjectHeader() {
 
   const project = projects.find((p) => p.path === activeProjectPath);
   const projectName = project?.name ?? activeProjectPath.split(/[/\\]/).pop();
-  const sessionCount = sessions.filter(
-    (s) => s.projectPath === activeProjectPath
-  ).length;
-
   return (
     <div className="project-header">
       <div className="project-header-info" data-tauri-drag-region>
@@ -41,8 +36,6 @@ export function ProjectHeader() {
         </button>
       </div>
       <div className="project-header-actions">
-        <span className="project-header-count">[{sessionCount}]</span>
-        <NewSessionMenu variant="pill" />
         <PinsDropdown />
         <button
           className={`project-header-text-btn${notesOpen ? " active" : ""}`}
