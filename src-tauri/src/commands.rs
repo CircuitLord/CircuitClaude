@@ -170,44 +170,56 @@ pub fn save_pinned_files(
 }
 
 #[tauri::command]
-pub fn get_git_status(project_path: String) -> git::GitStatus {
-    git::get_status(&project_path)
+pub async fn get_git_status(project_path: String) -> Result<git::GitStatus, String> {
+    tauri::async_runtime::spawn_blocking(move || git::get_status(&project_path))
+        .await
+        .map_err(|e| format!("Task join failed: {}", e))
 }
 
 #[tauri::command]
-pub fn get_git_diff(
+pub async fn get_git_diff(
     project_path: String,
     file_path: String,
     status: String,
 ) -> Result<String, String> {
-    git::get_diff(&project_path, &file_path, &status)
+    tauri::async_runtime::spawn_blocking(move || git::get_diff(&project_path, &file_path, &status))
+        .await
+        .map_err(|e| format!("Task join failed: {}", e))?
 }
 
 #[tauri::command]
-pub fn git_commit(
+pub async fn git_commit(
     project_path: String,
     files: Vec<String>,
     message: String,
 ) -> Result<String, String> {
-    git::commit(&project_path, &files, &message)
+    tauri::async_runtime::spawn_blocking(move || git::commit(&project_path, &files, &message))
+        .await
+        .map_err(|e| format!("Task join failed: {}", e))?
 }
 
 #[tauri::command]
-pub fn git_revert(project_path: String, files: Vec<git::GitFileEntry>) -> Result<(), String> {
-    git::revert(&project_path, &files)
+pub async fn git_revert(project_path: String, files: Vec<git::GitFileEntry>) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || git::revert(&project_path, &files))
+        .await
+        .map_err(|e| format!("Task join failed: {}", e))?
 }
 
 #[tauri::command]
-pub fn get_git_diff_stats(
+pub async fn get_git_diff_stats(
     project_path: String,
     files: Vec<git::GitFileEntry>,
 ) -> Result<Vec<git::DiffStat>, String> {
-    git::get_diff_stats(&project_path, &files)
+    tauri::async_runtime::spawn_blocking(move || git::get_diff_stats(&project_path, &files))
+        .await
+        .map_err(|e| format!("Task join failed: {}", e))?
 }
 
 #[tauri::command]
-pub fn git_push(project_path: String) -> Result<String, String> {
-    git::push(&project_path)
+pub async fn git_push(project_path: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || git::push(&project_path))
+        .await
+        .map_err(|e| format!("Task join failed: {}", e))?
 }
 
 #[tauri::command]

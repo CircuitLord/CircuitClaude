@@ -470,7 +470,6 @@ export function GitSection() {
   const { settings, update: updateSettings } = useSettingsStore();
   const panelMode = settings.sidebarPanelMode;
   const { fetchDirectory, clearProject } = useFileTreeStore();
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
   const [heightRatio, setHeightRatio] = useState(DEFAULT_RATIO);
   const [parentHeight, setParentHeight] = useState(0);
@@ -537,18 +536,24 @@ export function GitSection() {
     document.body.style.userSelect = "none";
   }
 
-  // Fetch on mount / project change, and poll
+  // Fetch on mount / project change, then poll — next timer starts after fetch resolves
   useEffect(() => {
     if (!activeProjectPath) return;
 
-    fetchStatus(activeProjectPath);
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
 
-    intervalRef.current = setInterval(() => {
-      fetchStatus(activeProjectPath);
-    }, POLL_INTERVAL);
+    const poll = () => {
+      fetchStatus(activeProjectPath).finally(() => {
+        if (cancelled) return;
+        timer = setTimeout(poll, POLL_INTERVAL);
+      });
+    };
+    poll();
 
     return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      cancelled = true;
+      if (timer) clearTimeout(timer);
     };
   }, [activeProjectPath, fetchStatus]);
 
