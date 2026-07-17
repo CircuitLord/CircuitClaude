@@ -24,12 +24,18 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
 
+      # Ninja + nvcc avoids the VS-generator "No CUDA toolset found" break on vs2026 images
+      - name: Setup MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
           workspaces: "./src-tauri -> target"
           # Include CUDA version in cache key so changing CUDA invalidates stale cmake artifacts
-          key: "cuda-13.1"
+          key: "cuda-13.1-ninja"
 
       - name: Install CUDA Toolkit
         uses: Jimver/cuda-toolkit@master
@@ -44,6 +50,8 @@ jobs:
           echo "CUDAToolkit_ROOT=$CUDA_PATH" >> $GITHUB_ENV
           echo "CMAKE_CUDA_COMPILER=$CUDA_PATH/bin/nvcc.exe" >> $GITHUB_ENV
           echo "LIB=$CUDA_PATH\\lib\\x64;$CUDA_PATH\\lib;$LIB" >> $GITHUB_ENV
+          # Ninja drives nvcc directly so CUDA build ignores the VS MSBuild toolset
+          echo "CMAKE_GENERATOR=Ninja" >> $GITHUB_ENV
 
       - name: Install frontend dependencies
         run: npm ci
