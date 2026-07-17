@@ -10,6 +10,15 @@ mod pi_manager;
 mod pty_manager;
 mod whisper_manager;
 
+#[cfg(not(debug_assertions))]
+fn focus_main_window(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+    }
+}
+
 fn resolve_bridge_path(app: &tauri::App) -> String {
     // In dev: use CARGO_MANIFEST_DIR/sidecar/claude-bridge.mjs
     if cfg!(debug_assertions) {
@@ -34,7 +43,17 @@ fn resolve_bridge_path(app: &tauri::App) -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    #[cfg(not(debug_assertions))]
+    let builder = tauri::Builder::default().plugin(tauri_plugin_single_instance::init(
+        |app, _args, _cwd| {
+            focus_main_window(app);
+        },
+    ));
+
+    #[cfg(debug_assertions)]
+    let builder = tauri::Builder::default();
+
+    builder
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
