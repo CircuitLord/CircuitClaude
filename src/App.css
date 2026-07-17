@@ -246,7 +246,7 @@ body,
   animation: tui-scanline 0.2s step-end forwards;
 }
 
-.sidebar-entry.thinking::after {
+.sidebar-entry.active.thinking::after {
   content: "";
   position: absolute;
   bottom: 0;
