@@ -3,26 +3,19 @@ import { useProjectStore } from "../stores/projectStore";
 import { closePtySession } from "./pty";
 import { destroyPiSession } from "./pi";
 
-export function spawnNewSession(type: string = "claude", targetPane?: 1 | 2) {
-  const { activeProjectPath, addSession, projectSplits, setFocusedPane } = useSessionStore.getState();
+export function spawnNewSession(type: string = "claude", projectPath?: string) {
+  const { activeProjectPath, addSession, setActiveProject } = useSessionStore.getState();
   const { projects } = useProjectStore.getState();
-  if (!activeProjectPath) return;
+  const target = projectPath ?? activeProjectPath;
+  if (!target) return;
+  if (target !== activeProjectPath) setActiveProject(target);
 
-  // If a targetPane is specified and a split exists, focus that pane first
-  // so addSession routes the new session to it
-  if (targetPane !== undefined) {
-    const split = projectSplits.get(activeProjectPath);
-    if (split) {
-      setFocusedPane(activeProjectPath, targetPane);
-    }
-  }
-
-  const project = projects.find((p) => p.path === activeProjectPath);
-  const name = project?.name ?? activeProjectPath.split(/[/\\]/).pop() ?? "Unknown";
+  const project = projects.find((p) => p.path === target);
+  const name = project?.name ?? target.split(/[/\\]/).pop() ?? "Unknown";
   addSession({
     id: generateTabId(),
     projectName: name,
-    projectPath: activeProjectPath,
+    projectPath: target,
     sessionId: null,
     createdAt: Date.now(),
     sessionType: type,

@@ -4,6 +4,8 @@ import { useProjectStore } from "../stores/projectStore";
 import { useSessionStore } from "../stores/sessionStore";
 import { useAddProject } from "./AddProjectDialog";
 import { GitSection } from "./GitSection";
+import { SidebarSessions } from "./SidebarSessions";
+import { NewSessionMenu } from "./NewSessionMenu";
 import { SettingsDialog } from "./SettingsDialog";
 import { readClaudeMd } from "../lib/config";
 import { openFileTab } from "../lib/sessions";
@@ -13,7 +15,7 @@ import type { ThemeName } from "../types";
 
 export function Sidebar() {
   const { projects, loaded, load, removeProject, reorderProjects, updateProjectTheme } = useProjectStore();
-  const { sessions, activeProjectPath, setActiveProject, tabStatuses } = useSessionStore();
+  const { sessions, activeProjectPath, setActiveProject } = useSessionStore();
   const settingsOpen = useSettingsStore((s) => s.settingsDialogOpen);
   const openSettingsDialog = useSettingsStore((s) => s.openSettingsDialog);
   const closeSettingsDialog = useSettingsStore((s) => s.closeSettingsDialog);
@@ -273,13 +275,9 @@ export function Sidebar() {
           }
 
           // Normal mode
-          const projectSessions = sessions.filter(
-            (s) => s.projectPath === p.path
-          );
-          const sessionCount = projectSessions.length;
-          const isWaitingAny = projectSessions.some((s) => tabStatuses.get(s.id) === "waiting");
-          const isThinkingAny = !isWaitingAny && projectSessions.some((s) => tabStatuses.get(s.id) === "thinking");
           const isActive = p.path === activeProjectPath;
+          // with no sessions the project row is the leaf, so it keeps the selection fill
+          const isLeaf = isActive && !sessions.some((s) => s.projectPath === p.path);
           const projectTheme = THEMES[p.theme] ?? THEMES.midnight;
           const entryStyle: CSSProperties = {
             "--sidebar-project-accent": projectTheme.css["--accent"],
@@ -287,36 +285,20 @@ export function Sidebar() {
             "--sidebar-project-text-tertiary": projectTheme.css["--text-tertiary"],
           } as CSSProperties;
 
-          const entryClasses = [
-            "sidebar-entry",
-            isActive && "active",
-            isThinkingAny && "thinking",
-          ].filter(Boolean).join(" ");
-
           return (
-            <div
-              key={p.path}
-              className={entryClasses}
-              onClick={() => handleSelectProject(p.path)}
-              title={p.path}
-              style={entryStyle}
-            >
-              <div className="sidebar-entry-line1">
-                <span className="sidebar-entry-prefix">{">"}</span>
-                <span className="sidebar-entry-name">{p.name}</span>
+            <div key={p.path} className="sidebar-group" style={entryStyle}>
+              <div
+                className={`sidebar-entry${isActive ? " active" : ""}${isLeaf ? " leaf" : ""}`}
+                onClick={() => handleSelectProject(p.path)}
+                title={p.path}
+              >
+                <div className="sidebar-entry-line1">
+                  <span className="sidebar-entry-prefix">~/</span>
+                  <span className="sidebar-entry-name">{p.name}</span>
+                  <NewSessionMenu variant="sidebar" projectPath={p.path} />
+                </div>
               </div>
-              <div className="sidebar-entry-status">
-                {isWaitingAny ? (
-                  <span className="sidebar-entry-status-text waiting"><span className="sidebar-entry-status-symbol">?</span> waiting</span>
-                ) : isThinkingAny ? (
-                  <span className="sidebar-entry-status-text alive"><span className="sidebar-entry-status-symbol">*</span> thinking</span>
-                ) : (
-                  <span className="sidebar-entry-status-text idle">idle</span>
-                )}
-                {sessionCount > 0 && (
-                  <span className="sidebar-entry-count has-sessions">[{sessionCount} {sessionCount === 1 ? "session" : "sessions"}]</span>
-                )}
-              </div>
+              <SidebarSessions projectPath={p.path} />
             </div>
           );
         })}

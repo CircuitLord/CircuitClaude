@@ -4,11 +4,11 @@ import { useSettingsStore } from "../stores/settingsStore";
 import { getSessionTypes } from "../lib/sessionTypes";
 
 interface NewSessionMenuProps {
-  variant: "button" | "pill";
-  targetPane?: 1 | 2;
+  variant: "pill" | "sidebar";
+  projectPath?: string;
 }
 
-export function NewSessionMenu({ variant, targetPane }: NewSessionMenuProps) {
+export function NewSessionMenu({ variant, projectPath }: NewSessionMenuProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const editableSessionTypes = useSettingsStore((s) => s.settings.sessionTypes);
@@ -37,7 +37,7 @@ export function NewSessionMenu({ variant, targetPane }: NewSessionMenuProps) {
 
   function handleSelect(id: string) {
     setOpen(false);
-    spawnNewSession(id, targetPane);
+    spawnNewSession(id, projectPath);
   }
 
   const dropdownContent = (
@@ -55,18 +55,19 @@ export function NewSessionMenu({ variant, targetPane }: NewSessionMenuProps) {
     </>
   );
 
-  if (variant === "button") {
+  if (variant === "sidebar") {
     return (
-      <div className="new-session-menu" ref={containerRef}>
+      <div className="new-session-menu" ref={containerRef} onClick={(e) => e.stopPropagation()}>
         <button
-          className="terminal-tab-add"
+          className="sidebar-entry-spawn"
+          aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
           title="New session"
         >
           +
         </button>
         {open && (
-          <div className="new-session-dropdown new-session-dropdown--tab">
+          <div className="new-session-dropdown new-session-dropdown--sidebar">
             {dropdownContent}
           </div>
         )}

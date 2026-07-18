@@ -1,79 +1,46 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSessionStore } from "../stores/sessionStore";
+import { useSessionDragStore } from "../stores/sessionDragStore";
 import { useEditorStore } from "../stores/editorStore";
 import { TerminalView } from "./TerminalView";
 import { EditorViewComponent } from "./EditorView";
 import { PiChatView } from "./PiChatView";
-import { NewSessionMenu } from "./NewSessionMenu";
-import { closeTab, pinTab } from "../lib/sessions";
-import { SplitDirection, PaneState } from "../types";
+import { closeTab } from "../lib/sessions";
 import { getTabPrefix } from "../lib/sessionTypes";
-
-function checkTabBarOverflow(tabBar: HTMLDivElement | null) {
-  if (!tabBar) return;
-  const wrapper = tabBar.parentElement;
-  if (!wrapper) return;
-  const { scrollLeft, scrollWidth, clientWidth } = tabBar;
-  wrapper.classList.toggle("terminal-tabs-bar-wrapper--overflow-left", scrollLeft > 1);
-  wrapper.classList.toggle("terminal-tabs-bar-wrapper--overflow-right", scrollLeft < scrollWidth - clientWidth - 1);
-}
 
 interface TerminalTabsProps {
   projectPath: string;
 }
 
-type DropZone = "left" | "right" | "top" | "bottom" | null;
-
 export function TerminalTabs({ projectPath }: TerminalTabsProps) {
   const {
     sessions,
     activeSessionId,
-    setActiveSession,
     tabStatuses,
     sessionTitles,
-    reorderSessions,
     projectSplits,
-    setSplit,
     clearSplit,
     setFocusedPane,
-    moveSessionToPane,
-    reorderPaneSessions,
   } = useSessionStore();
 
-  // Subscribe to editor files so breadcrumb re-renders on readOnly toggle
+  // Subscribe to editor files so the header re-renders on readOnly toggle
   const editorFiles = useEditorStore((s) => s.files);
 
-  const tabBarRef = useRef<HTMLDivElement>(null);
+  const dragSessionId = useSessionDragStore((s) => s.sessionId);
+  const dragProjectPath = useSessionDragStore((s) => s.projectPath);
+  const dragZone = useSessionDragStore((s) => s.zone);
+  const dragPane = useSessionDragStore((s) => s.pane);
+  const dragActive = dragSessionId !== null && dragProjectPath === projectPath;
+
   const panelsRef = useRef<HTMLDivElement>(null);
-  const pane1TabBarRef = useRef<HTMLDivElement>(null);
-  const pane2TabBarRef = useRef<HTMLDivElement>(null);
-  const pane1Ref = useRef<HTMLDivElement>(null);
-  const pane2Ref = useRef<HTMLDivElement>(null);
-  const [dragIndex, setDragIndex] = useState<number | null>(null);
-  const [dropIndex, setDropIndex] = useState<number | null>(null);
-  const dropIndexRef = useRef<number | null>(null);
-  // Track which pane's tab bar is being dragged (null = unsplit tab bar)
-  const [dragPane, setDragPane] = useState<1 | 2 | null>(null);
 
-  // Split drag state (for drag-to-split gesture from unsplit mode)
-  const [splitDragActive, setSplitDragActive] = useState(false);
-  const [hoveredZone, setHoveredZone] = useState<DropZone>(null);
-  const splitDragSessionIdRef = useRef<string | null>(null);
-
-  // Cross-pane drag state
-  const [crossPaneDragActive, setCrossPaneDragActive] = useState(false);
-  const [crossPaneDropTarget, setCrossPaneDropTarget] = useState<1 | 2 | null>(null);
-  const crossPaneDragSessionIdRef = useRef<string | null>(null);
-
-  // Split resize state
   const [splitRatio, setSplitRatio] = useState(50);
   const resizingRef = useRef(false);
 
   const split = projectSplits.get(projectPath) ?? null;
 
   const projectSessions = sessions.filter((s) => s.projectPath === projectPath);
-  const allVisible = projectSessions;
-  const visibleSessionIds = useMemo(() => allVisible.map((s) => s.id), [allVisible]);
+  const visibleSessionIds = useMemo(() => projectSessions.map((s) => s.id), [projectSessions]);
 
   // When unsplit, manage mounted sessions for xterm persistence
   const [mountedSessionIds, setMountedSessionIds] = useState<string[]>(visibleSessionIds);
@@ -90,13 +57,11 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
     prevSplitRef.current = split;
   }, [split]);
 
-  // Track mounted sessions for unsplit mode
   useEffect(() => {
     if (split) return; // Skip when split — pane-specific tracking handles it
     setMountedSessionIds((prev) => syncMounted(prev, visibleSessionIds));
   }, [visibleSessionIds, split]);
 
-  // Track mounted sessions for split panes
   useEffect(() => {
     if (!split) return;
     setPane1MountedIds((prev) => syncMounted(prev, split.pane1.sessionIds));
@@ -122,10 +87,15 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
     return next;
   }
 
-  const activeInProject = allVisible.find((s) => s.id === activeSessionId);
-  const visibleSessionId = activeInProject?.id ?? allVisible[0]?.id ?? null;
+  const sessionById = useMemo(
+    () => new Map(projectSessions.map((session) => [session.id, session])),
+    [projectSessions]
+  );
 
-  // --- Breadcrumb helpers ---
+  const activeInProject = projectSessions.find((s) => s.id === activeSessionId);
+  const visibleSessionId = activeInProject?.id ?? projectSessions[0]?.id ?? null;
+
+  // --- Pane header ---
   function computeBreadcrumb(filePath: string): string[] {
     const norm = filePath.replace(/\\/g, "/");
     const normProject = projectPath.replace(/\\/g, "/");
@@ -141,68 +111,54 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
       return ["~", ...homeMatch[1].slice(1).split("/")];
     }
 
-    // Fallback: full path segments
     return norm.split("/").filter(Boolean);
   }
 
-  function renderBreadcrumb(activeSessionId: string | null) {
-    if (!activeSessionId) return null;
-    const session = sessionById.get(activeSessionId);
-    if (!session || session.sessionType !== "editor" || !session.filePath) return null;
-    const segments = computeBreadcrumb(session.filePath);
-    const editorFile = editorFiles.get(activeSessionId);
-    const isReadOnly = editorFile?.readOnly ?? true;
-    return (
-      <div className="editor-breadcrumb">
-        {segments.map((seg, i) => (
-          <span key={i}>
-            {i > 0 && <span className="editor-breadcrumb-sep">&gt;</span>}
-            <span className="editor-breadcrumb-segment">{seg}</span>
+  function renderPaneHeader(sessionId: string | null) {
+    if (!sessionId) return null;
+    const session = sessionById.get(sessionId);
+    if (!session) return null;
+    const prefix = getTabPrefix(session.sessionType);
+
+    if (session.sessionType === "editor" && session.filePath) {
+      const segments = computeBreadcrumb(session.filePath);
+      const isReadOnly = editorFiles.get(sessionId)?.readOnly ?? true;
+      return (
+        <div className="pane-header">
+          <span className="pane-header-prefix">{prefix}</span>
+          {segments.map((seg, i) => (
+            <span key={i} className="pane-header-crumb">
+              {i > 0 && <span className="editor-breadcrumb-sep">&gt;</span>}
+              <span className="editor-breadcrumb-segment">{seg}</span>
+            </span>
+          ))}
+          <span
+            className={`editor-mode-toggle${!isReadOnly ? " editor-mode-toggle--edit" : ""}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              useEditorStore.getState().setReadOnly(sessionId, !isReadOnly);
+            }}
+          >
+            {isReadOnly ? ":view" : ":edit"}
           </span>
-        ))}
-        <span
-          className={`editor-mode-toggle${!isReadOnly ? " editor-mode-toggle--edit" : ""}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            useEditorStore.getState().setReadOnly(activeSessionId, !isReadOnly);
-          }}
-        >
-          {isReadOnly ? ":view" : ":edit"}
-        </span>
+        </div>
+      );
+    }
+
+    const status = tabStatuses.get(sessionId) ?? null;
+    const title = sessionTitles.get(sessionId) ?? session.projectName;
+    return (
+      <div className="pane-header">
+        <span className="pane-header-prefix">{prefix}</span>
+        <span className="pane-header-title">{title}</span>
+        {status === "thinking" ? (
+          <span className="pane-header-status thinking">*</span>
+        ) : status === "waiting" ? (
+          <span className="pane-header-status waiting">?</span>
+        ) : null}
       </div>
     );
   }
-  const sessionById = useMemo(
-    () => new Map(allVisible.map((session) => [session.id, session])),
-    [allVisible]
-  );
-
-  function handleCloseSession(id: string) {
-    closeTab(id);
-  }
-
-  // Compute drop zone from mouse position relative to panels area
-  function computeDropZone(clientX: number, clientY: number): DropZone {
-    if (!panelsRef.current) return null;
-    const rect = panelsRef.current.getBoundingClientRect();
-
-    // Ignore if mouse is outside the panels area
-    if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) {
-      return null;
-    }
-
-    const relX = (clientX - rect.left) / rect.width;
-    const relY = (clientY - rect.top) / rect.height;
-
-    if (relX < 0.2) return "left";
-    if (relX > 0.8) return "right";
-    if (relY < 0.25) return "top";
-    if (relY > 0.75) return "bottom";
-    return null;
-  }
-
-  const hoveredZoneRef = useRef(hoveredZone);
-  hoveredZoneRef.current = hoveredZone;
 
   // --- Resize handle ---
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
@@ -246,348 +202,9 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
     window.addEventListener("mouseup", onUp);
   }, [split, projectPath, clearSplit]);
 
-  const handleTabBarWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.currentTarget.scrollLeft += e.deltaY;
-  }, []);
-
-  const handleTabBarScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    checkTabBarOverflow(e.currentTarget);
-  }, []);
-
-  // Track tab bar overflow for fade indicators
-  useEffect(() => {
-    checkTabBarOverflow(tabBarRef.current);
-    checkTabBarOverflow(pane1TabBarRef.current);
-    checkTabBarOverflow(pane2TabBarRef.current);
-
-    const observer = new ResizeObserver(() => {
-      checkTabBarOverflow(tabBarRef.current);
-      checkTabBarOverflow(pane1TabBarRef.current);
-      checkTabBarOverflow(pane2TabBarRef.current);
-    });
-
-    if (tabBarRef.current) observer.observe(tabBarRef.current);
-    if (pane1TabBarRef.current) observer.observe(pane1TabBarRef.current);
-    if (pane2TabBarRef.current) observer.observe(pane2TabBarRef.current);
-
-    return () => observer.disconnect();
-  }, [allVisible, split]);
-
   const handleResizeDoubleClick = useCallback(() => {
     clearSplit(projectPath);
   }, [projectPath, clearSplit]);
-
-  // --- Unsplit tab bar drag ---
-  const handleTabDragStart = useCallback((e: React.MouseEvent, index: number) => {
-    if (e.button !== 0) return;
-    if ((e.target as HTMLElement).closest(".terminal-tab-close")) return;
-    e.preventDefault();
-
-    const currentSessions = useSessionStore.getState().sessions.filter((s) => s.projectPath === projectPath);
-    const draggedSessionId = currentSessions[index]?.id;
-
-    setDragIndex(index);
-    setDragPane(null);
-    splitDragSessionIdRef.current = draggedSessionId ?? null;
-    document.body.style.cursor = "grabbing";
-
-    let inSplitMode = false;
-
-    const onMove = (ev: MouseEvent) => {
-      if (!tabBarRef.current) return;
-      const tabBarRect = tabBarRef.current.getBoundingClientRect();
-      const currentState = useSessionStore.getState();
-      const hasSplit = currentState.projectSplits.has(projectPath);
-
-      const containerRect = panelsRef.current?.getBoundingClientRect();
-      const withinBounds = containerRect
-        && ev.clientX >= containerRect.left && ev.clientX <= containerRect.right
-        && ev.clientY >= tabBarRect.top && ev.clientY <= containerRect.bottom;
-
-      if (!hasSplit && !inSplitMode && withinBounds && ev.clientY > tabBarRect.bottom + 20 && currentSessions.length >= 2) {
-        inSplitMode = true;
-        setSplitDragActive(true);
-        setDragIndex(null);
-        setDropIndex(null);
-        dropIndexRef.current = null;
-      }
-
-      if (inSplitMode) {
-        const zone = computeDropZone(ev.clientX, ev.clientY);
-        setHoveredZone(zone);
-        hoveredZoneRef.current = zone;
-        return;
-      }
-
-      const tabs = tabBarRef.current.querySelectorAll<HTMLElement>(".terminal-tab");
-      let newDrop = tabs.length;
-
-      for (let i = 0; i < tabs.length; i++) {
-        const rect = tabs[i].getBoundingClientRect();
-        if (ev.clientX < rect.left + rect.width / 2) {
-          newDrop = i;
-          break;
-        }
-      }
-
-      dropIndexRef.current = newDrop;
-      setDropIndex(newDrop);
-    };
-
-    const onUp = () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
-      document.body.style.cursor = "";
-
-      if (inSplitMode) {
-        const zone = hoveredZoneRef.current;
-        setSplitDragActive(false);
-        setHoveredZone(null);
-        hoveredZoneRef.current = null;
-
-        const storeState = useSessionStore.getState();
-        const activeId = storeState.activeSessionId;
-        const dragId = splitDragSessionIdRef.current;
-        splitDragSessionIdRef.current = null;
-
-        if (zone && dragId) {
-          const direction: SplitDirection = (zone === "left" || zone === "right") ? "horizontal" : "vertical";
-          const draggedGoesFirst = zone === "left" || zone === "top";
-
-          // Build pane states: dragged tab goes to one pane, remaining tabs to the other
-          const allProjectSessions = storeState.sessions.filter((s) => s.projectPath === projectPath);
-          const allIds = allProjectSessions.map((s) => s.id);
-          const remainingIds = allIds.filter((id) => id !== dragId);
-
-          if (remainingIds.length > 0) {
-            // Pick active for the remaining pane: keep current active if it's in remaining, else first
-            const remainingActiveId = remainingIds.includes(activeId ?? "")
-              ? activeId!
-              : remainingIds[0];
-
-            const draggedPane: PaneState = { sessionIds: [dragId], activeSessionId: dragId };
-            const remainingPane: PaneState = { sessionIds: remainingIds, activeSessionId: remainingActiveId };
-
-            setSplit(projectPath, {
-              direction,
-              pane1: draggedGoesFirst ? draggedPane : remainingPane,
-              pane2: draggedGoesFirst ? remainingPane : draggedPane,
-              focusedPane: draggedGoesFirst ? 1 : 2,
-            });
-          }
-        }
-
-        setDragIndex(null);
-        setDropIndex(null);
-        dropIndexRef.current = null;
-        return;
-      }
-
-      const finalDrop = dropIndexRef.current;
-      if (finalDrop !== null) {
-        let targetIndex = finalDrop;
-        if (targetIndex > index) targetIndex--;
-
-        if (targetIndex !== index && targetIndex >= 0 && targetIndex < currentSessions.length) {
-          reorderSessions(projectPath, index, targetIndex);
-        }
-      }
-
-      setDragIndex(null);
-      setDropIndex(null);
-      dropIndexRef.current = null;
-      splitDragSessionIdRef.current = null;
-    };
-
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-  }, [projectPath, reorderSessions, setSplit]);
-
-  // --- Split pane tab bar drag (within pane + cross-pane) ---
-  const handlePaneTabDragStart = useCallback((e: React.MouseEvent, paneNum: 1 | 2, index: number) => {
-    if (e.button !== 0) return;
-    if ((e.target as HTMLElement).closest(".terminal-tab-close")) return;
-    e.preventDefault();
-
-    const currentState = useSessionStore.getState();
-    const currentSplit = currentState.projectSplits.get(projectPath);
-    if (!currentSplit) return;
-
-    const pane = paneNum === 1 ? currentSplit.pane1 : currentSplit.pane2;
-    const draggedSessionId = pane.sessionIds[index];
-    if (!draggedSessionId) return;
-
-    setDragIndex(index);
-    setDragPane(paneNum);
-    crossPaneDragSessionIdRef.current = draggedSessionId;
-    document.body.style.cursor = "grabbing";
-
-    let inCrossPaneMode = false;
-
-    const onMove = (ev: MouseEvent) => {
-      const myTabBarRef = paneNum === 1 ? pane1TabBarRef : pane2TabBarRef;
-      const otherPaneRef = paneNum === 1 ? pane2Ref : pane1Ref;
-
-      if (!myTabBarRef.current) return;
-
-      // Check if mouse is over the other pane's area
-      if (otherPaneRef.current) {
-        const otherRect = otherPaneRef.current.getBoundingClientRect();
-        if (ev.clientX >= otherRect.left && ev.clientX <= otherRect.right &&
-            ev.clientY >= otherRect.top && ev.clientY <= otherRect.bottom) {
-          if (!inCrossPaneMode) {
-            inCrossPaneMode = true;
-            setCrossPaneDragActive(true);
-            setDragIndex(null);
-            setDropIndex(null);
-            dropIndexRef.current = null;
-          }
-          setCrossPaneDropTarget(paneNum === 1 ? 2 : 1);
-          return;
-        }
-      }
-
-      // If we were in cross-pane mode but mouse moved back, cancel it
-      if (inCrossPaneMode) {
-        inCrossPaneMode = false;
-        setCrossPaneDragActive(false);
-        setCrossPaneDropTarget(null);
-        setDragIndex(index);
-        setDragPane(paneNum);
-      }
-
-      // Normal within-pane reorder
-      const tabs = myTabBarRef.current.querySelectorAll<HTMLElement>(".terminal-tab");
-      let newDrop = tabs.length;
-
-      for (let i = 0; i < tabs.length; i++) {
-        const rect = tabs[i].getBoundingClientRect();
-        if (ev.clientX < rect.left + rect.width / 2) {
-          newDrop = i;
-          break;
-        }
-      }
-
-      dropIndexRef.current = newDrop;
-      setDropIndex(newDrop);
-    };
-
-    const onUp = () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
-      document.body.style.cursor = "";
-
-      if (inCrossPaneMode && crossPaneDragSessionIdRef.current) {
-        const targetPaneNum = paneNum === 1 ? 2 : 1;
-        moveSessionToPane(projectPath, crossPaneDragSessionIdRef.current, targetPaneNum);
-        setCrossPaneDragActive(false);
-        setCrossPaneDropTarget(null);
-        crossPaneDragSessionIdRef.current = null;
-        setDragIndex(null);
-        setDragPane(null);
-        setDropIndex(null);
-        dropIndexRef.current = null;
-        return;
-      }
-
-      const finalDrop = dropIndexRef.current;
-      if (finalDrop !== null) {
-        let targetIndex = finalDrop;
-        if (targetIndex > index) targetIndex--;
-
-        const latestSplit = useSessionStore.getState().projectSplits.get(projectPath);
-        if (latestSplit) {
-          const latestPane = paneNum === 1 ? latestSplit.pane1 : latestSplit.pane2;
-          if (targetIndex !== index && targetIndex >= 0 && targetIndex < latestPane.sessionIds.length) {
-            reorderPaneSessions(projectPath, paneNum, index, targetIndex);
-          }
-        }
-      }
-
-      setDragIndex(null);
-      setDragPane(null);
-      setDropIndex(null);
-      dropIndexRef.current = null;
-      crossPaneDragSessionIdRef.current = null;
-      setCrossPaneDragActive(false);
-      setCrossPaneDropTarget(null);
-    };
-
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-  }, [projectPath, moveSessionToPane, reorderPaneSessions]);
-
-  // --- Tab rendering helper ---
-  function renderTab(
-    sessionId: string,
-    _index: number,
-    isActive: boolean,
-    isDragging: boolean,
-    showDropBefore: boolean,
-    showDropAfter: boolean,
-    onMouseDown: (e: React.MouseEvent) => void,
-  ) {
-    const s = sessionById.get(sessionId);
-    if (!s) return null;
-    const isEditor = s.sessionType === "editor";
-    const isPreview = s.isPreview === true;
-    const tabStatus = isEditor ? null : (tabStatuses.get(s.id) ?? null);
-    const editorDirty = isEditor ? useEditorStore.getState().isDirty(s.id) : false;
-    const prefix = getTabPrefix(s.sessionType);
-    const label = isEditor
-      ? (s.fileName ?? "file")
-      : (sessionTitles.get(s.id) ?? s.projectName);
-
-    return (
-      <div
-        key={s.id}
-        className={`terminal-tab${isActive ? " terminal-tab--active" : ""}${isPreview ? " terminal-tab--preview" : ""}${tabStatus === "thinking" ? " terminal-tab--thinking" : ""}${isDragging ? " terminal-tab--dragging" : ""}${showDropBefore ? " terminal-tab--drop-before" : ""}${showDropAfter ? " terminal-tab--drop-after" : ""}`}
-        role="tab"
-        aria-selected={isActive}
-        tabIndex={0}
-        onClick={() => setActiveSession(s.id)}
-        onDoubleClick={() => { if (isPreview) pinTab(s.id); }}
-        onMouseDown={onMouseDown}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            setActiveSession(s.id);
-          }
-        }}
-      >
-        <span className="terminal-tab-prefix">{prefix}</span>
-        <span
-          className="terminal-tab-name"
-          onDoubleClick={(e) => {
-            e.stopPropagation();
-            if (isPreview) { pinTab(s.id); }
-          }}
-        >{label}</span>
-        <span className="terminal-tab-trailing">
-          {isEditor && editorDirty ? (
-            <span className="terminal-tab-status terminal-tab-dirty">*</span>
-          ) : !isEditor && tabStatus === "thinking" ? (
-            <span className="terminal-tab-status terminal-tab-thinking">*</span>
-          ) : !isEditor && tabStatus === "waiting" ? (
-            <span className="terminal-tab-status terminal-tab-attention">?</span>
-          ) : null}
-          <button
-            type="button"
-            className="terminal-tab-close"
-            aria-label={`Close ${label} tab`}
-            onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              void handleCloseSession(s.id);
-            }}
-          >
-            x
-          </button>
-        </span>
-      </div>
-    );
-  }
 
   // --- Panel rendering helper ---
   function renderPanel(
@@ -624,9 +241,7 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
             projectName={session.projectName}
             sessionType={session.sessionType}
             hideTitleBar
-            onClose={() => {
-              handleCloseSession(session.id);
-            }}
+            onClose={() => closeTab(session.id)}
           />
         )}
       </div>
@@ -641,96 +256,45 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
     const pane2 = split.pane2;
     const isHorizontal = split.direction === "horizontal";
 
+    const renderPane = (paneNum: 1 | 2) => {
+      const pane = paneNum === 1 ? pane1 : pane2;
+      const mounted = paneNum === 1 ? pane1MountedIds : pane2MountedIds;
+      const size = paneNum === 1 ? splitRatio : 100 - splitRatio;
+      return (
+        <div
+          className={`terminal-tabs-pane${split.focusedPane === paneNum ? " terminal-tabs-pane--focused" : ""}${dragActive && dragPane === paneNum ? " terminal-tabs-pane--drop-target" : ""}`}
+          style={isHorizontal ? { width: `calc(${size}% - 1px)` } : { height: `calc(${size}% - 1px)` }}
+          data-pane={paneNum}
+          onMouseDown={() => setFocusedPane(projectPath, paneNum)}
+        >
+          {renderPaneHeader(pane.activeSessionId)}
+          <div className="terminal-tabs-panels">
+            {mounted.map((id) =>
+              renderPanel(
+                id,
+                id === pane.activeSessionId,
+                () => setFocusedPane(projectPath, paneNum),
+                split.focusedPane === paneNum,
+              )
+            )}
+          </div>
+        </div>
+      );
+    };
+
     return (
       <div className="terminal-tabs-container">
         <div
           className={`terminal-tabs-split-container terminal-tabs-split-container--${isHorizontal ? "h" : "v"}`}
           ref={panelsRef}
         >
-          {/* Pane 1 */}
-          <div
-            className={`terminal-tabs-pane${split.focusedPane === 1 ? " terminal-tabs-pane--focused" : ""}${crossPaneDragActive && crossPaneDropTarget === 1 ? " terminal-tabs-pane--drop-target" : ""}`}
-            style={isHorizontal ? { width: `calc(${splitRatio}% - 1px)` } : { height: `calc(${splitRatio}% - 1px)` }}
-            ref={pane1Ref}
-            onMouseDown={() => setFocusedPane(projectPath, 1)}
-          >
-            <div className="terminal-tabs-bar-wrapper">
-              <div className="terminal-tabs-bar" ref={pane1TabBarRef} onWheel={handleTabBarWheel} onScroll={handleTabBarScroll}>
-                {pane1.sessionIds.map((sid, index) => {
-                  const isActive = sid === pane1.activeSessionId;
-                  const isDragging = dragPane === 1 && dragIndex === index;
-                  let showDropBefore = false;
-                  let showDropAfter = false;
-                  if (dragPane === 1 && dragIndex !== null && dropIndex !== null && dropIndex !== dragIndex && dropIndex !== dragIndex + 1) {
-                    if (dropIndex === index) showDropBefore = true;
-                    else if (dropIndex === pane1.sessionIds.length && index === pane1.sessionIds.length - 1) showDropAfter = true;
-                  }
-                  return renderTab(
-                    sid, index, isActive, isDragging, showDropBefore, showDropAfter,
-                    (e) => handlePaneTabDragStart(e, 1, index),
-                  );
-                })}
-              </div>
-              <NewSessionMenu variant="button" targetPane={1} />
-            </div>
-            {renderBreadcrumb(pane1.activeSessionId)}
-            <div className="terminal-tabs-panels">
-              {pane1MountedIds.map((id) =>
-                renderPanel(
-                  id,
-                  id === pane1.activeSessionId,
-                  () => setFocusedPane(projectPath, 1),
-                  split.focusedPane === 1,
-                )
-              )}
-            </div>
-          </div>
-
-          {/* Resize handle */}
+          {renderPane(1)}
           <div
             className={`split-resize-handle split-resize-handle--${isHorizontal ? "h" : "v"}`}
             onMouseDown={handleResizeStart}
             onDoubleClick={handleResizeDoubleClick}
           />
-
-          {/* Pane 2 */}
-          <div
-            className={`terminal-tabs-pane${split.focusedPane === 2 ? " terminal-tabs-pane--focused" : ""}${crossPaneDragActive && crossPaneDropTarget === 2 ? " terminal-tabs-pane--drop-target" : ""}`}
-            style={isHorizontal ? { width: `calc(${100 - splitRatio}% - 1px)` } : { height: `calc(${100 - splitRatio}% - 1px)` }}
-            ref={pane2Ref}
-            onMouseDown={() => setFocusedPane(projectPath, 2)}
-          >
-            <div className="terminal-tabs-bar-wrapper">
-              <div className="terminal-tabs-bar" ref={pane2TabBarRef} onWheel={handleTabBarWheel} onScroll={handleTabBarScroll}>
-                {pane2.sessionIds.map((sid, index) => {
-                  const isActive = sid === pane2.activeSessionId;
-                  const isDragging = dragPane === 2 && dragIndex === index;
-                  let showDropBefore = false;
-                  let showDropAfter = false;
-                  if (dragPane === 2 && dragIndex !== null && dropIndex !== null && dropIndex !== dragIndex && dropIndex !== dragIndex + 1) {
-                    if (dropIndex === index) showDropBefore = true;
-                    else if (dropIndex === pane2.sessionIds.length && index === pane2.sessionIds.length - 1) showDropAfter = true;
-                  }
-                  return renderTab(
-                    sid, index, isActive, isDragging, showDropBefore, showDropAfter,
-                    (e) => handlePaneTabDragStart(e, 2, index),
-                  );
-                })}
-              </div>
-              <NewSessionMenu variant="button" targetPane={2} />
-            </div>
-            {renderBreadcrumb(pane2.activeSessionId)}
-            <div className="terminal-tabs-panels">
-              {pane2MountedIds.map((id) =>
-                renderPanel(
-                  id,
-                  id === pane2.activeSessionId,
-                  () => setFocusedPane(projectPath, 2),
-                  split.focusedPane === 2,
-                )
-              )}
-            </div>
-          </div>
+          {renderPane(2)}
         </div>
       </div>
     );
@@ -739,48 +303,26 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
   // ===== UNSPLIT MODE =====
   return (
     <div className="terminal-tabs-container">
-      <div className="terminal-tabs-bar-wrapper">
-        <div className="terminal-tabs-bar" ref={tabBarRef} onWheel={handleTabBarWheel} onScroll={handleTabBarScroll}>
-          {allVisible.map((s, index) => {
-            const isActive = s.id === visibleSessionId;
-            const isDragging = dragPane === null && dragIndex === index;
-            let showDropBefore = false;
-            let showDropAfter = false;
-            if (dragPane === null && dragIndex !== null && dropIndex !== null && dropIndex !== dragIndex && dropIndex !== dragIndex + 1) {
-              if (dropIndex === index) showDropBefore = true;
-              else if (dropIndex === allVisible.length && index === allVisible.length - 1) showDropAfter = true;
-            }
-            return renderTab(
-              s.id, index, isActive, isDragging, showDropBefore, showDropAfter,
-              (e) => handleTabDragStart(e, index),
-            );
-          })}
-        </div>
-        <NewSessionMenu variant="button" />
-      </div>
-      {renderBreadcrumb(visibleSessionId)}
+      {renderPaneHeader(visibleSessionId)}
       <div className="terminal-tabs-panels" ref={panelsRef}>
-        {/* Drop zone overlay during split drag */}
-        {splitDragActive && (
+        {/* Drop zone overlay while a sidebar session is dragged over the terminal */}
+        {dragActive && (
           <div className="split-drop-overlay">
-            <div className={`split-drop-zone split-drop-zone--left${hoveredZone === "left" ? " split-drop-zone--active" : ""}`}>
+            <div className={`split-drop-zone split-drop-zone--left${dragZone === "left" ? " split-drop-zone--active" : ""}`}>
               <span className="split-drop-label">| split</span>
             </div>
-            <div className={`split-drop-zone split-drop-zone--right${hoveredZone === "right" ? " split-drop-zone--active" : ""}`}>
+            <div className={`split-drop-zone split-drop-zone--right${dragZone === "right" ? " split-drop-zone--active" : ""}`}>
               <span className="split-drop-label">split |</span>
             </div>
-            <div className={`split-drop-zone split-drop-zone--top${hoveredZone === "top" ? " split-drop-zone--active" : ""}`}>
+            <div className={`split-drop-zone split-drop-zone--top${dragZone === "top" ? " split-drop-zone--active" : ""}`}>
               <span className="split-drop-label">&mdash; split</span>
             </div>
-            <div className={`split-drop-zone split-drop-zone--bottom${hoveredZone === "bottom" ? " split-drop-zone--active" : ""}`}>
+            <div className={`split-drop-zone split-drop-zone--bottom${dragZone === "bottom" ? " split-drop-zone--active" : ""}`}>
               <span className="split-drop-label">split &mdash;</span>
             </div>
           </div>
         )}
-
-        {mountedSessionIds.map((id) =>
-          renderPanel(id, id === visibleSessionId)
-        )}
+        {mountedSessionIds.map((id) => renderPanel(id, id === visibleSessionId))}
       </div>
     </div>
   );

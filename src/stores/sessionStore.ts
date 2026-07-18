@@ -15,6 +15,8 @@ interface SessionStore {
   removeProjectSessions: (projectPath: string) => void;
   setActiveSession: (id: string | null) => void;
   setActiveProject: (path: string | null) => void;
+  /** Focus a session from anywhere, switching project first if needed */
+  activateSession: (id: string) => void;
   updateSessionPtyId: (id: string, sessionId: string) => void;
   setTabStatus: (tabId: string, status: TabStatus | null) => void;
   setSessionTitle: (tabId: string, title: string) => void;
@@ -282,6 +284,16 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       activeSessionId: restoredSessionId,
       projectActiveSessionIds: next,
     });
+  },
+
+  activateSession: (id) => {
+    const state = get();
+    const session = state.sessions.find((s) => s.id === id);
+    if (!session) return;
+    if (state.activeProjectPath !== session.projectPath) {
+      get().setActiveProject(session.projectPath);
+    }
+    get().setActiveSession(id);
   },
 
   updateSessionPtyId: (id, sessionId) =>

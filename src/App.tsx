@@ -158,6 +158,7 @@ function App() {
                 <div
                   key={path}
                   className="terminal-grid-wrapper"
+                  data-project={path}
                   style={{ display: path === activeProjectPath ? "flex" : "none" }}
                 >
                   <TerminalTabs projectPath={path} />
