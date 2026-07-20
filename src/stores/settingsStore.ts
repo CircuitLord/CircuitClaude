@@ -1,12 +1,23 @@
 import { create } from "zustand";
-import { Settings, DEFAULT_SETTINGS, PI_CHAT_SESSION_TYPE, RightPanelTab } from "../types";
+import { Settings, DEFAULT_SETTINGS, PI_CHAT_SESSION_TYPE, RightPanelTab, type ResumeStrategy } from "../types";
 import { loadSettings, saveSettings } from "../lib/config";
 
 const EDITABLE_SESSION_TYPE_IDS = new Set(DEFAULT_SETTINGS.sessionTypes.map((type) => type.id));
 
+function inferResumeStrategy(command: string): ResumeStrategy {
+  const executable = command.trimStart().split(/\s+/, 1)[0]?.toLowerCase();
+  if (executable === "claude" || executable === "claude.cmd" || executable === "claude.exe") return "claude";
+  if (executable === "pi" || executable === "pi.cmd" || executable === "pi.exe") return "pi";
+  return "none";
+}
+
 function normalizeEditableSessionTypes(settings: Settings): Settings {
   const sessionTypes = (settings.sessionTypes?.length ? settings.sessionTypes : DEFAULT_SETTINGS.sessionTypes)
-    .filter((type) => type.id !== PI_CHAT_SESSION_TYPE.id);
+    .filter((type) => type.id !== PI_CHAT_SESSION_TYPE.id)
+    .map((type) => ({
+      ...type,
+      resumeStrategy: type.resumeStrategy ?? inferResumeStrategy(type.command),
+    }));
   const mergedIds = new Set(sessionTypes.map((type) => type.id));
   const mergedSessionTypes = [
     ...sessionTypes,
@@ -44,9 +55,9 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     if (saved) {
       const merged = normalizeEditableSessionTypes({ ...DEFAULT_SETTINGS, ...saved });
       set({ settings: merged, loaded: true });
-      if (saved.sessionTypes?.some((type) => type.id === PI_CHAT_SESSION_TYPE.id) || saved.defaultSessionType === PI_CHAT_SESSION_TYPE.id) {
-        await saveSettings(merged);
-      }
+      const needsSave = saved.sessionTypes?.some((type) => type.id === PI_CHAT_SESSION_TYPE.id || !type.resumeStrategy)
+        || saved.defaultSessionType === PI_CHAT_SESSION_TYPE.id;
+      if (needsSave) await saveSettings(merged);
     } else {
       set({ loaded: true });
     }

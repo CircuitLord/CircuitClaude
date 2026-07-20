@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { useSettingsStore } from "../stores/settingsStore";
-import { DEFAULT_SETTINGS, ThemeName, SyntaxThemeName, type VoiceEngine, type SessionTypeConfig, type Settings } from "../types";
+import { DEFAULT_SETTINGS, ThemeName, SyntaxThemeName, type ResumeStrategy, type VoiceEngine, type SessionTypeConfig, type Settings } from "../types";
 import { THEME_OPTIONS, SYNTAX_THEME_OPTIONS } from "../lib/themes";
 import { whisperGetAvailableModels, whisperDownloadModel, type ModelInfo, type DownloadProgress } from "../lib/whisper";
 import { checkForUpdate, downloadAndInstallUpdate } from "../lib/updater";
@@ -749,6 +749,12 @@ function SettingsHotkeysPage() {
 /* ------------------------------------------------------------------ */
 /*  Session Types Page                                                 */
 /* ------------------------------------------------------------------ */
+const RESUME_STRATEGY_OPTIONS: Array<{ label: string; value: ResumeStrategy }> = [
+  { label: "none", value: "none" },
+  { label: "claude", value: "claude" },
+  { label: "pi", value: "pi" },
+];
+
 function SettingsSessionTypesPage({
   settings,
   update,
@@ -759,10 +765,12 @@ function SettingsSessionTypesPage({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editCommand, setEditCommand] = useState("");
+  const [editResumeStrategy, setEditResumeStrategy] = useState<ResumeStrategy>("none");
   const [editPrefix, setEditPrefix] = useState("");
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
   const [newCommand, setNewCommand] = useState("");
+  const [newResumeStrategy, setNewResumeStrategy] = useState<ResumeStrategy>("none");
   const [newPrefix, setNewPrefix] = useState("");
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
@@ -773,6 +781,7 @@ function SettingsSessionTypesPage({
     setEditingId(st.id);
     setEditName(st.name);
     setEditCommand(st.command);
+    setEditResumeStrategy(st.resumeStrategy ?? "none");
     setEditPrefix(st.prefix ?? "");
     setAdding(false);
   }
@@ -781,7 +790,7 @@ function SettingsSessionTypesPage({
     if (!editingId) return;
     const updated = settings.sessionTypes.map((st) =>
       st.id === editingId
-        ? { ...st, name: editName.trim() || st.name, command: editCommand, prefix: editPrefix || undefined }
+        ? { ...st, name: editName.trim() || st.name, command: editCommand, resumeStrategy: editResumeStrategy, prefix: editPrefix || undefined }
         : st,
     );
     void update({ sessionTypes: updated });
@@ -850,6 +859,7 @@ function SettingsSessionTypesPage({
     setAdding(true);
     setNewName("");
     setNewCommand("");
+    setNewResumeStrategy("none");
     setNewPrefix(">");
     setEditingId(null);
   }
@@ -864,6 +874,7 @@ function SettingsSessionTypesPage({
       id,
       name,
       command,
+      resumeStrategy: newResumeStrategy,
       prefix: newPrefix || ">",
     };
     void update({ sessionTypes: [...settings.sessionTypes, newType] });
@@ -912,6 +923,14 @@ function SettingsSessionTypesPage({
                     onChange={(e) => setEditCommand(e.target.value)}
                     placeholder="e.g. claude"
                     rows={3}
+                  />
+                </div>
+                <div className="settings-row">
+                  <div className="settings-row-label"><span className="settings-row-name">resume as</span></div>
+                  <CustomSelect
+                    value={editResumeStrategy}
+                    options={RESUME_STRATEGY_OPTIONS}
+                    onChange={setEditResumeStrategy}
                   />
                 </div>
                 <div className="settings-row">
@@ -981,6 +1000,14 @@ function SettingsSessionTypesPage({
               onChange={(e) => setNewCommand(e.target.value)}
               placeholder="e.g. opencode"
               rows={3}
+            />
+          </div>
+          <div className="settings-row">
+            <div className="settings-row-label"><span className="settings-row-name">resume as</span></div>
+            <CustomSelect
+              value={newResumeStrategy}
+              options={RESUME_STRATEGY_OPTIONS}
+              onChange={setNewResumeStrategy}
             />
           </div>
           <div className="settings-row">

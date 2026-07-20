@@ -1,9 +1,11 @@
 export type SessionType = string;
+export type ResumeStrategy = "none" | "claude" | "pi";
 
 export interface SessionTypeConfig {
   id: string;
   name: string;
   command: string;
+  resumeStrategy: ResumeStrategy;
   prefix?: string;
 }
 
@@ -11,13 +13,14 @@ export const PI_CHAT_SESSION_TYPE: SessionTypeConfig = {
   id: "pi-chat",
   name: "pi chat",
   command: "pi",
+  resumeStrategy: "pi",
   prefix: "p>",
 };
 
 export const DEFAULT_SESSION_TYPES: SessionTypeConfig[] = [
-  { id: "claude", name: "claude", command: "claude", prefix: ">" },
-  { id: "codex", name: "codex", command: "codex", prefix: "c>" },
-  { id: "terminal", name: "terminal", command: "powershell", prefix: ">_" },
+  { id: "claude", name: "claude", command: "claude", resumeStrategy: "claude", prefix: ">" },
+  { id: "codex", name: "codex", command: "codex", resumeStrategy: "none", prefix: "c>" },
+  { id: "terminal", name: "terminal", command: "powershell", resumeStrategy: "none", prefix: ">_" },
 ];
 
 export type TabStatus = "thinking" | "waiting";

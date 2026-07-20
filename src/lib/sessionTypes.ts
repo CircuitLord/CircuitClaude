@@ -19,7 +19,8 @@ export function getTabPrefix(sessionType: string): string {
 }
 
 export function supportsAgentSessionResume(sessionType: string): boolean {
-  return sessionType === "claude" || sessionType === "pi" || sessionType === PI_CHAT_SESSION_TYPE.id;
+  const strategy = getSessionTypeConfig(sessionType)?.resumeStrategy;
+  return strategy === "claude" || strategy === "pi";
 }
 
 export function getSessionCommand(
@@ -31,7 +32,7 @@ export function getSessionCommand(
   const command = config?.command ?? sessionType;
   if (!agentSessionId) return command;
 
-  switch (sessionType) {
+  switch (config?.resumeStrategy) {
     case "claude":
       return resumeSession
         ? `${command} --resume ${agentSessionId}`

@@ -197,6 +197,8 @@ pub struct SessionTypeConfigRust {
     pub name: String,
     pub command: String,
     #[serde(default)]
+    pub resume_strategy: Option<String>,
+    #[serde(default)]
     pub built_in: Option<bool>,
     #[serde(default)]
     pub prefix: Option<String>,
