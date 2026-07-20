@@ -1,0 +1,188 @@
+<meta charset="UTF-8">
+<title>CircuitClaude TUI Style Explorations</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; }
+  body { font-family: "Cascadia Mono", Consolas, monospace; font-size: 13px; background: #0c0c10; }
+  .switch { height: 42px; display: flex; align-items: center; gap: 4px; padding: 0 12px;
+    background: #0c0c10; border-bottom: 1px solid #222; }
+  .switch button { background: none; border: 1px solid transparent; border-radius: 4px; color: #888;
+    font: 12px "Cascadia Mono", Consolas, monospace; padding: 5px 12px; cursor: pointer; }
+  .switch button.on { color: #fff; border-color: #444; background: #1a1a20; }
+  .switch .note { margin-left: auto; color: #555; font-size: 11px; }
+  #stage { height: calc(100vh - 42px); }
+
+  @keyframes blink { 50% { opacity: 0; } }
+  .blink { animation: blink 1.2s step-end infinite; }
+
+  /* shared layout */
+  .app { height: 100%; display: flex; flex-direction: column; font-family: "Cascadia Mono", Consolas, monospace;
+    font-size: 13px; background: var(--bg); color: var(--t1); position: relative; }
+  .titlebar { height: 32px; flex-shrink: 0; display: flex; align-items: center; gap: 12px;
+    padding: 0 12px; color: var(--t3); }
+  .titlebar .win { margin-left: auto; }
+  .cols { flex: 1; display: flex; min-height: 0; }
+  .sidebar { width: 280px; flex-shrink: 0; display: flex; flex-direction: column; }
+  .sb-hd { height: 36px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 14px; color: var(--t3); }
+  .sb-list { flex: 1; overflow-y: auto; padding: 4px 0; }
+  .proj { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 14px; cursor: pointer; color: var(--t2); }
+  .proj .cnt { margin-left: auto; color: var(--t3); }
+  .sess { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 14px 0 26px; cursor: pointer; color: var(--t2); }
+  .sess .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .st { width: 12px; text-align: center; flex-shrink: 0; }
+  .st.run { color: var(--ok); }
+  .st.wait { color: var(--warn); }
+  .st.idle { color: var(--t4); }
+  .sb-ft { flex-shrink: 0; display: flex; gap: 12px; padding: 9px 14px; color: var(--t3); }
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .tabs { height: 34px; flex-shrink: 0; display: flex; align-items: center; padding: 0 8px; }
+  .tab { padding: 6px 14px; color: var(--t3); cursor: pointer; }
+  .term { flex: 1; padding: 16px 20px; line-height: 1.6; overflow: hidden; }
+  .term .p { color: var(--ok); }
+  .term .dim { color: var(--t3); }
+  .status { height: 26px; flex-shrink: 0; display: flex; align-items: center; gap: 16px;
+    padding: 0 14px; color: var(--t3); font-size: 12px; }
+
+  /* ===== 1. phosphor — green CRT ===== */
+  .sk-phos { --bg: #060b06; --t1: #b8e6b0; --t2: #7fbf78; --t3: #48784a; --t4: #2b452e; --ok: #52e069; --warn: #d6de5c; }
+  .sk-phos::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: repeating-linear-gradient(0deg, rgba(0,0,0,0.18) 0 1px, transparent 1px 3px); }
+  .sk-phos .titlebar { border-bottom: 1px solid #14301a; text-shadow: 0 0 6px rgba(82,224,105,0.4); }
+  .sk-phos .sidebar { border-right: 1px solid #14301a; }
+  .sk-phos .proj { color: #8fd189; }
+  .sk-phos .proj::before { content: "▾ "; color: var(--t3); }
+  .sk-phos .sess:hover { background: rgba(82,224,105,0.06); }
+  .sk-phos .sess.act { background: rgba(82,224,105,0.12); color: #d9ffd4;
+    text-shadow: 0 0 6px rgba(82,224,105,0.5); }
+  .sk-phos .sess.act::before { content: ">"; position: absolute; margin-left: -14px; color: var(--ok); }
+  .sk-phos .tabs { border-bottom: 1px solid #14301a; }
+  .sk-phos .tab.act { color: #52e069; text-shadow: 0 0 6px rgba(82,224,105,0.5); }
+  .sk-phos .tab.act::before { content: "["; } .sk-phos .tab.act::after { content: "]"; }
+  .sk-phos .status { border-top: 1px solid #14301a; }
+
+  /* ===== 2. ember — amber CRT, warm ===== */
+  .sk-ember { --bg: #0d0905; --t1: #e6c99a; --t2: #bf9c6d; --t3: #7d6440; --t4: #453724; --ok: #ffb454; --warn: #ff7a45; }
+  .sk-ember .titlebar { border-bottom: 1px double #3a2d18; }
+  .sk-ember .sidebar { border-right: 1px double #3a2d18; }
+  .sk-ember .proj { color: #ffb454; }
+  .sk-ember .proj .cnt::before { content: "["; } .sk-ember .proj .cnt::after { content: "]"; }
+  .sk-ember .sess:hover { background: rgba(255,180,84,0.07); }
+  .sk-ember .sess.act { background: rgba(255,180,84,0.13); color: #ffe0b3; position: relative; }
+  .sk-ember .sess.act::after { content: ""; position: absolute; left: 12px; right: 12px; bottom: 2px;
+    height: 1px; background: #ffb454; box-shadow: 0 0 6px #ffb454; }
+  .sk-ember .tabs { border-bottom: 1px double #3a2d18; }
+  .sk-ember .tab.act { color: #ffb454; border-bottom: 1px solid #ffb454; }
+  .sk-ember .status { border-top: 1px double #3a2d18; }
+
+  /* ===== 3. norton — DOS blue, inverse block selection ===== */
+  .sk-dos { --bg: #0a1a52; --t1: #d8dff2; --t2: #9fb0dd; --t3: #5f74b8; --t4: #33438a; --ok: #5ff2a0; --warn: #ffe14d; }
+  .sk-dos .titlebar { background: #0d2064; color: #7ee6f2; }
+  .sk-dos .sidebar { border-right: 1px solid #33438a; background: #0c1d5c; }
+  .sk-dos .sb-hd { color: #7ee6f2; }
+  .sk-dos .proj { color: #cfe0ff; font-weight: 600; }
+  .sk-dos .sess:hover { background: #16307e; }
+  .sk-dos .sess.act { background: #7ee6f2; color: #0a1a52; }
+  .sk-dos .sess.act .st { color: #0a1a52 !important; }
+  .sk-dos .tabs { background: #0d2064; }
+  .sk-dos .tab.act { background: #7ee6f2; color: #0a1a52; }
+  .sk-dos .status { background: #7ee6f2; color: #0a1a52; }
+
+  /* ===== 4. ice — lazygit-style cool minimal ===== */
+  .sk-ice { --bg: #0e1116; --t1: #d3dae3; --t2: #93a1b0; --t3: #566270; --t4: #2c343d; --ok: #6fd6c4; --warn: #e8c26a; }
+  .sk-ice .titlebar { border-bottom: 1px dotted #2c343d; }
+  .sk-ice .sidebar { border-right: 1px dotted #2c343d; }
+  .sk-ice .proj { color: #8fb8d9; }
+  .sk-ice .proj::before { content: "~/"; color: var(--t3); }
+  .sk-ice .sess::before { content: "└ "; color: var(--t4); margin-left: -12px; }
+  .sk-ice .sess:hover { color: var(--t1); }
+  .sk-ice .sess.act { color: #fff; background: #18202a; box-shadow: inset 2px 0 0 #6fd6c4; }
+  .sk-ice .tabs { border-bottom: 1px dotted #2c343d; gap: 12px; padding: 0 16px; }
+  .sk-ice .tab { padding: 6px 0; }
+  .sk-ice .tab.act { color: #6fd6c4; }
+  .sk-ice .tab.act::after { content: "*"; color: var(--warn); margin-left: 3px; }
+  .sk-ice .status { border-top: 1px dotted #2c343d; }
+
+  /* ===== 5. frames — box-drawing panels, btop-like ===== */
+  .sk-box { --bg: #101014; --t1: #dcd7e8; --t2: #a79fc0; --t3: #665f80; --t4: #35314a; --ok: #7ee08a; --warn: #f2b95c; }
+  .sk-box .sidebar, .sk-box .main { border: 1px solid #3a3554; margin: 8px; position: relative; }
+  .sk-box .main { margin-left: 0; }
+  .sk-box .sidebar::before, .sk-box .main::before {
+    position: absolute; top: -9px; left: 12px; padding: 0 6px; background: var(--bg);
+    color: #b59cf2; font-size: 12px; }
+  .sk-box .sidebar::before { content: "┤ sessions ├"; }
+  .sk-box .main::before { content: "┤ sidebar-redesign ├"; }
+  .sk-box .proj { color: #b59cf2; }
+  .sk-box .proj .cnt::before { content: "("; } .sk-box .proj .cnt::after { content: ")"; }
+  .sk-box .sess:hover { background: #1a1826; }
+  .sk-box .sess.act { background: #241f38; color: #efeaff; box-shadow: inset 2px 0 0 #b59cf2; }
+  .sk-box .tabs { border-bottom: 1px solid #26223a; gap: 8px; }
+  .sk-box .tab.act { color: #b59cf2; }
+  .sk-box .tab.act::before { content: "["; color: var(--t3); }
+  .sk-box .tab.act::after { content: "]"; color: var(--t3); }
+  .sk-box .status { border-top: 1px solid #26223a; }
+</style>
+
+<div class="switch">
+  <button class="on" data-s="sk-phos">1 phosphor</button>
+  <button data-s="sk-ember">2 ember</button>
+  <button data-s="sk-dos">3 norton</button>
+  <button data-s="sk-ice">4 ice</button>
+  <button data-s="sk-box">5 frames</button>
+  <span class="note">terminal aesthetic only — same layout, sessions under projects</span>
+</div>
+<div id="stage"></div>
+
+<template id="tpl">
+  <div class="app">
+    <div class="titlebar"><span>circuitclaude</span><span class="win">— ▢ ✕</span></div>
+    <div class="cols">
+      <div class="sidebar">
+        <div class="sb-hd"><span>~/projects</span><span>+ new</span></div>
+        <div class="sb-list">
+          <div class="proj">circuitclaude <span class="cnt">3</span></div>
+          <div class="sess act"><span class="st run blink">*</span><span class="nm">sidebar-redesign</span></div>
+          <div class="sess"><span class="st wait">?</span><span class="nm">fix-cuda-build</span></div>
+          <div class="sess"><span class="st idle">·</span><span class="nm">notes-panel</span></div>
+          <div class="proj">project-ember <span class="cnt">2</span></div>
+          <div class="sess"><span class="st run blink">*</span><span class="nm">vr-grip-poses</span></div>
+          <div class="sess"><span class="st idle">·</span><span class="nm">netcode-audit</span></div>
+          <div class="proj">temporal-api <span class="cnt">1</span></div>
+          <div class="sess"><span class="st idle">·</span><span class="nm">auth-refresh</span></div>
+        </div>
+        <div class="sb-ft"><span>:settings</span></div>
+      </div>
+      <div class="main">
+        <div class="tabs">
+          <div class="tab act">terminal</div><div class="tab">conversation</div>
+          <div class="tab">files</div><div class="tab">git *2</div>
+        </div>
+        <div class="term">
+          <div><span class="p">●</span> Refactoring Sidebar.tsx to flat session list…</div>
+          <div class="dim">  ⎿ Read src/components/Sidebar.tsx (412 lines)</div>
+          <div class="dim">  ⎿ Edit src/stores/sessionStore.ts</div>
+          <div>&nbsp;</div>
+          <div><span class="p">✻</span> Thinking… <span class="dim">(12s · 4.2k tokens)</span></div>
+        </div>
+        <div class="status"><span>master</span><span>+2 ~1</span><span style="margin-left:auto">2 running · 1 waiting</span></div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+  const stage = document.getElementById('stage');
+  const tpl = document.getElementById('tpl');
+  function show(skin) {
+    stage.innerHTML = '';
+    const n = tpl.content.cloneNode(true);
+    n.querySelector('.app').classList.add(skin);
+    stage.appendChild(n);
+  }
+  document.querySelectorAll('.switch button').forEach(b => b.onclick = () => {
+    document.querySelectorAll('.switch button').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    show(b.dataset.s);
+  });
+  show('sk-phos');
+</script>

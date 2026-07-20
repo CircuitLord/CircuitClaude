@@ -254,11 +254,17 @@ export const THEME_OPTIONS: Array<{ label: string; value: ThemeName; accent: str
     accent: THEMES[key].accent,
   }));
 
-export function applyThemeToDOM(themeName: ThemeName): void {
+// instant skips the 300ms token crossfade (used when switching projects)
+export function applyThemeToDOM(themeName: ThemeName, instant = false): void {
   const theme = THEMES[themeName] ?? THEMES.midnight;
   const root = document.documentElement;
+  if (instant) root.classList.add("no-transition");
   for (const [prop, value] of Object.entries(theme.css)) {
     root.style.setProperty(prop, value);
+  }
+  if (instant) {
+    void root.offsetWidth; // flush the new values while transitions are off
+    root.classList.remove("no-transition");
   }
 }
 

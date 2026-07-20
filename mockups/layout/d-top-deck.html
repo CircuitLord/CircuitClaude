@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>D — Top Deck</title>
+<style>
+  :root {
+    --bg-base: #0a0a0e;
+    --bg-surface: #101014;
+    --bg-elevated: #16161b;
+    --border-subtle: #1c1c23;
+    --border-visible: #26262e;
+    --text-primary: #ededf0;
+    --text-secondary: #9898a6;
+    --text-tertiary: #7e7e8e;
+    --accent: #7c3aed;
+    --accent-muted: rgba(124,58,237,0.15);
+    --accent-text: #a78bfa;
+    --font-mono: "Cascadia Mono", Consolas, "JetBrains Mono", monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: var(--font-mono); font-size: 13px;
+    background: var(--bg-base); color: var(--text-primary); overflow: hidden;
+  }
+  @keyframes tui-blink { 50% { opacity: 0; } }
+  @keyframes tui-cycle {
+    0% { color: var(--text-tertiary); }
+    33% { color: var(--pa-text, var(--accent-text)); }
+    66% { color: var(--pa, var(--accent)); }
+  }
+  .blink { animation: tui-blink 1.2s step-end infinite; }
+  .cycle { animation: tui-cycle 2.4s step-end infinite; }
+
+  .window { display: flex; flex-direction: column; height: 100vh; }
+  .titlebar {
+    height: 34px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 12px;
+    background: var(--bg-surface); border-bottom: 1px solid var(--border-subtle);
+    color: var(--text-tertiary);
+  }
+  .titlebar .win-btns span { margin-left: 14px; }
+
+  /* ---- deck: all projects + sessions in one horizontal strip ---- */
+  .deck {
+    height: 46px; flex-shrink: 0;
+    display: flex; align-items: stretch;
+    background: var(--bg-surface); border-bottom: 1px solid var(--border-subtle);
+    overflow-x: auto; overflow-y: hidden;
+  }
+  .deck::-webkit-scrollbar { height: 4px; }
+  .deck::-webkit-scrollbar-thumb { background: var(--border-visible); border-radius: 2px; }
+
+  .group {
+    display: flex; flex-direction: column; justify-content: center;
+    padding: 0 14px 0 12px; flex-shrink: 0;
+    border-right: 1px solid var(--border-subtle);
+  }
+  .group-label {
+    font-size: 11px; color: var(--pa-text);
+    display: flex; gap: 5px; align-items: baseline;
+    margin-bottom: 3px;
+  }
+  .group-label .swatch { color: var(--pa); }
+  .chips { display: flex; gap: 3px; align-items: center; }
+  .chip {
+    display: flex; align-items: center; gap: 6px;
+    height: 22px; padding: 0 8px;
+    color: var(--text-secondary); cursor: pointer;
+    position: relative; white-space: nowrap;
+  }
+  .chip:hover { background: var(--bg-elevated); color: var(--text-primary); }
+  .chip .glyph.waiting { color: var(--pa-text); }
+  .chip .glyph.idle { color: var(--text-tertiary); opacity: 0.4; }
+  .chip.active { background: var(--pa-muted); color: var(--text-primary); }
+  .chip.active::after {
+    content: ""; position: absolute; left: 6px; right: 6px; bottom: -1px;
+    height: 1px; background: var(--pa); box-shadow: 0 0 6px var(--pa);
+  }
+  .chip-add { color: var(--text-tertiary); padding: 0 5px; cursor: pointer; }
+  .chip-add:hover { color: var(--pa-text); }
+  .deck-add {
+    display: flex; align-items: center; padding: 0 14px;
+    color: var(--text-tertiary); cursor: pointer; flex-shrink: 0;
+  }
+  .deck-add:hover { color: var(--accent-text); }
+
+  .p-ember { --pa: #f97316; --pa-text: #fdba74; --pa-muted: rgba(249,115,22,0.12); }
+  .p-teal  { --pa: #14b8a6; --pa-text: #5eead4; --pa-muted: rgba(20,184,166,0.12); }
+  .p-viol  { --pa: #7c3aed; --pa-text: #a78bfa; --pa-muted: rgba(124,58,237,0.15); }
+  .p-slate { --pa: #64748b; --pa-text: #94a3b8; --pa-muted: rgba(100,116,139,0.12); }
+
+  /* ---- full-bleed terminal ---- */
+  .term {
+    flex: 1; min-height: 0; overflow: hidden;
+    padding: 16px 22px; line-height: 1.55; white-space: pre-wrap;
+  }
+  .term .dim { color: var(--text-tertiary); }
+  .term .sec { color: var(--text-secondary); }
+  .term .acc { color: var(--accent-text); }
+  .term .dot { color: var(--accent); }
+
+  /* ---- statusline ---- */
+  .statusline {
+    height: 28px; flex-shrink: 0;
+    display: flex; align-items: center; gap: 14px;
+    padding: 0 14px;
+    background: var(--bg-surface); border-top: 1px solid var(--border-subtle);
+    color: var(--text-tertiary); font-size: 12px;
+  }
+  .statusline .path { color: var(--text-secondary); }
+  .statusline .status { color: var(--accent-text); }
+  .statusline .spacer { flex: 1; }
+  .statusline .act { cursor: pointer; }
+  .statusline .act:hover { color: var(--accent-text); }
+
+  .variant-badge {
+    position: fixed; right: 14px; bottom: 40px;
+    color: var(--text-tertiary); font-size: 12px;
+    background: var(--bg-elevated); border: 1px solid var(--border-visible);
+    border-radius: 4px; padding: 4px 10px; opacity: 0.85;
+  }
+</style>
+</head>
+<body>
+<div class="window">
+  <div class="titlebar">
+    <span>CircuitClaude</span>
+    <span class="win-btns"><span>–</span><span>□</span><span>×</span></span>
+  </div>
+
+  <div class="deck">
+    <div class="group p-ember">
+      <div class="group-label"><span class="swatch">#</span><span>no-shot</span></div>
+      <div class="chips">
+        <div class="chip"><span class="glyph cycle">*</span><span>fix grip pose lag</span></div>
+        <div class="chip"><span class="glyph waiting blink">?</span><span>server travel crash</span></div>
+        <div class="chip"><span class="glyph idle">·</span><span>shader cleanup</span></div>
+        <div class="chip-add">+</div>
+      </div>
+    </div>
+    <div class="group p-teal">
+      <div class="group-label"><span class="swatch">#</span><span>temporal-api</span></div>
+      <div class="chips">
+        <div class="chip"><span class="glyph idle">·</span><span>leaderboard endpoint</span></div>
+        <div class="chip"><span class="glyph waiting blink">?</span><span>auth token refresh</span></div>
+        <div class="chip-add">+</div>
+      </div>
+    </div>
+    <div class="group p-viol">
+      <div class="group-label"><span class="swatch">#</span><span>circuit-claude</span></div>
+      <div class="chips">
+        <div class="chip active"><span class="glyph cycle">*</span><span>sidebar redesign</span></div>
+        <div class="chip"><span class="glyph idle">·</span><span>notes autosave</span></div>
+        <div class="chip-add">+</div>
+      </div>
+    </div>
+    <div class="group p-slate">
+      <div class="group-label"><span class="swatch">#</span><span>dotfiles</span></div>
+      <div class="chips">
+        <div class="chip"><span class="glyph idle">·</span><span>pwsh profile</span></div>
+        <div class="chip-add">+</div>
+      </div>
+    </div>
+    <div class="deck-add">+ add project</div>
+  </div>
+
+  <div class="term"><span class="dim">╭──────────────────────────────────────────────╮
+│</span> <span class="acc">✻ Claude Code</span>  <span class="dim">~/CircuitClaude                │
+╰──────────────────────────────────────────────╯</span>
+
+<span class="sec">&gt; rework the sidebar so sessions are directly clickable</span>
+
+<span class="dot">●</span> I'll restructure the sidebar to render sessions nested under each project entry.
+
+<span class="dot">●</span> <span class="sec">Read(src/components/Sidebar.tsx)</span>
+  <span class="dim">└ 337 lines</span>
+
+<span class="dot">●</span> <span class="sec">Update(src/components/Sidebar.tsx)</span>
+  <span class="dim">└ Added session rows under each project entry</span>
+
+<span class="acc">✻ Churning…</span> <span class="dim">(esc to interrupt)</span></div>
+
+  <div class="statusline">
+    <span class="path">~/circuit-claude &gt; sidebar redesign</span>
+    <span class="status"><span class="cycle">*</span> thinking</span>
+    <span>master · 2 changed</span>
+    <span class="spacer"></span>
+    <span class="act">:claude.md</span>
+    <span class="act">:settings</span>
+  </div>
+</div>
+<div class="variant-badge">D — top deck · no sidebar</div>
+</body>
+</html>

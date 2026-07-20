@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useLayoutEffect } from "react";
+import { createPortal } from "react-dom";
 import { spawnNewSession } from "../lib/sessions";
 import { useSettingsStore } from "../stores/settingsStore";
 import { getSessionTypes } from "../lib/sessionTypes";
@@ -10,16 +11,30 @@ interface NewSessionMenuProps {
 
 export function NewSessionMenu({ variant, projectPath }: NewSessionMenuProps) {
   const [open, setOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const editableSessionTypes = useSettingsStore((s) => s.settings.sessionTypes);
   const sessionTypes = getSessionTypes(editableSessionTypes);
+
+  // sidebar clips overflow, so that dropdown is portaled and positioned from the button rect
+  useLayoutEffect(() => {
+    if (!open || variant !== "sidebar") return;
+    const rect = containerRef.current?.getBoundingClientRect();
+    const width = dropdownRef.current?.offsetWidth ?? 160;
+    if (!rect) return;
+    setMenuPos({
+      top: rect.bottom + 2,
+      left: Math.min(rect.left, window.innerWidth - width - 8),
+    });
+  }, [open, variant]);
 
   useEffect(() => {
     if (!open) return;
     function handleClickOutside(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const target = e.target as Node;
+      const inside = containerRef.current?.contains(target) || dropdownRef.current?.contains(target);
+      if (!inside) setOpen(false);
     }
     function handleKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
@@ -27,11 +42,18 @@ export function NewSessionMenu({ variant, projectPath }: NewSessionMenuProps) {
         setOpen(false);
       }
     }
+    function close() {
+      setOpen(false);
+    }
     document.addEventListener("mousedown", handleClickOutside);
     window.addEventListener("keydown", handleKey);
+    window.addEventListener("resize", close);
+    document.addEventListener("scroll", close, true);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
       window.removeEventListener("keydown", handleKey);
+      window.removeEventListener("resize", close);
+      document.removeEventListener("scroll", close, true);
     };
   }, [open]);
 
@@ -66,10 +88,16 @@ export function NewSessionMenu({ variant, projectPath }: NewSessionMenuProps) {
         >
           +
         </button>
-        {open && (
-          <div className="new-session-dropdown new-session-dropdown--sidebar">
+        {open && createPortal(
+          <div
+            className="new-session-dropdown new-session-dropdown--sidebar"
+            ref={dropdownRef}
+            style={{ top: menuPos.top, left: menuPos.left }}
+            onClick={(e) => e.stopPropagation()}
+          >
             {dropdownContent}
-          </div>
+          </div>,
+          document.body
         )}
       </div>
     );

@@ -1,18 +1,15 @@
 import { create } from "zustand";
 import { loadNote, saveNote } from "../lib/config";
-import { useSettingsStore } from "./settingsStore";
 
 let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
 const cache = new Map<string, string>();
 
 interface NotesState {
-  isOpen: boolean;
   projectPath: string;
   content: string;
   saving: boolean;
   loading: boolean;
   dirty: boolean;
-  toggle: () => void;
   preloadAll: (projectPaths: string[]) => void;
   loadForProject: (projectPath: string) => void;
   setContent: (content: string) => void;
@@ -21,18 +18,11 @@ interface NotesState {
 }
 
 export const useNotesStore = create<NotesState>((set, get) => ({
-  isOpen: false,
   projectPath: "",
   content: "",
   saving: false,
   loading: false,
   dirty: false,
-
-  toggle: () => {
-    const newOpen = !get().isOpen;
-    set({ isOpen: newOpen });
-    useSettingsStore.getState().update({ notesPanelOpen: newOpen });
-  },
 
   preloadAll: async (projectPaths: string[]) => {
     await Promise.all(

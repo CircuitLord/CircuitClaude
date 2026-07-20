@@ -1,0 +1,319 @@
+<meta charset="UTF-8">
+<title>CircuitClaude Full Redesigns</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; }
+  body { font-family: "Segoe UI", system-ui, sans-serif; font-size: 13px; }
+  .mock { display: none; height: calc(100vh - 42px); }
+  .mock.on { display: flex; flex-direction: column; }
+  .switch { height: 42px; display: flex; align-items: center; gap: 4px; padding: 0 12px;
+    background: #0c0c10; border-bottom: 1px solid #222; }
+  .switch button { background: none; border: 1px solid transparent; border-radius: 4px; color: #888;
+    font: 12px "Segoe UI", sans-serif; padding: 5px 12px; cursor: pointer; }
+  .switch button.on { color: #fff; border-color: #444; background: #1a1a20; }
+  .switch .note { margin-left: auto; color: #555; font-size: 11px; }
+  .mono { font-family: "Cascadia Mono", Consolas, monospace; }
+
+  /* ============ 1. INBOX (Linear/Superhuman) ============ */
+  .ib { background: #101012; color: #d8d8dc; }
+  .ib .bar { height: 40px; display: flex; align-items: center; gap: 14px; padding: 0 16px;
+    border-bottom: 1px solid #1e1e22; flex-shrink: 0; }
+  .ib .search { flex: 0 0 340px; background: #1a1a1f; border: 1px solid #26262c; border-radius: 6px;
+    padding: 6px 12px; color: #6f6f78; font-size: 12px; }
+  .ib .bar .kbd { margin-left: auto; color: #55555e; font-size: 11px; }
+  .ib .row { flex: 1; display: flex; min-height: 0; }
+  .ib .nav { width: 200px; flex-shrink: 0; border-right: 1px solid #1e1e22; padding: 12px 8px; }
+  .ib .nv { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px;
+    color: #9c9ca4; cursor: pointer; margin-bottom: 2px; }
+  .ib .nv:hover { background: #1a1a1f; }
+  .ib .nv.on { background: #1e1e26; color: #fff; }
+  .ib .nv b { margin-left: auto; font-weight: 500; font-size: 11px; color: #6f6f78; }
+  .ib .nv .c { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+  .ib .nvhd { padding: 14px 10px 6px; font-size: 11px; color: #55555e; text-transform: uppercase; letter-spacing: 0.05em; }
+  .ib .inbox { width: 380px; flex-shrink: 0; border-right: 1px solid #1e1e22; overflow-y: auto; }
+  .ib .it { display: flex; gap: 10px; padding: 12px 16px; border-bottom: 1px solid #17171b; cursor: pointer; }
+  .ib .it:hover { background: #16161a; }
+  .ib .it.on { background: #1b1b24; box-shadow: inset 2px 0 0 #6e7bff; }
+  .ib .sdot { width: 9px; height: 9px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .ib .sdot.run { background: #4dc274; box-shadow: 0 0 8px rgba(77,194,116,0.6); }
+  .ib .sdot.wait { background: #ffb02e; box-shadow: 0 0 8px rgba(255,176,46,0.6); }
+  .ib .sdot.idle { background: #3a3a42; }
+  .ib .it .body { flex: 1; min-width: 0; }
+  .ib .it .l1 { display: flex; align-items: baseline; gap: 8px; }
+  .ib .it .nm { font-weight: 600; color: #e8e8ec; }
+  .ib .it .pj { font-size: 11px; color: #6f6f78; }
+  .ib .it .tm { margin-left: auto; font-size: 11px; color: #55555e; }
+  .ib .it .prev { font-size: 12px; color: #8c8c95; margin-top: 3px; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+  .ib .it.wait .prev { color: #ffb02e; }
+  .ib .detail { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .ib .dhd { padding: 14px 20px; border-bottom: 1px solid #1e1e22; display: flex; align-items: center; gap: 10px; }
+  .ib .dhd .nm { font-weight: 600; font-size: 15px; }
+  .ib .pill { font-size: 11px; padding: 3px 9px; border-radius: 20px; background: rgba(77,194,116,0.12); color: #4dc274; }
+  .ib .dhd .acts { margin-left: auto; display: flex; gap: 8px; }
+  .ib .btn { background: #1e1e26; border: 1px solid #2c2c34; border-radius: 6px; padding: 5px 12px;
+    color: #b8b8c0; font-size: 12px; cursor: pointer; }
+  .ib .term { flex: 1; padding: 18px 22px; line-height: 1.6; overflow: hidden; font-size: 12.5px; }
+  .ib .term .p { color: #4dc274; }
+  .ib .term .dim { color: #55555e; }
+
+  /* ============ 2. BOARD (Vibe Kanban) ============ */
+  .kb { background: #121014; color: #d9d5de; }
+  .kb .bar { height: 44px; display: flex; align-items: center; gap: 14px; padding: 0 18px;
+    border-bottom: 1px solid #221e28; flex-shrink: 0; }
+  .kb .bar .ttl { font-weight: 600; color: #fff; }
+  .kb .bar .new { margin-left: auto; background: #8a5cf6; color: #fff; border: none;
+    border-radius: 6px; padding: 6px 14px; font-size: 12px; cursor: pointer; }
+  .kb .cols { flex: 1; display: flex; gap: 14px; padding: 16px 18px; overflow-x: auto; min-height: 0; }
+  .kb .col { width: 300px; flex-shrink: 0; display: flex; flex-direction: column; }
+  .kb .chd { display: flex; align-items: center; gap: 8px; padding: 0 4px 10px; font-size: 12px; color: #8d8797; }
+  .kb .chd .n { color: #5c5566; }
+  .kb .chd .c { width: 8px; height: 8px; border-radius: 50%; }
+  .kb .card { background: #1a1720; border: 1px solid #262130; border-radius: 10px;
+    padding: 12px 14px; margin-bottom: 10px; cursor: pointer; }
+  .kb .card:hover { border-color: #3a3348; }
+  .kb .card .nm { font-weight: 600; color: #ece8f2; }
+  .kb .card .pj { font-size: 11px; color: #8d8797; margin-top: 2px; }
+  .kb .card .msg { font-size: 12px; color: #a49dae; margin-top: 8px; line-height: 1.45; }
+  .kb .card .ft { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 11px; color: #5c5566; }
+  .kb .card .diff { margin-left: auto; }
+  .kb .card .add { color: #4dc274; } .kb .card .del { color: #e05c6e; }
+  .kb .card.hot { border-color: rgba(255,176,46,0.5); }
+  .kb .card.hot .msg { color: #ffb02e; }
+  .kb .prog { height: 3px; border-radius: 2px; background: #262130; margin-top: 10px; overflow: hidden; }
+  .kb .prog i { display: block; height: 100%; background: #8a5cf6; }
+
+  /* ============ 3. SPACES (Discord/Slack) ============ */
+  .dc { background: #17181c; color: #d7d9de; }
+  .dc .row { flex: 1; display: flex; min-height: 0; }
+  .dc .rail { width: 56px; flex-shrink: 0; background: #101114; display: flex; flex-direction: column;
+    align-items: center; padding: 12px 0; gap: 10px; }
+  .dc .ws { width: 38px; height: 38px; border-radius: 12px; background: #23252b; color: #9ba0aa;
+    display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 12px;
+    cursor: pointer; position: relative; }
+  .dc .ws.on { border-radius: 12px; background: #4f8cff; color: #fff; }
+  .dc .ws .n { position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; border-radius: 8px;
+    background: #e0475c; color: #fff; font-size: 10px; display: flex; align-items: center;
+    justify-content: center; padding: 0 4px; border: 2px solid #101114; }
+  .dc .chan { width: 250px; flex-shrink: 0; background: #1c1e23; display: flex; flex-direction: column; }
+  .dc .whd { padding: 16px 16px 12px; font-weight: 700; color: #fff; border-bottom: 1px solid #26282e; }
+  .dc .whd small { display: block; font-weight: 400; color: #8b909b; font-size: 11px; margin-top: 2px; }
+  .dc .clist { flex: 1; overflow-y: auto; padding: 10px 8px; }
+  .dc .chdr { padding: 10px 10px 4px; font-size: 11px; color: #8b909b; text-transform: uppercase; letter-spacing: 0.04em; }
+  .dc .ch { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px;
+    color: #9ba0aa; cursor: pointer; margin-bottom: 1px; }
+  .dc .ch:hover { background: #23252b; color: #d7d9de; }
+  .dc .ch.on { background: #2b2e36; color: #fff; }
+  .dc .ch .h { color: #6b7078; }
+  .dc .ch .b { margin-left: auto; min-width: 18px; height: 18px; border-radius: 9px; background: #e0475c;
+    color: #fff; font-size: 10px; display: flex; align-items: center; justify-content: center; padding: 0 5px; }
+  .dc .ch .live { margin-left: auto; width: 8px; height: 8px; border-radius: 50%; background: #43b581; }
+  .dc .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .dc .mhd { height: 48px; display: flex; align-items: center; gap: 10px; padding: 0 18px;
+    border-bottom: 1px solid #26282e; flex-shrink: 0; }
+  .dc .mhd .h { color: #6b7078; font-size: 16px; }
+  .dc .mhd .nm { font-weight: 600; color: #fff; }
+  .dc .mhd .topic { color: #8b909b; font-size: 12px; border-left: 1px solid #33363d; padding-left: 12px; }
+  .dc .feed { flex: 1; overflow: hidden; padding: 18px 22px; display: flex; flex-direction: column; gap: 14px; }
+  .dc .msg { display: flex; gap: 12px; }
+  .dc .av { width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0; display: flex;
+    align-items: center; justify-content: center; font-size: 14px; }
+  .dc .av.cl { background: #cc785c; } .dc .av.me { background: #4f8cff; }
+  .dc .msg .who { font-weight: 600; color: #fff; margin-bottom: 3px; }
+  .dc .msg .who small { font-weight: 400; color: #6b7078; margin-left: 8px; font-size: 11px; }
+  .dc .msg .txt { color: #c3c6cc; line-height: 1.5; }
+  .dc .block { background: #101114; border: 1px solid #26282e; border-radius: 8px; padding: 10px 12px;
+    margin-top: 8px; font-size: 12px; color: #8b909b; line-height: 1.55; }
+  .dc .composer { margin: 0 18px 16px; background: #23252b; border-radius: 10px; padding: 12px 16px; color: #6b7078; }
+
+  /* ============ 4. MISSION GRID ============ */
+  .mg { background: #0d0f12; color: #ccd3da; }
+  .mg .bar { height: 44px; display: flex; align-items: center; gap: 16px; padding: 0 18px;
+    border-bottom: 1px solid #1b1f25; flex-shrink: 0; }
+  .mg .bar .ttl { font-weight: 600; color: #fff; }
+  .mg .seg { display: flex; background: #171a1f; border-radius: 6px; padding: 2px; }
+  .mg .seg span { padding: 4px 12px; border-radius: 5px; font-size: 12px; color: #7d8590; cursor: pointer; }
+  .mg .seg span.on { background: #262b33; color: #fff; }
+  .mg .stats { margin-left: auto; display: flex; gap: 16px; font-size: 12px; color: #7d8590; }
+  .mg .stats b { color: #fff; font-weight: 600; }
+  .mg .grid { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-rows: 1fr;
+    gap: 12px; padding: 14px 18px; min-height: 0; overflow-y: auto; }
+  .mg .tile { background: #14171c; border: 1px solid #21262e; border-radius: 10px;
+    display: flex; flex-direction: column; overflow: hidden; cursor: pointer; }
+  .mg .tile:hover { border-color: #39414d; }
+  .mg .tile.hot { border-color: rgba(255,176,46,0.55); }
+  .mg .thd { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid #1b1f25; }
+  .mg .thd .nm { font-weight: 600; color: #e8ecf0; font-size: 12.5px; }
+  .mg .thd .pj { color: #58606b; font-size: 11px; }
+  .mg .thd .st { margin-left: auto; font-size: 11px; }
+  .mg .st.run { color: #4dc274; } .mg .st.wait { color: #ffb02e; } .mg .st.idle { color: #58606b; }
+  .mg .body { flex: 1; padding: 10px 12px; font-size: 11.5px; line-height: 1.55; color: #8d95a0; overflow: hidden; }
+  .mg .body .p { color: #4dc274; }
+  .mg .body .q { color: #ffb02e; }
+</style>
+
+<div class="switch">
+  <button class="on" data-m="ib">1 inbox</button>
+  <button data-m="kb">2 board</button>
+  <button data-m="dc">3 spaces</button>
+  <button data-m="mg">4 mission grid</button>
+  <span class="note">CircuitClaude full redesigns — terminal style dropped</span>
+</div>
+
+<!-- 1 INBOX -->
+<div class="mock ib on" id="ib">
+  <div class="bar"><div class="search">Search sessions, projects, files…&nbsp;&nbsp;⌘K</div><span class="kbd">j/k navigate · enter open · n new</span></div>
+  <div class="row">
+    <div class="nav">
+      <div class="nv on">Inbox <b>2</b></div>
+      <div class="nv">Running <b>2</b></div>
+      <div class="nv">All sessions <b>6</b></div>
+      <div class="nv">Archive</div>
+      <div class="nvhd">Projects</div>
+      <div class="nv"><span class="c" style="background:#6e7bff"></span>circuitclaude <b>3</b></div>
+      <div class="nv"><span class="c" style="background:#4dc274"></span>project-ember <b>2</b></div>
+      <div class="nv"><span class="c" style="background:#ffb02e"></span>temporal-api <b>1</b></div>
+    </div>
+    <div class="inbox">
+      <div class="it wait"><span class="sdot wait"></span><div class="body">
+        <div class="l1"><span class="nm">fix-cuda-build</span><span class="pj">circuitclaude</span><span class="tm">2m</span></div>
+        <div class="prev">Should I pin CUDA to 13.1 or detect from PATH?</div></div></div>
+      <div class="it on"><span class="sdot run"></span><div class="body">
+        <div class="l1"><span class="nm">sidebar-redesign</span><span class="pj">circuitclaude</span><span class="tm">now</span></div>
+        <div class="prev">Editing Sidebar.tsx — flattening session list…</div></div></div>
+      <div class="it"><span class="sdot run"></span><div class="body">
+        <div class="l1"><span class="nm">vr-grip-poses</span><span class="pj">project-ember</span><span class="tm">now</span></div>
+        <div class="prev">Generating grip pose blueprint for pistol…</div></div></div>
+      <div class="it"><span class="sdot idle"></span><div class="body">
+        <div class="l1"><span class="nm">notes-panel</span><span class="pj">circuitclaude</span><span class="tm">2h</span></div>
+        <div class="prev">Done — added markdown preview toggle</div></div></div>
+      <div class="it"><span class="sdot idle"></span><div class="body">
+        <div class="l1"><span class="nm">netcode-audit</span><span class="pj">project-ember</span><span class="tm">1d</span></div>
+        <div class="prev">Done — 3 findings, report in notes</div></div></div>
+      <div class="it"><span class="sdot idle"></span><div class="body">
+        <div class="l1"><span class="nm">auth-refresh</span><span class="pj">temporal-api</span><span class="tm">3d</span></div>
+        <div class="prev">Done — refresh tokens rotate on use</div></div></div>
+    </div>
+    <div class="detail">
+      <div class="dhd"><span class="nm">sidebar-redesign</span><span class="pill">running</span>
+        <div class="acts"><button class="btn">Terminal</button><button class="btn">Diff · 4 files</button><button class="btn">Git</button></div></div>
+      <div class="term mono">
+        <div><span class="p">●</span> Refactoring Sidebar.tsx to flat session list…</div>
+        <div class="dim">  ⎿ Read src/components/Sidebar.tsx (412 lines)</div>
+        <div class="dim">  ⎿ Edit src/stores/sessionStore.ts</div>
+        <div>&nbsp;</div>
+        <div><span class="p">✻</span> Thinking… <span class="dim">(12s · 4.2k tokens)</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 2 BOARD -->
+<div class="mock kb" id="kb">
+  <div class="bar"><span class="ttl">Sessions</span><span style="color:#8d8797">All projects</span><button class="new">+ New session</button></div>
+  <div class="cols">
+    <div class="col">
+      <div class="chd"><span class="c" style="background:#ffb02e"></span>Needs you <span class="n">1</span></div>
+      <div class="card hot">
+        <div class="nm">fix-cuda-build</div><div class="pj">circuitclaude</div>
+        <div class="msg">"Should I pin CUDA to 13.1 or detect from PATH?"</div>
+        <div class="ft">waiting 2m<span class="diff"><span class="add">+82</span> <span class="del">−14</span></span></div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="chd"><span class="c" style="background:#4dc274"></span>Running <span class="n">2</span></div>
+      <div class="card">
+        <div class="nm">sidebar-redesign</div><div class="pj">circuitclaude</div>
+        <div class="msg">Editing Sidebar.tsx — flattening session list</div>
+        <div class="prog"><i style="width:60%"></i></div>
+        <div class="ft">12s thinking · 4.2k tokens<span class="diff"><span class="add">+204</span> <span class="del">−96</span></span></div>
+      </div>
+      <div class="card">
+        <div class="nm">vr-grip-poses</div><div class="pj">project-ember</div>
+        <div class="msg">Generating grip pose blueprint for pistol</div>
+        <div class="prog"><i style="width:30%"></i></div>
+        <div class="ft">running 8m<span class="diff"><span class="add">+41</span> <span class="del">−2</span></span></div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="chd"><span class="c" style="background:#5c5566"></span>Done <span class="n">3</span></div>
+      <div class="card"><div class="nm">notes-panel</div><div class="pj">circuitclaude</div>
+        <div class="msg">Added markdown preview toggle</div>
+        <div class="ft">2h ago<span class="diff"><span class="add">+156</span> <span class="del">−31</span></span></div></div>
+      <div class="card"><div class="nm">netcode-audit</div><div class="pj">project-ember</div>
+        <div class="msg">3 findings, report in notes</div>
+        <div class="ft">yesterday</div></div>
+      <div class="card"><div class="nm">auth-refresh</div><div class="pj">temporal-api</div>
+        <div class="msg">Refresh tokens rotate on use</div>
+        <div class="ft">3d ago<span class="diff"><span class="add">+63</span> <span class="del">−12</span></span></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- 3 SPACES -->
+<div class="mock dc" id="dc">
+  <div class="row">
+    <div class="rail">
+      <div class="ws on">CC<span class="n">1</span></div>
+      <div class="ws">PE</div>
+      <div class="ws">TA</div>
+      <div class="ws" style="margin-top:auto">+</div>
+    </div>
+    <div class="chan">
+      <div class="whd">circuitclaude<small>3 sessions · 2 active</small></div>
+      <div class="clist">
+        <div class="chdr">Active</div>
+        <div class="ch on"><span class="h">#</span>sidebar-redesign<span class="live"></span></div>
+        <div class="ch"><span class="h">#</span>fix-cuda-build<span class="b">1</span></div>
+        <div class="chdr">Recent</div>
+        <div class="ch"><span class="h">#</span>notes-panel</div>
+        <div class="chdr">Other projects</div>
+        <div class="ch"><span class="h">#</span>vr-grip-poses<span class="live"></span></div>
+        <div class="ch"><span class="h">#</span>netcode-audit</div>
+        <div class="ch"><span class="h">#</span>auth-refresh</div>
+      </div>
+    </div>
+    <div class="main">
+      <div class="mhd"><span class="h">#</span><span class="nm">sidebar-redesign</span><span class="topic">Flatten sidebar to show all sessions</span></div>
+      <div class="feed">
+        <div class="msg"><div class="av me">J</div><div><div class="who">Jordan<small>10:42</small></div>
+          <div class="txt">Refactor the sidebar so sessions show without clicking a project</div></div></div>
+        <div class="msg"><div class="av cl">✳</div><div><div class="who">Claude<small>10:42</small></div>
+          <div class="txt">Flattening the list. Sessions grouped under project headers, statuses inline.</div>
+          <div class="block mono">⎿ Read src/components/Sidebar.tsx (412 lines)<br>⎿ Edit src/stores/sessionStore.ts<br>✻ Thinking… (12s · 4.2k tokens)</div></div></div>
+      </div>
+      <div class="composer">Message #sidebar-redesign… &nbsp;(⌘T for raw terminal)</div>
+    </div>
+  </div>
+</div>
+
+<!-- 4 MISSION GRID -->
+<div class="mock mg" id="mg">
+  <div class="bar"><span class="ttl">Mission</span>
+    <div class="seg"><span class="on">Grid</span><span>Focus</span></div>
+    <div class="stats"><span><b>2</b> running</span><span><b>1</b> waiting</span><span><b>3</b> idle</span></div>
+  </div>
+  <div class="grid">
+    <div class="tile"><div class="thd"><span class="nm">sidebar-redesign</span><span class="pj">circuitclaude</span><span class="st run">● running</span></div>
+      <div class="body mono"><span class="p">●</span> Refactoring Sidebar.tsx…<br>⎿ Edit src/stores/sessionStore.ts<br>✻ Thinking… (12s)</div></div>
+    <div class="tile hot"><div class="thd"><span class="nm">fix-cuda-build</span><span class="pj">circuitclaude</span><span class="st wait">● needs you</span></div>
+      <div class="body mono"><span class="q">?</span> Should I pin CUDA to 13.1 or detect from PATH?<br><br><span class="q">▸ waiting 2m</span></div></div>
+    <div class="tile"><div class="thd"><span class="nm">vr-grip-poses</span><span class="pj">project-ember</span><span class="st run">● running</span></div>
+      <div class="body mono"><span class="p">●</span> Generating grip pose blueprint…<br>⎿ Write Content/Anims/Pistol_Grip.uasset</div></div>
+    <div class="tile"><div class="thd"><span class="nm">notes-panel</span><span class="pj">circuitclaude</span><span class="st idle">idle 2h</span></div>
+      <div class="body mono">Done — added markdown preview toggle<br>+156 −31 across 4 files</div></div>
+    <div class="tile"><div class="thd"><span class="nm">netcode-audit</span><span class="pj">project-ember</span><span class="st idle">idle 1d</span></div>
+      <div class="body mono">Done — 3 findings, report in notes</div></div>
+    <div class="tile"><div class="thd"><span class="nm">auth-refresh</span><span class="pj">temporal-api</span><span class="st idle">idle 3d</span></div>
+      <div class="body mono">Done — refresh tokens rotate on use<br>+63 −12</div></div>
+  </div>
+</div>
+
+<script>
+  document.querySelectorAll('.switch button').forEach(b => b.onclick = () => {
+    document.querySelectorAll('.switch button').forEach(x => x.classList.remove('on'));
+    document.querySelectorAll('.mock').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    document.getElementById(b.dataset.m).classList.add('on');
+  });
+</script>

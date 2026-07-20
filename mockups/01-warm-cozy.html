@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CircuitClaude — Warm / Cozy</title>
+<style>
+  :root {
+    --bg: #faf6f0;
+    --bg-panel: #fffdfa;
+    --bg-elev: #f3ece2;
+    --ink: #3a322b;
+    --ink-soft: #7d7268;
+    --ink-faint: #a9a094;
+    --line: #ece2d4;
+    --accent: #d97757;
+    --accent-soft: #fbeae2;
+    --green: #5b9e6f;
+    --amber: #c79232;
+    --radius: 14px;
+    --shadow: 0 1px 2px rgba(58,50,43,.04), 0 6px 20px rgba(58,50,43,.06);
+    font-family: 'Inter', -apple-system, system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--ink); height: 100vh; overflow: hidden; -webkit-font-smoothing: antialiased; }
+  .app { display: grid; grid-template-columns: 256px 1fr 320px; grid-template-rows: 1fr 30px; height: 100vh; }
+
+  /* SIDEBAR */
+  .sidebar { grid-row: 1 / 3; background: var(--bg-panel); border-right: 1px solid var(--line); display: flex; flex-direction: column; padding: 18px 14px; gap: 6px; }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 4px 6px 14px; }
+  .brand .dot { width: 26px; height: 26px; border-radius: 9px; background: linear-gradient(135deg, var(--accent), #e9a07f); box-shadow: var(--shadow); }
+  .brand b { font-size: 15px; font-weight: 650; letter-spacing: -.2px; }
+  .brand span { font-size: 11px; color: var(--ink-faint); margin-left: auto; }
+  .seclabel { font-size: 11px; font-weight: 600; color: var(--ink-faint); text-transform: uppercase; letter-spacing: .6px; padding: 14px 8px 6px; }
+  .item { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border-radius: 10px; cursor: pointer; font-size: 13.5px; color: var(--ink-soft); }
+  .item:hover { background: var(--bg-elev); color: var(--ink); }
+  .item.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .item .emoji { font-size: 15px; }
+  .item .badge { margin-left: auto; font-size: 11px; background: var(--bg-elev); color: var(--ink-soft); padding: 1px 8px; border-radius: 20px; font-weight: 600; }
+  .item.active .badge { background: #fff; color: var(--accent); }
+  .live { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px rgba(91,158,111,.18); margin-left: auto; }
+  .subitem { margin-left: 12px; font-size: 13px; }
+  .newbtn { margin: 8px 4px; padding: 10px; border: 1.5px dashed var(--line); border-radius: 10px; color: var(--ink-soft); font-size: 13px; text-align: center; cursor: pointer; }
+  .newbtn:hover { border-color: var(--accent); color: var(--accent); }
+  .sidefoot { margin-top: auto; padding-top: 10px; border-top: 1px solid var(--line); }
+
+  /* MAIN */
+  .main { display: flex; flex-direction: column; min-width: 0; }
+  .topbar { height: 56px; display: flex; align-items: center; gap: 12px; padding: 0 22px; border-bottom: 1px solid var(--line); background: var(--bg-panel); }
+  .topbar .title { font-size: 14.5px; font-weight: 650; letter-spacing: -.2px; }
+  .topbar .crumb { font-size: 12.5px; color: var(--ink-faint); }
+  .pill { font-size: 11.5px; padding: 4px 11px; border-radius: 20px; font-weight: 600; }
+  .pill.run { background: #e9f4ec; color: var(--green); }
+  .topbar .spacer { margin-left: auto; }
+  .iconbtn { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; color: var(--ink-soft); cursor: pointer; font-size: 15px; }
+  .iconbtn:hover { background: var(--bg-elev); color: var(--ink); }
+
+  .chat { flex: 1; overflow-y: auto; padding: 28px 26px 10px; display: flex; flex-direction: column; gap: 22px; }
+  .msg { display: flex; gap: 14px; max-width: 760px; }
+  .avatar { width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0; display: grid; place-items: center; font-size: 14px; }
+  .avatar.you { background: var(--bg-elev); }
+  .avatar.ai { background: linear-gradient(135deg, var(--accent), #e9a07f); color: #fff; }
+  .who { font-size: 12.5px; font-weight: 650; margin-bottom: 5px; color: var(--ink); }
+  .who span { color: var(--ink-faint); font-weight: 400; margin-left: 8px; }
+  .body { font-size: 14px; line-height: 1.65; color: #4a4138; }
+  .body code { background: var(--bg-elev); padding: 1px 6px; border-radius: 6px; font-family: 'SF Mono', ui-monospace, monospace; font-size: 12.5px; }
+
+  .toolcard { margin-top: 12px; background: var(--bg-panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+  .toolhead { display: flex; align-items: center; gap: 9px; padding: 11px 15px; font-size: 12.5px; }
+  .toolhead .tag { font-weight: 650; }
+  .toolhead .ok { margin-left: auto; color: var(--green); font-size: 12px; font-weight: 600; }
+  .toolbody { padding: 0 15px 13px; }
+  .difff { font-family: 'SF Mono', ui-monospace, monospace; font-size: 12px; line-height: 1.7; border-radius: 9px; overflow: hidden; border: 1px solid var(--line); }
+  .difff .ln { padding: 1px 12px; }
+  .difff .add { background: #ecf6ef; color: #3f7a53; }
+  .difff .del { background: #fbecea; color: #b65a4a; }
+  .difff .ctx { color: var(--ink-soft); }
+
+  .composer { padding: 14px 22px 20px; border-top: 1px solid var(--line); background: var(--bg-panel); }
+  .inputwrap { background: var(--bg); border: 1.5px solid var(--line); border-radius: var(--radius); padding: 13px 15px; display: flex; flex-direction: column; gap: 11px; }
+  .inputwrap:focus-within { border-color: var(--accent); }
+  .inputwrap .ph { color: var(--ink-faint); font-size: 14px; }
+  .inputrow { display: flex; align-items: center; gap: 8px; }
+  .chip { font-size: 11.5px; color: var(--ink-soft); background: var(--bg-elev); padding: 5px 10px; border-radius: 8px; cursor: pointer; }
+  .send { margin-left: auto; background: var(--accent); color: #fff; border: none; padding: 8px 18px; border-radius: 10px; font-size: 13px; font-weight: 650; cursor: pointer; }
+
+  /* RIGHT PANEL */
+  .rail { background: var(--bg-panel); border-left: 1px solid var(--line); display: flex; flex-direction: column; }
+  .railtabs { display: flex; gap: 4px; padding: 14px 14px 8px; }
+  .railtab { font-size: 12.5px; padding: 6px 12px; border-radius: 8px; color: var(--ink-soft); cursor: pointer; }
+  .railtab.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .railbody { padding: 6px 16px; overflow-y: auto; }
+  .gitrow { display: flex; align-items: center; gap: 10px; padding: 8px 8px; border-radius: 9px; font-size: 13px; cursor: pointer; }
+  .gitrow:hover { background: var(--bg-elev); }
+  .gitrow .mk { width: 18px; height: 18px; border-radius: 5px; display: grid; place-items: center; font-size: 11px; font-weight: 700; }
+  .mk.m { background: #fcf1dd; color: var(--amber); }
+  .mk.a { background: #e9f4ec; color: var(--green); }
+  .gitrow .path { color: var(--ink-soft); }
+  .gitrow .path b { color: var(--ink); font-weight: 600; }
+  .commitcard { margin: 14px 4px; }
+  .commitcard textarea { width: 100%; border: 1.5px solid var(--line); border-radius: 10px; padding: 10px; font-size: 13px; font-family: inherit; resize: none; background: var(--bg); color: var(--ink); }
+  .commitbtn { width: 100%; margin-top: 8px; background: var(--ink); color: #fff; border: none; padding: 10px; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; }
+
+  /* STATUS */
+  .status { grid-column: 2 / 4; height: 30px; display: flex; align-items: center; gap: 18px; padding: 0 22px; background: var(--bg-panel); border-top: 1px solid var(--line); font-size: 11.5px; color: var(--ink-faint); }
+  .status .g { display: flex; align-items: center; gap: 6px; }
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 8px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="brand"><div class="dot"></div><b>CircuitClaude</b><span>v0.4</span></div>
+    <div class="seclabel">Projects</div>
+    <div class="item active"><span class="emoji">🔥</span> ProjectEmber <span class="badge">3</span></div>
+    <div class="item"><span class="emoji">🌐</span> TemporalAPI <span class="live"></span></div>
+    <div class="item"><span class="emoji">⚙️</span> CircuitClaude <span class="badge">1</span></div>
+    <div class="newbtn">+ Add project</div>
+
+    <div class="seclabel">Sessions — ProjectEmber</div>
+    <div class="item subitem active"><span class="emoji">💬</span> claude · main <span class="live"></span></div>
+    <div class="item subitem"><span class="emoji">🖥️</span> dev server</div>
+    <div class="item subitem"><span class="emoji">🧪</span> test-runner</div>
+    <div class="newbtn">+ New session</div>
+
+    <div class="sidefoot">
+      <div class="item"><span class="emoji">📝</span> Notes</div>
+      <div class="item"><span class="emoji">🎙️</span> Voice input</div>
+      <div class="item"><span class="emoji">⚙️</span> Settings</div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <section class="main">
+    <div class="topbar">
+      <div class="title">claude · main</div>
+      <div class="crumb">~/Projects/ProjectEmber</div>
+      <span class="pill run">● running</span>
+      <div class="spacer"></div>
+      <div class="iconbtn">⤢</div>
+      <div class="iconbtn">⋯</div>
+    </div>
+
+    <div class="chat">
+      <div class="msg">
+        <div class="avatar you">🙂</div>
+        <div>
+          <div class="who">You <span>2:14 PM</span></div>
+          <div class="body">Add a cooldown to the grapple ability so it can't be spammed. Should be 3 seconds.</div>
+        </div>
+      </div>
+
+      <div class="msg">
+        <div class="avatar ai">✦</div>
+        <div style="flex:1">
+          <div class="who">Claude <span>2:14 PM</span></div>
+          <div class="body">I'll add a cooldown timer to <code>GrappleComponent</code>. Updating the activation check and adding a <code>LastUsedTime</code> field.</div>
+
+          <div class="toolcard">
+            <div class="toolhead"><span>✏️</span><span class="tag">Edit</span><code style="font-size:11.5px;color:var(--ink-soft)">GrappleComponent.cpp</code><span class="ok">+6 −1</span></div>
+            <div class="toolbody">
+              <div class="difff">
+                <div class="ln ctx">&nbsp;void UGrappleComponent::TryActivate() {</div>
+                <div class="ln del">- &nbsp;&nbsp;FireGrapple();</div>
+                <div class="ln add">+ &nbsp;&nbsp;if (World->TimeSince(LastUsedTime) < Cooldown) return;</div>
+                <div class="ln add">+ &nbsp;&nbsp;LastUsedTime = World->GetTimeSeconds();</div>
+                <div class="ln add">+ &nbsp;&nbsp;FireGrapple();</div>
+                <div class="ln ctx">&nbsp;}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="body" style="margin-top:14px">Done — grapple now respects a 3s cooldown. Want me to surface the remaining time on the HUD too?</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="composer">
+      <div class="inputwrap">
+        <div class="ph">Reply to Claude…</div>
+        <div class="inputrow">
+          <span class="chip">📎 Attach</span>
+          <span class="chip">@ Mention file</span>
+          <span class="chip">🎙️</span>
+          <button class="send">Send ↵</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- RIGHT RAIL -->
+  <aside class="rail">
+    <div class="railtabs">
+      <div class="railtab active">Changes</div>
+      <div class="railtab">Files</div>
+      <div class="railtab">Notes</div>
+    </div>
+    <div class="railbody">
+      <div class="seclabel" style="padding:6px 8px">3 changed · main</div>
+      <div class="gitrow"><div class="mk m">M</div><div class="path">Source/<b>GrappleComponent.cpp</b></div></div>
+      <div class="gitrow"><div class="mk m">M</div><div class="path">Source/<b>GrappleComponent.h</b></div></div>
+      <div class="gitrow"><div class="mk a">A</div><div class="path">Config/<b>Abilities.ini</b></div></div>
+
+      <div class="commitcard">
+        <textarea rows="3">Add 3s cooldown to grapple ability</textarea>
+        <button class="commitbtn">Commit 3 files →</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- STATUS -->
+  <footer class="status">
+    <div class="g">🌿 main</div>
+    <div class="g">↑2 ↓0</div>
+    <div class="g" style="margin-left:auto">claude-opus-4-8</div>
+    <div class="g">● connected</div>
+  </footer>
+</div>
+</body>
+</html>

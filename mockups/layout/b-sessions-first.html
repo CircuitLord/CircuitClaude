@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>B — Sessions First</title>
+<style>
+  :root {
+    --bg-base: #0a0a0e;
+    --bg-surface: #101014;
+    --bg-elevated: #16161b;
+    --border-subtle: #1c1c23;
+    --border-visible: #26262e;
+    --text-primary: #ededf0;
+    --text-secondary: #9898a6;
+    --text-tertiary: #7e7e8e;
+    --accent: #7c3aed;
+    --accent-muted: rgba(124,58,237,0.15);
+    --accent-text: #a78bfa;
+    --font-mono: "Cascadia Mono", Consolas, "JetBrains Mono", monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: var(--font-mono); font-size: 13px;
+    background: var(--bg-base); color: var(--text-primary); overflow: hidden;
+  }
+  @keyframes tui-blink { 50% { opacity: 0; } }
+  @keyframes tui-cycle {
+    0% { color: var(--text-tertiary); }
+    33% { color: var(--pa-text, var(--accent-text)); }
+    66% { color: var(--pa, var(--accent)); }
+  }
+  .blink { animation: tui-blink 1.2s step-end infinite; }
+  .cycle { animation: tui-cycle 2.4s step-end infinite; }
+
+  .window { display: flex; flex-direction: column; height: 100vh; }
+  .titlebar {
+    height: 34px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 12px;
+    background: var(--bg-surface); border-bottom: 1px solid var(--border-subtle);
+    color: var(--text-tertiary);
+  }
+  .titlebar .win-btns span { margin-left: 14px; }
+  .main { flex: 1; display: flex; min-height: 0; }
+
+  /* ---- sidebar: the sidebar IS the tab list ---- */
+  .sidebar {
+    width: 292px; flex-shrink: 0;
+    display: flex; flex-direction: column;
+    background: var(--bg-surface); border-right: 1px solid var(--border-subtle);
+  }
+  .sb-header {
+    height: 40px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 12px; color: var(--text-tertiary);
+  }
+  .sb-header .actions { display: flex; gap: 10px; align-items: center; }
+  .txt-btn { color: var(--text-tertiary); cursor: pointer; }
+  .txt-btn:hover { color: var(--accent-text); }
+  .pill-btn {
+    background: var(--accent-muted); color: var(--accent-text);
+    border: 1px solid transparent; border-radius: 4px;
+    padding: 3px 9px; cursor: pointer; font-family: var(--font-mono); font-size: 13px;
+  }
+  .divider { height: 1px; background: var(--border-subtle); margin: 0 12px; flex-shrink: 0; }
+
+  .sb-list { flex: 1; overflow-y: auto; padding: 4px 0 8px; }
+  .sb-list::-webkit-scrollbar { width: 4px; }
+  .sb-list::-webkit-scrollbar-thumb { background: var(--border-visible); border-radius: 2px; }
+
+  .group-header {
+    display: flex; align-items: center; gap: 6px;
+    height: 30px; padding: 0 12px; margin-top: 6px;
+    color: var(--text-tertiary); font-size: 12px;
+  }
+  .group-header .swatch { color: var(--pa); }
+  .group-header .spacer { flex: 1; }
+  .group-header .new { cursor: pointer; }
+  .group-header .new:hover { color: var(--pa-text); }
+
+  /* two-line session row */
+  .sess {
+    padding: 6px 12px 7px 12px; cursor: pointer; position: relative;
+    display: flex; gap: 8px;
+  }
+  .sess:hover { background: var(--bg-elevated); }
+  .sess .prefix { width: 14px; color: transparent; flex-shrink: 0; padding-top: 1px; }
+  .sess .body { flex: 1; min-width: 0; }
+  .sess .title {
+    color: var(--text-secondary);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .sess:hover .title { color: var(--text-primary); }
+  .sess .meta {
+    margin-top: 2px; font-size: 11.5px; color: var(--text-tertiary);
+    display: flex; gap: 10px;
+  }
+  .sess .meta .st-think { color: var(--pa-text); }
+  .sess .meta .st-wait { color: var(--pa-text); }
+  .sess .x { color: transparent; flex-shrink: 0; padding-top: 1px; cursor: pointer; }
+  .sess:hover .x { color: var(--text-tertiary); }
+  .sess:hover .x:hover { color: var(--text-primary); }
+  .sess.active { background: var(--pa-muted); }
+  .sess.active .prefix { color: var(--pa-text); }
+  .sess.active .title { color: var(--text-primary); }
+  .sess.active::after {
+    content: ""; position: absolute; left: 12px; right: 12px; bottom: 0;
+    height: 1px; background: var(--pa); box-shadow: 0 0 6px var(--pa);
+  }
+
+  .p-ember { --pa: #f97316; --pa-text: #fdba74; --pa-muted: rgba(249,115,22,0.12); }
+  .p-teal  { --pa: #14b8a6; --pa-text: #5eead4; --pa-muted: rgba(20,184,166,0.12); }
+  .p-viol  { --pa: #7c3aed; --pa-text: #a78bfa; --pa-muted: rgba(124,58,237,0.15); }
+  .p-slate { --pa: #64748b; --pa-text: #94a3b8; --pa-muted: rgba(100,116,139,0.12); }
+
+  .sb-git {
+    flex-shrink: 0; padding: 8px 12px;
+    border-top: 1px solid var(--border-subtle);
+    color: var(--text-tertiary); font-size: 12px; line-height: 1.7;
+  }
+  .sb-git .branch { color: var(--text-secondary); }
+  .sb-footer {
+    flex-shrink: 0; height: 36px;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    border-top: 1px solid var(--border-subtle); color: var(--text-tertiary);
+  }
+
+  /* ---- content: no tab bar, slim breadcrumb strip ---- */
+  .content { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .strip {
+    height: 30px; flex-shrink: 0;
+    display: flex; align-items: center; gap: 8px;
+    padding: 0 14px;
+    background: var(--bg-surface); border-bottom: 1px solid var(--border-subtle);
+    color: var(--text-tertiary); font-size: 12px;
+  }
+  .strip .path { color: var(--text-secondary); }
+  .strip .status { color: var(--accent-text); }
+  .strip .spacer { flex: 1; }
+  .strip .act { cursor: pointer; }
+  .strip .act:hover { color: var(--accent-text); }
+
+  .term {
+    flex: 1; min-height: 0; overflow: hidden;
+    padding: 14px 18px; line-height: 1.55; white-space: pre-wrap;
+  }
+  .term .dim { color: var(--text-tertiary); }
+  .term .sec { color: var(--text-secondary); }
+  .term .acc { color: var(--accent-text); }
+  .term .dot { color: var(--accent); }
+
+  .variant-badge {
+    position: fixed; right: 14px; bottom: 12px;
+    color: var(--text-tertiary); font-size: 12px;
+    background: var(--bg-elevated); border: 1px solid var(--border-visible);
+    border-radius: 4px; padding: 4px 10px; opacity: 0.85;
+  }
+</style>
+</head>
+<body>
+<div class="window">
+  <div class="titlebar">
+    <span>CircuitClaude</span>
+    <span class="win-btns"><span>–</span><span>□</span><span>×</span></span>
+  </div>
+  <div class="main">
+    <div class="sidebar">
+      <div class="sb-header">
+        <span>~/sessions</span>
+        <span class="actions"><span class="txt-btn">:edit</span><button class="pill-btn">+ add</button></span>
+      </div>
+      <div class="divider"></div>
+      <div class="sb-list">
+
+        <div class="p-ember">
+          <div class="group-header"><span class="swatch">#</span><span>~/no-shot</span><span class="spacer"></span><span class="new">+ new</span></div>
+          <div class="sess">
+            <span class="prefix">&gt;</span>
+            <div class="body">
+              <div class="title">fix grip pose lag</div>
+              <div class="meta"><span class="st-think"><span class="cycle">*</span> thinking</span><span>12m</span></div>
+            </div>
+            <span class="x">x</span>
+          </div>
+          <div class="sess">
+            <span class="prefix">&gt;</span>
+            <div class="body">
+              <div class="title">server travel crash</div>
+              <div class="meta"><span class="st-wait"><span class="blink">?</span> waiting on you</span><span>3m</span></div>
+            </div>
+            <span class="x">x</span>
+          </div>
+          <div class="sess">
+            <span class="prefix">&gt;</span>
+            <div class="body">
+              <div class="title">shader cleanup</div>
+              <div class="meta"><span>idle</span><span>1h</span></div>
+            </div>
+            <span class="x">x</span>
+          </div>
+        </div>
+
+        <div class="p-teal">
+          <div class="group-header"><span class="swatch">#</span><span>~/temporal-api</span><span class="spacer"></span><span class="new">+ new</span></div>
+          <div class="sess">
+            <span class="prefix">&gt;</span>
+            <div class="body">
+              <div class="title">leaderboard endpoint</div>
+              <div class="meta"><span>idle</span><span>26m</span></div>
+            </div>
+            <span class="x">x</span>
+          </div>
+          <div class="sess">
+            <span class="prefix">&gt;</span>
+            <div class="body">
+              <div class="title">auth token refresh</div>
+              <div class="meta"><span class="st-wait"><span class="blink">?</span> waiting on you</span><span>8m</span></div>
+            </div>
+            <span class="x">x</span>
+          </div>
+        </div>
+
+        <div class="p-viol">
+          <div class="group-header"><span class="swatch">#</span><span>~/circuit-claude</span><span class="spacer"></span><span class="new">+ new</span></div>
+          <div class="sess active">
+            <span class="prefix">&gt;</span>
+            <div class="body">
+              <div class="title">sidebar redesign</div>
+              <div class="meta"><span class="st-think"><span class="cycle">*</span> thinking</span><span>2m</span></div>
+            </div>
+            <span class="x">x</span>
+          </div>
+          <div class="sess">
+            <span class="prefix">&gt;</span>
+            <div class="body">
+              <div class="title">notes autosave</div>
+              <div class="meta"><span>idle</span><span>44m</span></div>
+            </div>
+            <span class="x">x</span>
+          </div>
+        </div>
+
+        <div class="p-slate">
+          <div class="group-header"><span class="swatch">#</span><span>~/dotfiles</span><span class="spacer"></span><span class="new">+ new</span></div>
+          <div class="sess">
+            <span class="prefix">&gt;</span>
+            <div class="body">
+              <div class="title">pwsh profile</div>
+              <div class="meta"><span>idle</span><span>2d</span></div>
+            </div>
+            <span class="x">x</span>
+          </div>
+        </div>
+
+      </div>
+      <div class="sb-git">
+        <div><span class="branch">~/git master</span> · 2 changed</div>
+        <div>M src/components/Sidebar.tsx</div>
+      </div>
+      <div class="sb-footer">
+        <span class="txt-btn">:claude.md</span><span>·</span><span class="txt-btn">:settings</span>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="strip">
+        <span class="path">~/circuit-claude &gt; sidebar redesign</span>
+        <span class="status"><span class="cycle">*</span> thinking</span>
+        <span class="spacer"></span>
+        <span class="act">:split</span>
+        <span class="act">:close</span>
+      </div>
+      <div class="term"><span class="dim">╭──────────────────────────────────────────────╮
+│</span> <span class="acc">✻ Claude Code</span>  <span class="dim">~/CircuitClaude                │
+╰──────────────────────────────────────────────╯</span>
+
+<span class="sec">&gt; rework the sidebar so sessions are directly clickable</span>
+
+<span class="dot">●</span> I'll restructure the sidebar to render sessions nested under each project entry.
+
+<span class="dot">●</span> <span class="sec">Read(src/components/Sidebar.tsx)</span>
+  <span class="dim">└ 337 lines</span>
+
+<span class="dot">●</span> <span class="sec">Update(src/components/Sidebar.tsx)</span>
+  <span class="dim">└ Added session rows under each project entry</span>
+
+<span class="acc">✻ Churning…</span> <span class="dim">(esc to interrupt)</span></div>
+    </div>
+  </div>
+</div>
+<div class="variant-badge">B — sessions first · no tab bar</div>
+</body>
+</html>

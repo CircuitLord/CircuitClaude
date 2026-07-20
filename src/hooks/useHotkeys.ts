@@ -1,7 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useSessionStore } from "../stores/sessionStore";
 import { useProjectStore } from "../stores/projectStore";
-import { useNotesStore } from "../stores/notesStore";
 import { spawnNewSession, closeTab } from "../lib/sessions";
 import { voiceInputController, type VoiceInputState } from "../lib/voiceInput";
 import { whisperDownloadModel, whisperGetModelStatus, type DownloadProgress } from "../lib/whisper";
@@ -207,7 +206,7 @@ export function useHotkeys() {
       if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key === "n") {
         e.preventDefault();
         if (!activeProjectPath) return;
-        useNotesStore.getState().toggle();
+        useSettingsStore.getState().toggleRightPanelTab("notes");
         return;
       }
 

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CircuitClaude — UI Mockups</title>
+<style>
+  body { font-family: 'Inter', system-ui, sans-serif; background: #16161c; color: #e4e4ec; margin: 0; padding: 60px 40px; }
+  h1 { font-size: 26px; letter-spacing: -.5px; }
+  p { color: #9a9aac; max-width: 560px; line-height: 1.6; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px,1fr)); gap: 18px; margin-top: 32px; max-width: 900px; }
+  a { display: block; text-decoration: none; color: inherit; background: #232330; border: 1px solid #34343f; border-radius: 14px; padding: 22px; transition: .15s; }
+  a:hover { border-color: #7c8cff; transform: translateY(-3px); }
+  a b { font-size: 16px; display: block; margin-bottom: 6px; }
+  a span { color: #9a9aac; font-size: 13px; line-height: 1.5; }
+  .sw { display: flex; gap: 6px; margin-top: 14px; }
+  .sw i { width: 22px; height: 22px; border-radius: 6px; }
+</style>
+</head>
+<body>
+  <h1>CircuitClaude — Non-Terminal UI Mockups</h1>
+  <p>Same scene in every mockup: ProjectEmber → claude · main session, a grapple-cooldown turn with an Edit tool diff, git changes. Click to open.</p>
+
+  <h2 style="font-size:14px;color:#7c8cff;margin-top:32px;letter-spacing:.3px">v2 — dark, conversation-hero (Linear/Height + Arc/Raycast)</h2>
+  <div class="grid">
+    <a href="04-linear.html"><b>04 · Linear-style</b><span>Dense, calm, keyboard-driven. ⌘K bar, thin lines, muted purple, context rail.</span>
+      <div class="sw"><i style="background:#7c7fea"></i><i style="background:#0c0c0e"></i><i style="background:#4cc38a"></i><i style="background:#161618"></i></div></a>
+    <a href="05-arc-raycast.html"><b>05 · Arc / Raycast</b><span>Colored project spaces, tinted bg, rounded cards, floating command palette.</span>
+      <div class="sw"><i style="background:#e5645a"></i><i style="background:#0b0b0f"></i><i style="background:#57d08a"></i><i style="background:#7c7fea"></i></div></a>
+  </div>
+
+  <h2 style="font-size:14px;color:#6e6e80;margin-top:36px;letter-spacing:.3px">v1 — rejected</h2>
+  <div class="grid" style="opacity:.5">
+    <a href="01-warm-cozy.html"><b>01 · Warm / Cozy</b><span>Notion/Linear vibe. Rounded cards, warm neutrals.</span>
+      <div class="sw"><i style="background:#d97757"></i><i style="background:#faf6f0"></i><i style="background:#5b9e6f"></i><i style="background:#f3ece2"></i></div></a>
+    <a href="02-modern-ide.html"><b>02 · Modern IDE</b><span>VS Code-ish. Dark panels, activity bar, tabs.</span>
+      <div class="sw"><i style="background:#7c8cff"></i><i style="background:#1e1e24"></i><i style="background:#57c97e"></i><i style="background:#2a2a36"></i></div></a>
+    <a href="03-neo-brutalist.html"><b>03 · Neo-Brutalist</b><span>Thick borders, hard shadows, chunky type.</span>
+      <div class="sw"><i style="background:#ff5c38"></i><i style="background:#ffd23f"></i><i style="background:#3d63ff"></i><i style="background:#1fbf6b"></i></div></a>
+  </div>
+</body>
+</html>

@@ -1,0 +1,320 @@
+<meta charset="UTF-8">
+<title>CircuitClaude Redesigns</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; }
+  body { font-size: 13px; }
+  .mock { display: none; height: calc(100vh - 42px); }
+  .mock.on { display: flex; flex-direction: column; }
+
+  /* switcher */
+  .switch {
+    height: 42px; display: flex; align-items: center; gap: 4px; padding: 0 12px;
+    background: #0c0c10; border-bottom: 1px solid #222; font-family: Consolas, monospace;
+  }
+  .switch button {
+    background: none; border: 1px solid transparent; border-radius: 4px; color: #888;
+    font: 12px Consolas, monospace; padding: 5px 12px; cursor: pointer;
+  }
+  .switch button.on { color: #fff; border-color: #444; background: #1a1a20; }
+  .switch .note { margin-left: auto; color: #555; font-size: 11px; }
+
+  /* ============ 1. FLIGHTDECK ============ */
+  .fd { font-family: "Cascadia Mono", Consolas, monospace; background: #0b0a06; color: #d8cba8; }
+  .fd .bar { height: 32px; display: flex; align-items: center; padding: 0 12px; gap: 16px;
+    border-bottom: 1px solid #2a2415; color: #8a7d55; flex-shrink: 0; }
+  .fd .bar b { color: #e8a33d; font-weight: 400; }
+  .fd .row { flex: 1; display: flex; min-height: 0; }
+  .fd .side { width: 300px; flex-shrink: 0; border-right: 1px solid #2a2415; display: flex; flex-direction: column; }
+  .fd .attn { border-bottom: 1px solid #2a2415; padding: 8px 0; background: rgba(232,163,61,0.05); }
+  .fd .attn .hd { padding: 2px 12px 6px; color: #e8a33d; font-size: 11px; }
+  .fd .sess { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; cursor: pointer; }
+  .fd .sess:hover { background: rgba(232,163,61,0.08); }
+  .fd .sess.act { background: rgba(232,163,61,0.14); box-shadow: inset 2px 0 0 #e8a33d; }
+  .fd .st { width: 12px; text-align: center; flex-shrink: 0; }
+  .fd .st.run { color: #9ec24a; animation: blink 1.2s step-end infinite; }
+  .fd .st.wait { color: #e8a33d; }
+  .fd .st.idle { color: #574f38; }
+  .fd .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #d8cba8; }
+  .fd .pj { color: #8a7d55; font-size: 11px; flex-shrink: 0; }
+  .fd .grp { padding: 10px 12px 4px; color: #8a7d55; font-size: 11px; display: flex; justify-content: space-between; }
+  .fd .grp span { color: #574f38; }
+  .fd .list { flex: 1; overflow-y: auto; }
+  .fd .foot { border-top: 1px solid #2a2415; padding: 8px 12px; color: #8a7d55; display: flex; gap: 14px; }
+  .fd .foot i { font-style: normal; cursor: pointer; } .fd .foot i:hover { color: #e8a33d; }
+  .fd .term { flex: 1; padding: 16px 20px; overflow: hidden; font-size: 13px; line-height: 1.55; }
+  .fd .term .p { color: #9ec24a; }
+  .fd .term .dim { color: #6b6248; }
+  .fd .tabs { height: 34px; display: flex; align-items: flex-end; border-bottom: 1px solid #2a2415; padding: 0 8px; gap: 2px; flex-shrink: 0; }
+  .fd .tab { padding: 7px 14px; color: #8a7d55; cursor: pointer; }
+  .fd .tab.on { color: #e8a33d; border-bottom: 1px solid #e8a33d; }
+  .fd .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+  /* ============ 2. LEDGER ============ */
+  .lg { font-family: "Iosevka", "Cascadia Mono", Consolas, monospace; background: #f6f3ec; color: #2b2822; }
+  .lg .bar { height: 34px; display: flex; align-items: center; padding: 0 14px; gap: 16px;
+    border-bottom: 1px solid #d9d3c4; color: #8c8371; flex-shrink: 0; background: #f1ede2; }
+  .lg .row { flex: 1; display: flex; min-height: 0; }
+  .lg .side { width: 320px; flex-shrink: 0; border-right: 1px solid #d9d3c4; background: #f1ede2;
+    display: flex; flex-direction: column; padding: 10px 0; }
+  .lg .proj { padding: 12px 16px 4px; color: #2b2822; border-bottom: 1px solid #d9d3c4; margin: 0 12px 4px; font-weight: 600; }
+  .lg .proj small { color: #8c8371; font-weight: 400; margin-left: 8px; }
+  .lg .sess { display: flex; align-items: baseline; padding: 5px 20px 5px 24px; cursor: pointer; color: #4a463c; }
+  .lg .sess:hover { background: #e9e3d3; }
+  .lg .sess.act { background: #e4dcc6; box-shadow: inset 3px 0 0 #a5522c; color: #2b2822; }
+  .lg .dots { flex: 1; margin: 0 8px; border-bottom: 1px dotted #b8b09c; transform: translateY(-4px); }
+  .lg .stat { font-size: 11px; }
+  .lg .stat.run { color: #5a7d2a; }
+  .lg .stat.wait { color: #a5522c; }
+  .lg .stat.idle { color: #a39a86; }
+  .lg .list { flex: 1; overflow-y: auto; }
+  .lg .foot { border-top: 1px solid #d9d3c4; margin: 0 12px; padding: 10px 4px 2px; color: #8c8371; display: flex; gap: 16px; }
+  .lg .main { flex: 1; display: flex; flex-direction: column; min-width: 0; background: #fbf9f4; }
+  .lg .tabs { height: 36px; display: flex; align-items: center; padding: 0 12px; gap: 18px;
+    border-bottom: 1px solid #d9d3c4; flex-shrink: 0; color: #8c8371; }
+  .lg .tab.on { color: #a5522c; text-decoration: underline; text-underline-offset: 5px; }
+  .lg .term { flex: 1; padding: 18px 24px; line-height: 1.6; color: #3a362d; overflow: hidden; }
+  .lg .term .p { color: #5a7d2a; }
+  .lg .term .dim { color: #a39a86; }
+
+  /* ============ 3. SIGNAL ============ */
+  .sg { font-family: "Cascadia Mono", Consolas, monospace; background: #06111a; color: #b8d4e0; }
+  .sg .bar { height: 32px; display: flex; align-items: center; padding: 0 12px; gap: 16px;
+    border-bottom: 1px solid #10293a; color: #4d7590; flex-shrink: 0; }
+  .sg .row { flex: 1; display: flex; min-height: 0; }
+  .sg .side { width: 290px; flex-shrink: 0; border-right: 1px solid #10293a; display: flex; flex-direction: column; }
+  .sg .live { border-bottom: 1px solid #10293a; padding: 8px 0 10px; }
+  .sg .hd { padding: 4px 12px 6px; color: #35c5f0; font-size: 11px; }
+  .sg .hd.dim { color: #4d7590; }
+  .sg .sess { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; cursor: pointer; }
+  .sg .sess:hover { background: rgba(53,197,240,0.06); }
+  .sg .sess.act { background: rgba(53,197,240,0.12); }
+  .sg .sess.act .nm { color: #e6f4fa; }
+  .sg .meter { display: flex; gap: 2px; align-items: flex-end; height: 12px; width: 22px; flex-shrink: 0; }
+  .sg .meter i { width: 3px; background: #35c5f0; }
+  .sg .meter.calm i { background: #1c4a63; }
+  .sg .meter.wait i { background: #f0a835; }
+  .sg .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sg .pj { color: #4d7590; font-size: 11px; }
+  .sg .tree { flex: 1; overflow-y: auto; padding-top: 6px; }
+  .sg .tnode { padding: 6px 12px; color: #7ba2b8; cursor: pointer; }
+  .sg .tnode:hover { color: #b8d4e0; }
+  .sg .tnode span { color: #35577a; margin-right: 6px; }
+  .sg .foot { border-top: 1px solid #10293a; padding: 8px 12px; color: #4d7590; display: flex; gap: 14px; }
+  .sg .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .sg .tabs { height: 34px; display: flex; align-items: flex-end; border-bottom: 1px solid #10293a; padding: 0 8px; flex-shrink: 0; }
+  .sg .tab { padding: 7px 14px; color: #4d7590; cursor: pointer; }
+  .sg .tab.on { color: #35c5f0; box-shadow: inset 0 -1px 0 #35c5f0; }
+  .sg .term { flex: 1; padding: 16px 20px; line-height: 1.55; overflow: hidden; }
+  .sg .term .p { color: #35c5f0; }
+  .sg .term .dim { color: #35577a; }
+
+  /* ============ 4. FRAME ============ */
+  .fr { font-family: "Segoe UI", system-ui, sans-serif; background: #131316; color: #d6d6db; }
+  .fr .bar { height: 36px; display: flex; align-items: center; padding: 0 14px; gap: 16px;
+    border-bottom: 1px solid #232329; color: #77777f; flex-shrink: 0; font-size: 12px; }
+  .fr .row { flex: 1; display: flex; min-height: 0; }
+  .fr .rail { width: 48px; flex-shrink: 0; border-right: 1px solid #232329; display: flex;
+    flex-direction: column; align-items: center; padding: 10px 0; gap: 8px; }
+  .fr .chip { width: 30px; height: 30px; border-radius: 8px; background: #1e1e24; color: #9a9aa2;
+    display: flex; align-items: center; justify-content: center; font-size: 12px; cursor: pointer; position: relative; }
+  .fr .chip.on { background: #2b2b33; color: #fff; outline: 1px solid #3c3c46; }
+  .fr .chip .dot { position: absolute; top: -2px; right: -2px; width: 8px; height: 8px;
+    border-radius: 50%; background: #ff6a4d; border: 2px solid #131316; }
+  .fr .side { width: 270px; flex-shrink: 0; border-right: 1px solid #232329; display: flex; flex-direction: column; }
+  .fr .shd { padding: 12px 14px 6px; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: #77777f; }
+  .fr .list { flex: 1; overflow-y: auto; padding: 0 8px; }
+  .fr .card { border-radius: 8px; padding: 8px 10px; margin-bottom: 4px; cursor: pointer; }
+  .fr .card:hover { background: #1c1c22; }
+  .fr .card.act { background: #232330; outline: 1px solid #34343f; }
+  .fr .card .t { display: flex; align-items: center; gap: 8px; }
+  .fr .card .nm { flex: 1; font-size: 13px; color: #e4e4e9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fr .badge { font-size: 10px; padding: 2px 7px; border-radius: 10px; }
+  .fr .badge.run { background: rgba(97,199,124,0.15); color: #61c77c; }
+  .fr .badge.wait { background: rgba(255,106,77,0.15); color: #ff6a4d; }
+  .fr .badge.idle { background: #232329; color: #77777f; }
+  .fr .card .sub { font-size: 11px; color: #77777f; margin-top: 3px; }
+  .fr .foot { border-top: 1px solid #232329; padding: 10px 14px; display: flex; gap: 12px; font-size: 12px; color: #77777f; }
+  .fr .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .fr .tabs { height: 38px; display: flex; align-items: center; gap: 4px; padding: 0 10px;
+    border-bottom: 1px solid #232329; flex-shrink: 0; }
+  .fr .tab { padding: 6px 14px; border-radius: 6px; color: #9a9aa2; font-size: 12px; cursor: pointer; }
+  .fr .tab.on { background: #232330; color: #fff; }
+  .fr .term { flex: 1; padding: 16px 20px; font-family: Consolas, monospace; font-size: 13px; line-height: 1.55; overflow: hidden; }
+  .fr .term .p { color: #61c77c; }
+  .fr .term .dim { color: #63636b; }
+
+  @keyframes blink { 50% { opacity: 0; } }
+</style>
+
+<div class="switch">
+  <button class="on" data-m="fd">1 flightdeck</button>
+  <button data-m="lg">2 ledger</button>
+  <button data-m="sg">3 signal</button>
+  <button data-m="fr">4 frame</button>
+  <span class="note">CircuitClaude redesign explorations — all sessions visible without clicking a project</span>
+</div>
+
+<!-- 1 FLIGHTDECK -->
+<div class="mock fd on" id="fd">
+  <div class="bar"><b>circuitclaude</b><span>6 sessions · 2 running · 1 needs input</span><span style="margin-left:auto">— ▢ ✕</span></div>
+  <div class="row">
+    <div class="side">
+      <div class="attn">
+        <div class="hd">! needs attention</div>
+        <div class="sess"><span class="st wait">?</span><span class="nm">fix-cuda-build</span><span class="pj">circuitclaude</span></div>
+      </div>
+      <div class="list">
+        <div class="grp">circuitclaude <span>3</span></div>
+        <div class="sess act"><span class="st run">▸</span><span class="nm">sidebar-redesign</span></div>
+        <div class="sess"><span class="st wait">?</span><span class="nm">fix-cuda-build</span></div>
+        <div class="sess"><span class="st idle">·</span><span class="nm">notes-panel</span></div>
+        <div class="grp">project-ember <span>2</span></div>
+        <div class="sess"><span class="st run">▸</span><span class="nm">vr-grip-poses</span></div>
+        <div class="sess"><span class="st idle">·</span><span class="nm">netcode-audit</span></div>
+        <div class="grp">temporal-api <span>1</span></div>
+        <div class="sess"><span class="st idle">·</span><span class="nm">auth-refresh</span></div>
+      </div>
+      <div class="foot"><i>+ new</i><i>:projects</i><i style="margin-left:auto">:settings</i></div>
+    </div>
+    <div class="main">
+      <div class="tabs"><div class="tab on">terminal</div><div class="tab">conversation</div><div class="tab">files</div><div class="tab">git *2</div></div>
+      <div class="term">
+        <div><span class="p">●</span> Refactoring Sidebar.tsx to flat session list…</div>
+        <div class="dim">  ⎿ Read src/components/Sidebar.tsx (412 lines)</div>
+        <div class="dim">  ⎿ Edit src/stores/sessionStore.ts</div>
+        <div>&nbsp;</div>
+        <div><span class="p">✻</span> Thinking… <span class="dim">(12s · 4.2k tokens)</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 2 LEDGER -->
+<div class="mock lg" id="lg">
+  <div class="bar"><span>circuitclaude</span><span style="margin-left:auto">— ▢ ✕</span></div>
+  <div class="row">
+    <div class="side">
+      <div class="list">
+        <div class="proj">circuitclaude <small>3 sessions</small></div>
+        <div class="sess act"><span>sidebar-redesign</span><span class="dots"></span><span class="stat run">running</span></div>
+        <div class="sess"><span>fix-cuda-build</span><span class="dots"></span><span class="stat wait">waiting</span></div>
+        <div class="sess"><span>notes-panel</span><span class="dots"></span><span class="stat idle">idle</span></div>
+        <div class="proj">project-ember <small>2 sessions</small></div>
+        <div class="sess"><span>vr-grip-poses</span><span class="dots"></span><span class="stat run">running</span></div>
+        <div class="sess"><span>netcode-audit</span><span class="dots"></span><span class="stat idle">idle</span></div>
+        <div class="proj">temporal-api <small>1 session</small></div>
+        <div class="sess"><span>auth-refresh</span><span class="dots"></span><span class="stat idle">idle</span></div>
+      </div>
+      <div class="foot"><span>+ new session</span><span style="margin-left:auto">settings</span></div>
+    </div>
+    <div class="main">
+      <div class="tabs"><span class="tab on">terminal</span><span class="tab">conversation</span><span class="tab">files</span><span class="tab">git (2)</span></div>
+      <div class="term">
+        <div><span class="p">●</span> Refactoring Sidebar.tsx to flat session list…</div>
+        <div class="dim">  ⎿ Read src/components/Sidebar.tsx (412 lines)</div>
+        <div class="dim">  ⎿ Edit src/stores/sessionStore.ts</div>
+        <div>&nbsp;</div>
+        <div><span class="p">✻</span> Thinking… <span class="dim">(12s · 4.2k tokens)</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 3 SIGNAL -->
+<div class="mock sg" id="sg">
+  <div class="bar"><span style="color:#35c5f0">circuitclaude</span><span>on air: 2</span><span style="margin-left:auto">— ▢ ✕</span></div>
+  <div class="row">
+    <div class="side">
+      <div class="live">
+        <div class="hd">● live</div>
+        <div class="sess act"><span class="meter"><i style="height:5px"></i><i style="height:10px"></i><i style="height:7px"></i><i style="height:12px"></i></span><span class="nm">sidebar-redesign</span><span class="pj">circuitclaude</span></div>
+        <div class="sess"><span class="meter"><i style="height:9px"></i><i style="height:4px"></i><i style="height:11px"></i><i style="height:6px"></i></span><span class="nm">vr-grip-poses</span><span class="pj">ember</span></div>
+        <div class="sess"><span class="meter wait"><i style="height:8px"></i><i style="height:8px"></i><i style="height:8px"></i><i style="height:8px"></i></span><span class="nm">fix-cuda-build</span><span class="pj">circuitclaude</span></div>
+      </div>
+      <div class="hd dim" style="padding-top:10px">standby</div>
+      <div class="tree">
+        <div class="sess"><span class="meter calm"><i style="height:3px"></i><i style="height:3px"></i><i style="height:3px"></i><i style="height:3px"></i></span><span class="nm">notes-panel</span><span class="pj">circuitclaude</span></div>
+        <div class="sess"><span class="meter calm"><i style="height:3px"></i><i style="height:3px"></i><i style="height:3px"></i><i style="height:3px"></i></span><span class="nm">netcode-audit</span><span class="pj">ember</span></div>
+        <div class="sess"><span class="meter calm"><i style="height:3px"></i><i style="height:3px"></i><i style="height:3px"></i><i style="height:3px"></i></span><span class="nm">auth-refresh</span><span class="pj">temporal-api</span></div>
+        <div class="hd dim" style="padding-top:12px">projects</div>
+        <div class="tnode"><span>▸</span>circuitclaude</div>
+        <div class="tnode"><span>▸</span>project-ember</div>
+        <div class="tnode"><span>▸</span>temporal-api</div>
+      </div>
+      <div class="foot"><span>+ new</span><span style="margin-left:auto">:settings</span></div>
+    </div>
+    <div class="main">
+      <div class="tabs"><div class="tab on">terminal</div><div class="tab">conversation</div><div class="tab">files</div><div class="tab">git *2</div></div>
+      <div class="term">
+        <div><span class="p">●</span> Refactoring Sidebar.tsx to flat session list…</div>
+        <div class="dim">  ⎿ Read src/components/Sidebar.tsx (412 lines)</div>
+        <div class="dim">  ⎿ Edit src/stores/sessionStore.ts</div>
+        <div>&nbsp;</div>
+        <div><span class="p">✻</span> Thinking… <span class="dim">(12s · 4.2k tokens)</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 4 FRAME -->
+<div class="mock fr" id="fr">
+  <div class="bar"><span style="color:#fff">CircuitClaude</span><span>6 sessions</span><span style="margin-left:auto">— ▢ ✕</span></div>
+  <div class="row">
+    <div class="rail">
+      <div class="chip on">CC<span class="dot"></span></div>
+      <div class="chip">PE</div>
+      <div class="chip">TA</div>
+      <div class="chip" style="margin-top:auto">+</div>
+    </div>
+    <div class="side">
+      <div class="shd">All sessions</div>
+      <div class="list">
+        <div class="card act">
+          <div class="t"><span class="nm">sidebar-redesign</span><span class="badge run">running</span></div>
+          <div class="sub">circuitclaude · editing Sidebar.tsx</div>
+        </div>
+        <div class="card">
+          <div class="t"><span class="nm">fix-cuda-build</span><span class="badge wait">needs input</span></div>
+          <div class="sub">circuitclaude · asking about CUDA 13.1 path</div>
+        </div>
+        <div class="card">
+          <div class="t"><span class="nm">vr-grip-poses</span><span class="badge run">running</span></div>
+          <div class="sub">project-ember · generating anim blueprint</div>
+        </div>
+        <div class="card">
+          <div class="t"><span class="nm">notes-panel</span><span class="badge idle">idle</span></div>
+          <div class="sub">circuitclaude · 2h ago</div>
+        </div>
+        <div class="card">
+          <div class="t"><span class="nm">netcode-audit</span><span class="badge idle">idle</span></div>
+          <div class="sub">project-ember · yesterday</div>
+        </div>
+        <div class="card">
+          <div class="t"><span class="nm">auth-refresh</span><span class="badge idle">idle</span></div>
+          <div class="sub">temporal-api · 3d ago</div>
+        </div>
+      </div>
+      <div class="foot"><span>＋ New session</span><span style="margin-left:auto">Settings</span></div>
+    </div>
+    <div class="main">
+      <div class="tabs"><div class="tab on">Terminal</div><div class="tab">Conversation</div><div class="tab">Files</div><div class="tab">Git · 2</div></div>
+      <div class="term">
+        <div><span class="p">●</span> Refactoring Sidebar.tsx to flat session list…</div>
+        <div class="dim">  ⎿ Read src/components/Sidebar.tsx (412 lines)</div>
+        <div class="dim">  ⎿ Edit src/stores/sessionStore.ts</div>
+        <div>&nbsp;</div>
+        <div><span class="p">✻</span> Thinking… <span class="dim">(12s · 4.2k tokens)</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.querySelectorAll('.switch button').forEach(b => b.onclick = () => {
+    document.querySelectorAll('.switch button').forEach(x => x.classList.remove('on'));
+    document.querySelectorAll('.mock').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    document.getElementById(b.dataset.m).classList.add('on');
+  });
+</script>

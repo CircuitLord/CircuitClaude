@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useGitStore, fileKey } from "../stores/gitStore";
-import { statusColor, displayStatus } from "./GitSection";
+import { statusColor, displayStatus } from "./GitPanel";
 import { DiffStat } from "../types";
 
 interface CommitDialogProps {

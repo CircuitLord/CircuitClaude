@@ -6,14 +6,13 @@ interface SessionStore {
   sessions: TerminalSession[];
   activeSessionId: string | null;
   activeProjectPath: string | null;
-  /** Remembers the last active tab per project so switching projects preserves tab selection */
-  projectActiveSessionIds: Map<string, string>;
   tabStatuses: Map<string, TabStatus>;
   sessionTitles: Map<string, string>;
-  addSession: (session: TerminalSession) => void;
+  addSession: (session: TerminalSession, position: "start" | "end") => void;
   removeSession: (id: string) => void;
   removeProjectSessions: (projectPath: string) => void;
   setActiveSession: (id: string | null) => void;
+  /** Switching project always lands on the new-session launcher, not a remembered tab */
   setActiveProject: (path: string | null) => void;
   /** Focus a session from anywhere, switching project first if needed */
   activateSession: (id: string) => void;
@@ -53,19 +52,12 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   sessions: [],
   activeSessionId: null,
   activeProjectPath: null,
-  projectActiveSessionIds: new Map(),
   tabStatuses: new Map(),
   sessionTitles: new Map(),
   projectSplits: new Map(),
 
-  addSession: (session) =>
+  addSession: (session, position) =>
     set((state) => {
-      const next = new Map(state.projectActiveSessionIds);
-      // Save outgoing project's active tab
-      if (state.activeProjectPath && state.activeSessionId) {
-        next.set(state.activeProjectPath, state.activeSessionId);
-      }
-
       const projectSplits = new Map(state.projectSplits);
       const split = projectSplits.get(session.projectPath);
 
@@ -73,19 +65,24 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         // Add new session to the focused pane
         const pane = getPaneState(split, split.focusedPane);
         const newPane: PaneState = {
-          sessionIds: [...pane.sessionIds, session.id],
+          sessionIds: position === "start" ? [session.id, ...pane.sessionIds] : [...pane.sessionIds, session.id],
           activeSessionId: session.id,
         };
         projectSplits.set(session.projectPath, withUpdatedPane(split, split.focusedPane, newPane));
       }
 
-      // Set the new session as active for its project
-      next.set(session.projectPath, session.id);
+      const sessions = [...state.sessions];
+      if (position === "start") {
+        const firstProjectSessionIndex = sessions.findIndex((existing) => existing.projectPath === session.projectPath);
+        sessions.splice(firstProjectSessionIndex === -1 ? sessions.length : firstProjectSessionIndex, 0, session);
+      } else {
+        sessions.push(session);
+      }
+
       return {
-        sessions: [...state.sessions, session],
+        sessions,
         activeSessionId: session.id,
         activeProjectPath: session.projectPath,
-        projectActiveSessionIds: next,
         projectSplits,
       };
     }),
@@ -148,44 +145,17 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         }
       }
 
-      const activeProjectPath = state.activeProjectPath;
       const tabStatuses = new Map(state.tabStatuses);
       tabStatuses.delete(id);
       const sessionTitles = new Map(state.sessionTitles);
       sessionTitles.delete(id);
-      const projectActiveSessionIds = new Map(state.projectActiveSessionIds);
-
-      if (removed) {
-        const remainingProjectSessions = sessions.filter((s) => s.projectPath === removed.projectPath);
-        const rememberedId = projectActiveSessionIds.get(removed.projectPath);
-
-        if (rememberedId === id) {
-          const replacementId =
-            remainingProjectSessions.find((s) => s.id === activeSessionId)?.id
-            ?? remainingProjectSessions[0]?.id
-            ?? null;
-
-          if (replacementId) {
-            projectActiveSessionIds.set(removed.projectPath, replacementId);
-          } else {
-            projectActiveSessionIds.delete(removed.projectPath);
-          }
-        } else if (
-          activeProjectPath === removed.projectPath
-          && activeSessionId
-          && remainingProjectSessions.some((s) => s.id === activeSessionId)
-        ) {
-          projectActiveSessionIds.set(removed.projectPath, activeSessionId);
-        }
-      }
 
       return {
         sessions,
         activeSessionId,
-        activeProjectPath,
+        activeProjectPath: state.activeProjectPath,
         tabStatuses,
         sessionTitles,
-        projectActiveSessionIds,
         projectSplits,
       };
     }),
@@ -207,8 +177,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         state.activeProjectPath === projectPath
           ? null
           : state.activeProjectPath;
-      const projectActiveSessionIds = new Map(state.projectActiveSessionIds);
-      projectActiveSessionIds.delete(projectPath);
       const projectSplits = new Map(state.projectSplits);
       projectSplits.delete(projectPath);
       const removedIds = new Set(
@@ -226,7 +194,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         sessions,
         activeSessionId,
         activeProjectPath,
-        projectActiveSessionIds,
         projectSplits,
         tabStatuses,
         sessionTitles,
@@ -252,39 +219,18 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           const newPane: PaneState = { ...pane, activeSessionId: id };
           const newSplit = withUpdatedPane({ ...split, focusedPane: paneNum as 1 | 2 }, paneNum, newPane);
           nextSplits.set(state.activeProjectPath, newSplit);
-          const next = new Map(state.projectActiveSessionIds);
-          next.set(state.activeProjectPath, id);
-          set({ activeSessionId: id, projectActiveSessionIds: next, projectSplits: nextSplits });
+          set({ activeSessionId: id, projectSplits: nextSplits });
           return;
         }
         // Session not in any pane (shouldn't normally happen in split mode)
         // Fall through to non-split behavior
       }
-
-      // No split active — original behavior
-      const next = new Map(state.projectActiveSessionIds);
-      next.set(state.activeProjectPath, id);
-      set({ activeSessionId: id, projectActiveSessionIds: next });
-    } else {
-      set({ activeSessionId: id });
     }
+
+    set({ activeSessionId: id });
   },
 
-  setActiveProject: (path) => {
-    const state = get();
-    // Save the current tab for the outgoing project
-    const next = new Map(state.projectActiveSessionIds);
-    if (state.activeProjectPath && state.activeSessionId) {
-      next.set(state.activeProjectPath, state.activeSessionId);
-    }
-    // Restore the saved tab for the incoming project
-    const restoredSessionId = path ? next.get(path) ?? null : null;
-    set({
-      activeProjectPath: path,
-      activeSessionId: restoredSessionId,
-      projectActiveSessionIds: next,
-    });
-  },
+  setActiveProject: (path) => set({ activeProjectPath: path, activeSessionId: null }),
 
   activateSession: (id) => {
     const state = get();
@@ -370,9 +316,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       // Set the focused pane's active session as the global active
       const focusedPane = getPaneState(split, split.focusedPane);
       const activeSessionId = focusedPane.activeSessionId;
-      const projectActiveSessionIds = new Map(state.projectActiveSessionIds);
-      projectActiveSessionIds.set(projectPath, activeSessionId);
-      return { projectSplits: next, activeSessionId, projectActiveSessionIds };
+      return { projectSplits: next, activeSessionId };
     }),
 
   setFocusedPane: (projectPath, pane) =>
@@ -383,9 +327,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       const newSplit = { ...split, focusedPane: pane };
       next.set(projectPath, newSplit);
       const activeSessionId = getPaneState(newSplit, pane).activeSessionId;
-      const projectActiveSessionIds = new Map(state.projectActiveSessionIds);
-      projectActiveSessionIds.set(projectPath, activeSessionId);
-      return { projectSplits: next, activeSessionId, projectActiveSessionIds };
+      return { projectSplits: next, activeSessionId };
     }),
 
   moveSessionToPane: (projectPath, sessionId, targetPane, insertIndex?) =>
@@ -414,10 +356,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       if (newSourceIds.length === 0) {
         // Source pane is empty — collapse split
         projectSplits.delete(projectPath);
-        const newActiveId = sessionId;
-        const projectActiveSessionIds = new Map(state.projectActiveSessionIds);
-        projectActiveSessionIds.set(projectPath, newActiveId);
-        return { projectSplits, activeSessionId: newActiveId, projectActiveSessionIds };
+        return { projectSplits, activeSessionId: sessionId };
       }
 
       // Update source pane's active if we moved the active session
@@ -436,9 +375,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         : { ...base, pane1: newTarget, pane2: newSource };
 
       projectSplits.set(projectPath, newSplit);
-      const projectActiveSessionIds = new Map(state.projectActiveSessionIds);
-      projectActiveSessionIds.set(projectPath, sessionId);
-      return { projectSplits, activeSessionId: sessionId, projectActiveSessionIds };
+      return { projectSplits, activeSessionId: sessionId };
     }),
 
   reorderPaneSessions: (projectPath, pane, fromIndex, toIndex) =>

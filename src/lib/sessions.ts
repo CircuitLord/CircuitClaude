@@ -19,7 +19,7 @@ export function spawnNewSession(type: string = "claude", projectPath?: string) {
     sessionId: null,
     createdAt: Date.now(),
     sessionType: type,
-  });
+  }, "start");
 }
 
 /** Open a file as an editor tab. If already open for this project, focuses it instead.
@@ -77,7 +77,7 @@ export function openFileTab(filePath: string, fileName: string, preview = true) 
     filePath,
     fileName,
     isPreview: preview,
-  });
+  }, "end");
 }
 
 /** Promote a preview tab to a permanent tab. */

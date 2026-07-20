@@ -1,20 +1,11 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import { useGitStore, fileKey } from "../stores/gitStore";
 import { useSessionStore } from "../stores/sessionStore";
-import { useSettingsStore } from "../stores/settingsStore";
-import { useFileTreeStore } from "../stores/fileTreeStore";
 import { GitFileEntry } from "../types";
 import { SegmentedControl } from "./SegmentedControl";
 import { CommitDialog } from "./CommitDialog";
-import { FileTreeView } from "./FileTreeView";
 import { fileColorClass } from "../lib/files";
 
-const POLL_INTERVAL = 7000;
-const DEFAULT_RATIO = 0.5; // default to 50% of sidebar height
-const MAX_RATIO = 0.7; // max 70% of sidebar height
-const MIN_RATIO = 0.3; // min 30% of sidebar height when expanded
-const MIN_HEIGHT = 38; // just the header
-const MIN_LIST_HEIGHT = 80; // minimum space for project list above
 const REVERT_CONFIRM_TIMEOUT = 3000;
 
 export function statusColor(status: string): string {
@@ -338,11 +329,6 @@ const VIEW_MODE_OPTIONS: Array<{ label: string; value: "file" | "tree" }> = [
   { label: "tree", value: "tree" },
 ];
 
-const PANEL_MODE_OPTIONS: Array<{ label: string; value: "source" | "files" }> = [
-  { label: "~/files", value: "files" },
-  { label: "~/source", value: "source" },
-];
-
 /* ---- Flat view components ---- */
 
 function FileItem({
@@ -462,100 +448,12 @@ function ActionBar({ projectPath }: { projectPath: string }) {
   );
 }
 
+
 /* ---- Main Component ---- */
 
-export function GitSection() {
+export function GitPanel() {
   const activeProjectPath = useSessionStore((s) => s.activeProjectPath);
-  const { statuses, fetchStatus, openDiff, viewMode, setViewMode, commitDialogOpen, closeCommitDialog } = useGitStore();
-  const { settings, update: updateSettings } = useSettingsStore();
-  const panelMode = settings.sidebarPanelMode;
-  const { fetchDirectory, clearProject } = useFileTreeStore();
-  const sectionRef = useRef<HTMLDivElement>(null);
-  const [heightRatio, setHeightRatio] = useState(DEFAULT_RATIO);
-  const [parentHeight, setParentHeight] = useState(0);
-  const dragRef = useRef<{ startY: number; startHeight: number } | null>(null);
-
-  // Track parent (sidebar) height via ResizeObserver
-  useEffect(() => {
-    const el = sectionRef.current?.parentElement;
-    if (!el) return;
-    setParentHeight(el.clientHeight);
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setParentHeight(entry.contentRect.height);
-      }
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [activeProjectPath]);
-
-  const panelHeight = parentHeight > 0
-    ? Math.min(
-        Math.max(parentHeight * MIN_RATIO, parentHeight * heightRatio),
-        parentHeight * MAX_RATIO,
-        parentHeight - MIN_LIST_HEIGHT
-      )
-    : MIN_HEIGHT;
-
-  // Resize drag handling
-  useEffect(() => {
-    function onMouseMove(e: MouseEvent) {
-      if (!dragRef.current || !sectionRef.current) return;
-      const delta = dragRef.current.startY - e.clientY;
-      const parentEl = sectionRef.current.parentElement;
-      const parentH = parentEl ? parentEl.clientHeight : 600;
-      const minHeight = parentH * MIN_RATIO;
-      const maxHeight = Math.min(parentH * MAX_RATIO, parentH - MIN_LIST_HEIGHT);
-      const newHeight = Math.min(
-        Math.max(minHeight, dragRef.current.startHeight + delta),
-        maxHeight
-      );
-      setHeightRatio(newHeight / parentH);
-    }
-
-    function onMouseUp() {
-      if (dragRef.current) {
-        dragRef.current = null;
-        document.body.style.cursor = "";
-        document.body.style.userSelect = "";
-      }
-    }
-
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
-    return () => {
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", onMouseUp);
-    };
-  }, []);
-
-  function onResizeStart(e: React.MouseEvent) {
-    e.preventDefault();
-    dragRef.current = { startY: e.clientY, startHeight: panelHeight };
-    document.body.style.cursor = "ns-resize";
-    document.body.style.userSelect = "none";
-  }
-
-  // Fetch on mount / project change, then poll — next timer starts after fetch resolves
-  useEffect(() => {
-    if (!activeProjectPath) return;
-
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-
-    const poll = () => {
-      fetchStatus(activeProjectPath).finally(() => {
-        if (cancelled) return;
-        timer = setTimeout(poll, POLL_INTERVAL);
-      });
-    };
-    poll();
-
-    return () => {
-      cancelled = true;
-      if (timer) clearTimeout(timer);
-    };
-  }, [activeProjectPath, fetchStatus]);
+  const { statuses, openDiff, viewMode, setViewMode, commitDialogOpen, closeCommitDialog } = useGitStore();
 
   const status = activeProjectPath ? statuses[activeProjectPath] : undefined;
   const allFiles = status?.files ?? [];
@@ -566,113 +464,79 @@ export function GitSection() {
   const totalCount = allFiles.length;
 
   return (
-    <div
-      className="git-section"
-      ref={sectionRef}
-      style={{ height: panelHeight }}
-    >
-      <div className="git-resize-handle" onMouseDown={onResizeStart} />
-      <div className="git-section-header">
-        <span className="git-section-title">
-          <SegmentedControl
-            value={panelMode}
-            options={PANEL_MODE_OPTIONS}
-            onChange={(v) => updateSettings({ sidebarPanelMode: v })}
-          />
-        </span>
-        {panelMode === "source" && totalCount > 0 && (
-          <span className="git-section-badge">[{totalCount}]</span>
-        )}
-        {panelMode === "source" && status?.branch && (
+    <>
+      <div className="right-panel-header">
+        <span className="right-panel-title">~/source</span>
+        {totalCount > 0 && <span className="git-section-badge">[{totalCount}]</span>}
+        {status?.branch && (
           <span className="git-branch-label">
             <span className="git-branch-prefix">@</span>
             {status.branch}
           </span>
         )}
-        {panelMode === "files" && (
-          <span
-            className="git-branch-label"
-            style={{ cursor: "pointer" }}
-            onClick={() => {
-              clearProject();
-              fetchDirectory(activeProjectPath);
-            }}
-          >
-            :refresh
-          </span>
-        )}
       </div>
       <div className="sidebar-divider" />
-      {panelMode === "source" && (
-        <>
-          <div className="git-section-body">
-            {status && !status.isRepo ? (
-              <div className="git-empty">Not a git repository</div>
-            ) : status ? (
-              <>
-                {totalCount > 0 && (
-                  <div className="git-view-toggle">
-                    <SegmentedControl
-                      value={viewMode}
-                      options={VIEW_MODE_OPTIONS}
-                      onChange={setViewMode}
-                    />
+      <div className="git-section-body">
+        {status && !status.isRepo ? (
+          <div className="git-empty">Not a git repository</div>
+        ) : status ? (
+          <>
+            {totalCount > 0 && (
+              <div className="git-view-toggle">
+                <SegmentedControl
+                  value={viewMode}
+                  options={VIEW_MODE_OPTIONS}
+                  onChange={setViewMode}
+                />
+              </div>
+            )}
+            <div className="git-section-files">
+              {totalCount === 0 ? (
+                <div className="git-empty">Working tree clean</div>
+              ) : viewMode === "tree" ? (
+                treeNodes.map((node) => (
+                  <TreeNodeRenderer
+                    key={node.fullPath}
+                    node={node}
+                    depth={0}
+                    onFileClick={(f) => openDiff(activeProjectPath, f)}
+                    projectPath={activeProjectPath}
+                  />
+                ))
+              ) : (
+                <div className="git-group">
+                  <div className="git-group-header git-group-header--static">
+                    <GroupCheckbox files={allFiles} />
+                    <span className="git-group-label">Changes</span>
+                    <span className="git-group-count">[{allFiles.length}]</span>
                   </div>
-                )}
-                <div className="git-section-files">
-                  {totalCount === 0 ? (
-                    <div className="git-empty">Working tree clean</div>
-                  ) : viewMode === "tree" ? (
-                    treeNodes.map((node) => (
-                      <TreeNodeRenderer
-                        key={node.fullPath}
-                        node={node}
-                        depth={0}
-                        onFileClick={(f) => openDiff(activeProjectPath, f)}
-                        projectPath={activeProjectPath}
-                      />
-                    ))
-                  ) : (
-                    <div className="git-group">
-                      <div className="git-group-header git-group-header--static">
-                        <GroupCheckbox files={allFiles} />
-                        <span className="git-group-label">Changes</span>
-                        <span className="git-group-count">[{allFiles.length}]</span>
-                      </div>
-                      <div className="git-group-items">
-                        {allFiles.map((f) => {
-                          const { dir, name } = splitPath(f.path);
-                          return (
-                            <FileItem
-                              key={f.path}
-                              file={f}
-                              dir={dir}
-                              name={name}
-                              onFileClick={() => openDiff(activeProjectPath, f)}
-                              projectPath={activeProjectPath}
-                            />
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
+                  <div className="git-group-items">
+                    {allFiles.map((f) => {
+                      const { dir, name } = splitPath(f.path);
+                      return (
+                        <FileItem
+                          key={f.path}
+                          file={f}
+                          dir={dir}
+                          name={name}
+                          onFileClick={() => openDiff(activeProjectPath, f)}
+                          projectPath={activeProjectPath}
+                        />
+                      );
+                    })}
+                  </div>
                 </div>
-              </>
-            ) : null}
-          </div>
-          {totalCount > 0 && <ActionBar projectPath={activeProjectPath} />}
-        </>
-      )}
-      {panelMode === "files" && (
-        <div className="git-section-body">
-          <FileTreeView projectPath={activeProjectPath} />
-        </div>
-      )}
+              )}
+            </div>
+          </>
+        ) : null}
+      </div>
+      {totalCount > 0 && <ActionBar projectPath={activeProjectPath} />}
       <CommitDialog
         isOpen={commitDialogOpen}
         onClose={closeCommitDialog}
         projectPath={activeProjectPath}
       />
-    </div>
+    </>
   );
 }

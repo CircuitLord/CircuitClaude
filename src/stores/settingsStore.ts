@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { Settings, DEFAULT_SETTINGS, PI_CHAT_SESSION_TYPE } from "../types";
+import { Settings, DEFAULT_SETTINGS, PI_CHAT_SESSION_TYPE, RightPanelTab } from "../types";
 import { loadSettings, saveSettings } from "../lib/config";
 
 const EDITABLE_SESSION_TYPE_IDS = new Set(DEFAULT_SETTINGS.sessionTypes.map((type) => type.id));
@@ -29,6 +29,7 @@ interface SettingsStore {
   settingsDialogOpen: boolean;
   load: () => Promise<void>;
   update: (partial: Partial<Settings>) => Promise<void>;
+  toggleRightPanelTab: (tab: RightPanelTab) => void;
   openSettingsDialog: () => void;
   closeSettingsDialog: () => void;
 }
@@ -55,6 +56,12 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     const updated = normalizeEditableSessionTypes({ ...get().settings, ...partial });
     set({ settings: updated });
     await saveSettings(updated);
+  },
+
+  // clicking the active tab closes the panel
+  toggleRightPanelTab: (tab: RightPanelTab) => {
+    const current = get().settings.rightPanelTab;
+    get().update({ rightPanelTab: current === tab ? null : tab });
   },
 
   openSettingsDialog: () => set({ settingsDialogOpen: true }),

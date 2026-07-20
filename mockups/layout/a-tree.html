@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>A — Session Tree</title>
+<style>
+  :root {
+    --bg-base: #0a0a0e;
+    --bg-surface: #101014;
+    --bg-elevated: #16161b;
+    --border-subtle: #1c1c23;
+    --border-visible: #26262e;
+    --text-primary: #ededf0;
+    --text-secondary: #9898a6;
+    --text-tertiary: #7e7e8e;
+    --accent: #7c3aed;
+    --accent-muted: rgba(124,58,237,0.15);
+    --accent-text: #a78bfa;
+    --font-mono: "Cascadia Mono", Consolas, "JetBrains Mono", monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    background: var(--bg-base);
+    color: var(--text-primary);
+    overflow: hidden;
+  }
+  @keyframes tui-blink { 50% { opacity: 0; } }
+  @keyframes tui-cycle {
+    0% { color: var(--text-tertiary); }
+    33% { color: var(--pa-text, var(--accent-text)); }
+    66% { color: var(--pa, var(--accent)); }
+  }
+  .blink { animation: tui-blink 1.2s step-end infinite; }
+  .cycle { animation: tui-cycle 2.4s step-end infinite; }
+
+  .window { display: flex; flex-direction: column; height: 100vh; }
+  .titlebar {
+    height: 34px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 12px;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border-subtle);
+    color: var(--text-tertiary);
+  }
+  .titlebar .win-btns span { margin-left: 14px; }
+  .main { flex: 1; display: flex; min-height: 0; }
+
+  /* ---- sidebar ---- */
+  .sidebar {
+    width: 264px; flex-shrink: 0;
+    display: flex; flex-direction: column;
+    background: var(--bg-surface);
+    border-right: 1px solid var(--border-subtle);
+  }
+  .sb-header {
+    height: 40px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 12px;
+    color: var(--text-tertiary);
+  }
+  .sb-header .actions { display: flex; gap: 10px; align-items: center; }
+  .txt-btn { color: var(--text-tertiary); cursor: pointer; }
+  .txt-btn:hover { color: var(--accent-text); }
+  .pill-btn {
+    background: var(--accent-muted); color: var(--accent-text);
+    border: 1px solid transparent; border-radius: 4px;
+    padding: 3px 9px; cursor: pointer; font-family: var(--font-mono); font-size: 13px;
+  }
+  .pill-btn:hover { background: rgba(124,58,237,0.25); border-color: var(--accent); }
+  .divider { height: 1px; background: var(--border-subtle); margin: 0 12px; flex-shrink: 0; }
+
+  .sb-list { flex: 1; overflow-y: auto; padding: 6px 0; }
+  .sb-list::-webkit-scrollbar { width: 4px; }
+  .sb-list::-webkit-scrollbar-thumb { background: var(--border-visible); border-radius: 2px; }
+
+  /* project row */
+  .proj {
+    display: flex; align-items: center; height: 32px;
+    padding: 0 12px; cursor: pointer;
+    color: var(--text-secondary);
+    position: relative;
+  }
+  .proj:hover { background: var(--bg-elevated); color: var(--text-primary); }
+  .proj .fold { width: 14px; color: var(--text-tertiary); }
+  .proj .name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .proj .swatch { color: var(--pa); margin-right: 6px; }
+  .proj .count { color: var(--text-tertiary); font-size: 12px; }
+  .proj.current .name { color: var(--text-primary); }
+
+  /* session row */
+  .sess {
+    display: flex; align-items: center; height: 30px;
+    padding: 0 12px 0 26px; cursor: pointer;
+    color: var(--text-secondary);
+    position: relative;
+  }
+  .sess:hover { background: var(--bg-elevated); color: var(--text-primary); }
+  .sess .prefix { width: 14px; color: transparent; flex-shrink: 0; }
+  .sess .name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sess .glyph { margin-left: 8px; flex-shrink: 0; }
+  .sess .glyph.waiting { color: var(--pa-text); }
+  .sess .glyph.idle { color: var(--text-tertiary); opacity: 0.4; }
+  .sess.active {
+    background: var(--pa-muted);
+  }
+  .sess.active .prefix { color: var(--pa-text); }
+  .sess.active .name { color: var(--text-primary); }
+  .sess.active::after {
+    content: ""; position: absolute; left: 12px; right: 12px; bottom: 0;
+    height: 1px; background: var(--pa);
+    box-shadow: 0 0 6px var(--pa);
+  }
+  .new-sess {
+    display: flex; align-items: center; height: 26px;
+    padding: 0 12px 0 40px; cursor: pointer;
+    color: var(--text-tertiary); font-size: 12px;
+  }
+  .new-sess:hover { color: var(--accent-text); }
+
+  /* per-project accent scopes */
+  .p-ember { --pa: #f97316; --pa-text: #fdba74; --pa-muted: rgba(249,115,22,0.12); }
+  .p-teal  { --pa: #14b8a6; --pa-text: #5eead4; --pa-muted: rgba(20,184,166,0.12); }
+  .p-viol  { --pa: #7c3aed; --pa-text: #a78bfa; --pa-muted: rgba(124,58,237,0.15); }
+  .p-slate { --pa: #64748b; --pa-text: #94a3b8; --pa-muted: rgba(100,116,139,0.12); }
+
+  .sb-git {
+    flex-shrink: 0; padding: 8px 12px;
+    border-top: 1px solid var(--border-subtle);
+    color: var(--text-tertiary); font-size: 12px; line-height: 1.7;
+  }
+  .sb-git .branch { color: var(--text-secondary); }
+  .sb-footer {
+    flex-shrink: 0; height: 36px;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    border-top: 1px solid var(--border-subtle);
+    color: var(--text-tertiary);
+  }
+
+  /* ---- content ---- */
+  .content { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .tabbar {
+    height: 36px; flex-shrink: 0;
+    display: flex; align-items: center;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border-subtle);
+    padding: 0 8px; gap: 2px;
+  }
+  .tab {
+    display: flex; align-items: center; gap: 7px;
+    height: 28px; padding: 0 10px;
+    color: var(--text-secondary); cursor: pointer;
+    position: relative;
+  }
+  .tab:hover { background: var(--bg-elevated); color: var(--text-primary); }
+  .tab.active { background: var(--accent-muted); color: var(--text-primary); }
+  .tab.active::after {
+    content: ""; position: absolute; left: 8px; right: 8px; bottom: 0;
+    height: 1px; background: var(--accent); box-shadow: 0 0 6px var(--accent);
+  }
+  .tab .x { color: var(--text-tertiary); }
+  .tab .x:hover { color: var(--text-primary); }
+  .tab-add { color: var(--text-tertiary); padding: 0 8px; cursor: pointer; }
+  .tab-add:hover { color: var(--accent-text); }
+
+  .term {
+    flex: 1; min-height: 0; overflow: hidden;
+    padding: 14px 18px; line-height: 1.55;
+    white-space: pre-wrap;
+  }
+  .term .dim { color: var(--text-tertiary); }
+  .term .sec { color: var(--text-secondary); }
+  .term .acc { color: var(--accent-text); }
+  .term .dot { color: var(--accent); }
+
+  .variant-badge {
+    position: fixed; right: 14px; bottom: 12px;
+    color: var(--text-tertiary); font-size: 12px;
+    background: var(--bg-elevated); border: 1px solid var(--border-visible);
+    border-radius: 4px; padding: 4px 10px; opacity: 0.85;
+  }
+</style>
+</head>
+<body>
+<div class="window">
+  <div class="titlebar">
+    <span>CircuitClaude</span>
+    <span class="win-btns"><span>–</span><span>□</span><span>×</span></span>
+  </div>
+  <div class="main">
+    <div class="sidebar">
+      <div class="sb-header">
+        <span>~/projects</span>
+        <span class="actions"><span class="txt-btn">:edit</span><button class="pill-btn">+ add</button></span>
+      </div>
+      <div class="divider"></div>
+      <div class="sb-list">
+
+        <div class="p-ember">
+          <div class="proj"><span class="fold">-</span><span class="swatch">#</span><span class="name">no-shot</span><span class="count">[3]</span></div>
+          <div class="sess"><span class="prefix">&gt;</span><span class="name">fix grip pose lag</span><span class="glyph cycle">*</span></div>
+          <div class="sess"><span class="prefix">&gt;</span><span class="name">server travel crash</span><span class="glyph waiting blink">?</span></div>
+          <div class="sess"><span class="prefix">&gt;</span><span class="name">shader cleanup</span><span class="glyph idle">·</span></div>
+          <div class="new-sess">+ new session</div>
+        </div>
+
+        <div class="p-teal">
+          <div class="proj"><span class="fold">-</span><span class="swatch">#</span><span class="name">temporal-api</span><span class="count">[2]</span></div>
+          <div class="sess"><span class="prefix">&gt;</span><span class="name">leaderboard endpoint</span><span class="glyph idle">·</span></div>
+          <div class="sess"><span class="prefix">&gt;</span><span class="name">auth token refresh</span><span class="glyph waiting blink">?</span></div>
+          <div class="new-sess">+ new session</div>
+        </div>
+
+        <div class="p-viol">
+          <div class="proj current"><span class="fold">-</span><span class="swatch">#</span><span class="name">circuit-claude</span><span class="count">[2]</span></div>
+          <div class="sess active"><span class="prefix">&gt;</span><span class="name">sidebar redesign</span><span class="glyph cycle">*</span></div>
+          <div class="sess"><span class="prefix">&gt;</span><span class="name">notes autosave</span><span class="glyph idle">·</span></div>
+          <div class="new-sess">+ new session</div>
+        </div>
+
+        <div class="p-slate">
+          <div class="proj"><span class="fold">+</span><span class="swatch">#</span><span class="name">dotfiles</span><span class="count">[1]</span></div>
+        </div>
+
+      </div>
+      <div class="sb-git">
+        <div><span class="branch">~/git master</span> · 2 changed</div>
+        <div>M src/components/Sidebar.tsx</div>
+      </div>
+      <div class="sb-footer">
+        <span class="txt-btn">:claude.md</span><span>·</span><span class="txt-btn">:settings</span>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="tabbar">
+        <div class="tab active"><span>sidebar redesign</span><span class="cycle" style="--pa-text:#a78bfa;--pa:#7c3aed;">*</span><span class="x">x</span></div>
+        <div class="tab"><span>notes autosave</span><span class="x">x</span></div>
+        <div class="tab-add">+</div>
+      </div>
+      <div class="term"><span class="dim">╭──────────────────────────────────────────────╮
+│</span> <span class="acc">✻ Claude Code</span>  <span class="dim">~/CircuitClaude                │
+╰──────────────────────────────────────────────╯</span>
+
+<span class="sec">&gt; rework the sidebar so sessions are directly clickable</span>
+
+<span class="dot">●</span> I'll restructure the sidebar to render sessions nested under each project entry.
+
+<span class="dot">●</span> <span class="sec">Read(src/components/Sidebar.tsx)</span>
+  <span class="dim">└ 337 lines</span>
+
+<span class="dot">●</span> <span class="sec">Update(src/components/Sidebar.tsx)</span>
+  <span class="dim">└ Added session rows under each project entry</span>
+
+<span class="acc">✻ Churning…</span> <span class="dim">(esc to interrupt)</span></div>
+    </div>
+  </div>
+</div>
+<div class="variant-badge">A — session tree · tabs kept</div>
+</body>
+</html>

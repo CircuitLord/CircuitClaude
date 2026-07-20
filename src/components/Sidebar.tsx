@@ -3,7 +3,6 @@ import type { CSSProperties } from "react";
 import { useProjectStore } from "../stores/projectStore";
 import { useSessionStore } from "../stores/sessionStore";
 import { useAddProject } from "./AddProjectDialog";
-import { GitSection } from "./GitSection";
 import { SidebarSessions } from "./SidebarSessions";
 import { NewSessionMenu } from "./NewSessionMenu";
 import { SettingsDialog } from "./SettingsDialog";
@@ -15,7 +14,7 @@ import type { ThemeName } from "../types";
 
 export function Sidebar() {
   const { projects, loaded, load, removeProject, reorderProjects, updateProjectTheme } = useProjectStore();
-  const { sessions, activeProjectPath, setActiveProject } = useSessionStore();
+  const { sessions, activeProjectPath, activeSessionId, setActiveProject } = useSessionStore();
   const settingsOpen = useSettingsStore((s) => s.settingsDialogOpen);
   const openSettingsDialog = useSettingsStore((s) => s.openSettingsDialog);
   const closeSettingsDialog = useSettingsStore((s) => s.closeSettingsDialog);
@@ -276,8 +275,8 @@ export function Sidebar() {
 
           // Normal mode
           const isActive = p.path === activeProjectPath;
-          // with no sessions the project row is the leaf, so it keeps the selection fill
-          const isLeaf = isActive && !sessions.some((s) => s.projectPath === p.path);
+          // with no session selected the project row is the leaf, so it keeps the selection fill
+          const isLeaf = isActive && !sessions.some((s) => s.projectPath === p.path && s.id === activeSessionId);
           const projectTheme = THEMES[p.theme] ?? THEMES.midnight;
           const entryStyle: CSSProperties = {
             "--sidebar-project-accent": projectTheme.css["--accent"],
@@ -303,7 +302,6 @@ export function Sidebar() {
           );
         })}
       </div>
-      <GitSection />
       <div className="sidebar-footer">
         <button className="sidebar-footer-btn" onClick={() => readClaudeMd().then((r) => openFileTab(r.path, "CLAUDE.md", false))}>
           :claude.md

@@ -1,14 +1,10 @@
 import { useEffect, useRef, useCallback, useMemo } from "react";
 import { useNotesStore } from "../stores/notesStore";
 import { useSessionStore } from "../stores/sessionStore";
-import { useSettingsStore } from "../stores/settingsStore";
 import hljs from "highlight.js/lib/core";
 import markdown from "highlight.js/lib/languages/markdown";
 
 hljs.registerLanguage("markdown", markdown);
-
-const MIN_WIDTH = 200;
-const MAX_WIDTH = 800;
 
 const INTRAWORD_UNDERSCORE_PLACEHOLDER = "\uE001";
 
@@ -29,36 +25,27 @@ function restoreIntrawordUnderscores(text: string): string {
 }
 
 export function NotesPanel() {
-  const { isOpen, content, loading, saving, dirty, setContent, save, toggle, loadForProject } =
+  const { content, loading, saving, dirty, setContent, save, loadForProject } =
     useNotesStore();
   const activeProjectPath = useSessionStore((s) => s.activeProjectPath);
-  const width = useSettingsStore((s) => s.settings.notesPanelWidth);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const highlightRef = useRef<HTMLPreElement>(null);
   const prevProjectRef = useRef<string | null>(null);
-  const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
 
   // Load notes when project changes
   useEffect(() => {
-    if (!activeProjectPath || !isOpen) return;
+    if (!activeProjectPath) return;
     if (prevProjectRef.current === activeProjectPath) return;
     prevProjectRef.current = activeProjectPath;
     loadForProject(activeProjectPath);
-  }, [activeProjectPath, isOpen, loadForProject]);
-
-  // Reset tracking ref when panel closes
-  useEffect(() => {
-    if (!isOpen) {
-      prevProjectRef.current = null;
-    }
-  }, [isOpen]);
+  }, [activeProjectPath, loadForProject]);
 
   // Auto-focus textarea when panel opens
   useEffect(() => {
-    if (isOpen && !loading && textareaRef.current) {
+    if (!loading && textareaRef.current) {
       textareaRef.current.focus();
     }
-  }, [isOpen, loading]);
+  }, [loading]);
 
   // Sync scroll from textarea to highlight layer
   const handleScroll = useCallback(() => {
@@ -80,38 +67,6 @@ export function NotesPanel() {
     }
   }, [content]);
 
-  // Resize drag handling
-  useEffect(() => {
-    function onMouseMove(e: MouseEvent) {
-      if (!dragRef.current) return;
-      const delta = dragRef.current.startX - e.clientX;
-      const newWidth = Math.min(Math.max(MIN_WIDTH, dragRef.current.startWidth + delta), MAX_WIDTH);
-      useSettingsStore.getState().update({ notesPanelWidth: newWidth });
-    }
-
-    function onMouseUp() {
-      if (dragRef.current) {
-        dragRef.current = null;
-        document.body.style.cursor = "";
-        document.body.style.userSelect = "";
-      }
-    }
-
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
-    return () => {
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", onMouseUp);
-    };
-  }, []);
-
-  function onResizeStart(e: React.MouseEvent) {
-    e.preventDefault();
-    dragRef.current = { startX: e.clientX, startWidth: width };
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-  }
-
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {
@@ -123,21 +78,16 @@ export function NotesPanel() {
     [save]
   );
 
-  if (!isOpen) return null;
-
   return (
-    <div className="notes-panel" style={{ width, minWidth: MIN_WIDTH, maxWidth: MAX_WIDTH }}>
-      <div className="resize-handle-vertical" onMouseDown={onResizeStart} />
-      <div className="notes-panel-header">
-        <span className="notes-panel-path">~/notes</span>
-        <div className="notes-panel-actions">
+    <>
+      <div className="right-panel-header">
+        <span className="right-panel-title">~/notes</span>
+        <div className="right-panel-header-actions">
           {saving && <span className="notes-panel-status">saving...</span>}
           {dirty && !saving && <span className="notes-panel-dot">*</span>}
-          <button className="notes-panel-close" onClick={toggle}>
-            :close
-          </button>
         </div>
       </div>
+      <div className="sidebar-divider" />
       <div className="notes-panel-body">
         {loading ? (
           <div className="notes-panel-loading">loading...</div>
@@ -165,6 +115,6 @@ export function NotesPanel() {
       <div className="notes-panel-footer">
         <span className="notes-panel-hint">ctrl+s save</span>
       </div>
-    </div>
+    </>
   );
 }

@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CircuitClaude — Neo-Brutalist</title>
+<style>
+  :root {
+    --bg: #f4f1e8;
+    --paper: #ffffff;
+    --ink: #16140f;
+    --accent: #ff5c38;
+    --yellow: #ffd23f;
+    --blue: #3d63ff;
+    --green: #1fbf6b;
+    --pink: #ff8fc7;
+    --line: #16140f;
+    --shadow: 5px 5px 0 var(--ink);
+    --shadow-sm: 3px 3px 0 var(--ink);
+    font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--ink); height: 100vh; overflow: hidden; }
+  .app { display: grid; grid-template-columns: 252px 1fr 300px; grid-template-rows: 1fr 40px; height: 100vh; gap: 0; }
+
+  /* SIDEBAR */
+  .sidebar { grid-row: 1 / 3; background: var(--paper); border-right: 3px solid var(--ink); display: flex; flex-direction: column; padding: 16px; gap: 12px; overflow-y: auto; }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 6px 10px; background: var(--accent); border: 3px solid var(--ink); box-shadow: var(--shadow-sm); }
+  .brand b { font-size: 16px; font-weight: 700; letter-spacing: -.4px; color: #fff; }
+  .brand .v { margin-left: auto; font-size: 11px; font-weight: 700; background: var(--ink); color: #fff; padding: 1px 6px; }
+  .lab { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; padding: 4px 2px; }
+  .item { display: flex; align-items: center; gap: 9px; padding: 10px 12px; border: 3px solid var(--ink); background: var(--paper); font-size: 13.5px; font-weight: 600; cursor: pointer; }
+  .item:hover { transform: translate(-2px,-2px); box-shadow: var(--shadow-sm); }
+  .item.active { background: var(--yellow); box-shadow: var(--shadow-sm); }
+  .item.sub { margin-left: 14px; font-size: 12.5px; }
+  .item.sub.active { background: var(--blue); color: #fff; }
+  .item .em { font-size: 15px; }
+  .item .ct { margin-left: auto; background: var(--ink); color: #fff; font-size: 11px; font-weight: 700; padding: 1px 7px; }
+  .item.active .ct { background: var(--accent); }
+  .live { margin-left: auto; width: 12px; height: 12px; background: var(--green); border: 2px solid var(--ink); }
+  .newb { padding: 9px; border: 3px dashed var(--ink); text-align: center; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+  .newb:hover { background: var(--pink); }
+  .foot { margin-top: auto; display: flex; flex-direction: column; gap: 8px; }
+
+  /* MAIN */
+  .main { display: flex; flex-direction: column; min-width: 0; background: var(--bg); }
+  .top { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 3px solid var(--ink); background: var(--paper); }
+  .top h1 { font-size: 17px; font-weight: 700; letter-spacing: -.4px; }
+  .top .crumb { font-size: 12px; font-weight: 600; background: var(--ink); color: #fff; padding: 3px 8px; }
+  .top .run { margin-left: auto; font-size: 12px; font-weight: 700; background: var(--green); color: var(--ink); padding: 5px 12px; border: 3px solid var(--ink); }
+  .ib { width: 36px; height: 36px; border: 3px solid var(--ink); background: var(--paper); display: grid; place-items: center; font-size: 15px; cursor: pointer; font-weight: 700; }
+  .ib:hover { box-shadow: var(--shadow-sm); transform: translate(-2px,-2px); }
+
+  .chat { flex: 1; overflow-y: auto; padding: 22px 22px 8px; display: flex; flex-direction: column; gap: 20px; }
+  .turn { max-width: 780px; }
+  .turn.you { align-self: flex-end; }
+  .head { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+  .badge { font-size: 12px; font-weight: 700; padding: 3px 10px; border: 3px solid var(--ink); text-transform: uppercase; letter-spacing: .5px; }
+  .badge.you { background: var(--pink); }
+  .badge.ai { background: var(--blue); color: #fff; }
+  .time { font-size: 11px; font-weight: 600; opacity: .55; }
+  .bubble { background: var(--paper); border: 3px solid var(--ink); box-shadow: var(--shadow); padding: 14px 16px; font-size: 14px; line-height: 1.6; font-weight: 450; }
+  .turn.you .bubble { background: var(--yellow); }
+  .bubble code { font-family: 'Space Mono', ui-monospace, monospace; background: var(--ink); color: var(--yellow); padding: 1px 6px; font-size: 12.5px; }
+
+  .tool { margin-top: 12px; border: 3px solid var(--ink); box-shadow: var(--shadow); background: var(--paper); }
+  .th { display: flex; align-items: center; gap: 9px; padding: 9px 13px; background: var(--ink); color: #fff; font-size: 12px; font-weight: 700; }
+  .th .nm { text-transform: uppercase; letter-spacing: .5px; }
+  .th .pp { font-family: 'Space Mono', monospace; font-weight: 400; opacity: .85; font-size: 11.5px; }
+  .th .ok { margin-left: auto; background: var(--green); color: var(--ink); padding: 1px 8px; }
+  .dcode { font-family: 'Space Mono', ui-monospace, monospace; font-size: 12px; line-height: 1.75; }
+  .dl { padding: 1px 14px; border-bottom: 1px solid #e7e3d6; }
+  .dl.add { background: #d4f7e3; font-weight: 700; }
+  .dl.del { background: #ffd9d2; }
+
+  .composer { border-top: 3px solid var(--ink); padding: 14px 20px 18px; background: var(--paper); }
+  .field { border: 3px solid var(--ink); box-shadow: var(--shadow); padding: 13px 15px; background: var(--paper); }
+  .field .ph { font-size: 14px; font-weight: 500; opacity: .5; }
+  .frow { display: flex; align-items: center; gap: 9px; margin-top: 12px; }
+  .ghost { font-size: 12px; font-weight: 700; padding: 6px 11px; border: 3px solid var(--ink); background: var(--paper); cursor: pointer; }
+  .ghost:hover { background: var(--pink); }
+  .send { margin-left: auto; background: var(--accent); color: #fff; border: 3px solid var(--ink); padding: 7px 18px; font-size: 13px; font-weight: 700; cursor: pointer; box-shadow: var(--shadow-sm); }
+  .send:hover { transform: translate(-2px,-2px); box-shadow: 5px 5px 0 var(--ink); }
+
+  /* RIGHT */
+  .rail { background: var(--paper); border-left: 3px solid var(--ink); display: flex; flex-direction: column; overflow: hidden; }
+  .rtabs { display: flex; }
+  .rt { flex: 1; padding: 12px; text-align: center; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; border-bottom: 3px solid var(--ink); border-right: 3px solid var(--ink); cursor: pointer; }
+  .rt:last-child { border-right: none; }
+  .rt.on { background: var(--yellow); }
+  .rbody { padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+  .gitcard { border: 3px solid var(--ink); padding: 10px 12px; display: flex; align-items: center; gap: 10px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+  .gitcard:hover { box-shadow: var(--shadow-sm); transform: translate(-2px,-2px); }
+  .mk { width: 24px; height: 24px; border: 3px solid var(--ink); display: grid; place-items: center; font-family: 'Space Mono', monospace; font-weight: 700; font-size: 12px; }
+  .mk.m { background: var(--yellow); } .mk.a { background: var(--green); }
+  .gp { font-family: 'Space Mono', monospace; font-size: 11.5px; }
+  .commit { margin-top: 6px; }
+  .commit textarea { width: 100%; border: 3px solid var(--ink); padding: 10px; font-size: 13px; font-family: inherit; font-weight: 500; resize: none; }
+  .cbtn { width: 100%; margin-top: 8px; background: var(--blue); color: #fff; border: 3px solid var(--ink); padding: 11px; font-size: 13px; font-weight: 700; cursor: pointer; box-shadow: var(--shadow-sm); }
+  .cbtn:hover { transform: translate(-2px,-2px); box-shadow: 5px 5px 0 var(--ink); }
+
+  /* STATUS */
+  .status { grid-column: 2 / 4; display: flex; align-items: center; gap: 0; background: var(--ink); }
+  .status .s { color: #fff; font-size: 11.5px; font-weight: 700; padding: 0 16px; height: 100%; display: flex; align-items: center; gap: 6px; border-right: 1px solid #3a352a; }
+  .status .s.accent { background: var(--accent); }
+  .status .r { margin-left: auto; border-right: none; border-left: 1px solid #3a352a; }
+  ::-webkit-scrollbar { width: 12px; }
+  ::-webkit-scrollbar-track { background: var(--bg); border-left: 2px solid var(--ink); }
+  ::-webkit-scrollbar-thumb { background: var(--ink); }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="brand"><b>CIRCUITCLAUDE</b><span class="v">0.4</span></div>
+    <div class="lab">// Projects</div>
+    <div class="item active"><span class="em">🔥</span> ProjectEmber <span class="ct">3</span></div>
+    <div class="item"><span class="em">🌐</span> TemporalAPI <span class="live"></span></div>
+    <div class="item"><span class="em">⚙️</span> CircuitClaude <span class="ct">1</span></div>
+    <div class="newb">+ ADD PROJECT</div>
+
+    <div class="lab">// Sessions</div>
+    <div class="item sub active"><span class="em">💬</span> claude · main <span class="live"></span></div>
+    <div class="item sub"><span class="em">🖥️</span> dev server</div>
+    <div class="item sub"><span class="em">🧪</span> test-runner</div>
+    <div class="newb">+ NEW SESSION</div>
+
+    <div class="foot">
+      <div class="item"><span class="em">📝</span> Notes</div>
+      <div class="item"><span class="em">⚙️</span> Settings</div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <section class="main">
+    <div class="top">
+      <h1>claude · main</h1>
+      <span class="crumb">~/Projects/ProjectEmber</span>
+      <span class="run">● RUNNING</span>
+      <div class="ib">⤢</div>
+      <div class="ib">⋯</div>
+    </div>
+
+    <div class="chat">
+      <div class="turn you" style="align-self:flex-end">
+        <div class="head" style="justify-content:flex-end"><span class="time">2:14 PM</span><span class="badge you">You</span></div>
+        <div class="bubble">Add a cooldown to the grapple ability so it can't be spammed. Should be 3 seconds.</div>
+      </div>
+
+      <div class="turn">
+        <div class="head"><span class="badge ai">Claude ✦</span><span class="time">opus-4-8 · 2:14 PM</span></div>
+        <div class="bubble">
+          Adding a cooldown to <code>GrappleComponent</code> — guarding activation against <code>LastUsedTime</code>.
+          <div class="tool">
+            <div class="th"><span class="nm">✎ Edit</span><span class="pp">GrappleComponent.cpp</span><span class="ok">+6 −1</span></div>
+            <div class="dcode">
+              <div class="dl">&nbsp;void UGrappleComponent::TryActivate() {</div>
+              <div class="dl del">−&nbsp;&nbsp;FireGrapple();</div>
+              <div class="dl add">+&nbsp;&nbsp;if (World->TimeSince(LastUsedTime) < Cooldown) return;</div>
+              <div class="dl add">+&nbsp;&nbsp;LastUsedTime = World->GetTimeSeconds();</div>
+              <div class="dl add">+&nbsp;&nbsp;FireGrapple();</div>
+              <div class="dl">&nbsp;}</div>
+            </div>
+          </div>
+          <div style="margin-top:12px">Compiled clean. Grapple enforces a 3s cooldown. Want the remaining time on the HUD?</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="composer">
+      <div class="field">
+        <div class="ph">Type a message…</div>
+        <div class="frow">
+          <span class="ghost">@ FILE</span>
+          <span class="ghost">/ CMD</span>
+          <span class="ghost">🎙️</span>
+          <button class="send">SEND ⏎</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- RIGHT -->
+  <aside class="rail">
+    <div class="rtabs">
+      <div class="rt on">Changes</div>
+      <div class="rt">Files</div>
+      <div class="rt">Notes</div>
+    </div>
+    <div class="rbody">
+      <div class="lab">// 3 changed · main</div>
+      <div class="gitcard"><div class="mk m">M</div><span class="gp">GrappleComponent.cpp</span></div>
+      <div class="gitcard"><div class="mk m">M</div><span class="gp">GrappleComponent.h</span></div>
+      <div class="gitcard"><div class="mk a">A</div><span class="gp">Abilities.ini</span></div>
+      <div class="commit">
+        <textarea rows="3">Add 3s cooldown to grapple ability</textarea>
+        <button class="cbtn">✓ COMMIT 3 FILES</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- STATUS -->
+  <footer class="status">
+    <div class="s accent">⎇ MAIN</div>
+    <div class="s">↑2 ↓0</div>
+    <div class="s">3 CHANGED</div>
+    <div class="s r">CLAUDE-OPUS-4-8</div>
+    <div class="s">● CONNECTED</div>
+  </footer>
+</div>
+</body>
+</html>

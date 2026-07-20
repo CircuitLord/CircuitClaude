@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Layout Explorations</title>
+<style>
+  :root {
+    --bg-base: #0a0a0e;
+    --bg-surface: #101014;
+    --bg-elevated: #16161b;
+    --border-subtle: #1c1c23;
+    --border-visible: #26262e;
+    --text-primary: #ededf0;
+    --text-secondary: #9898a6;
+    --text-tertiary: #7e7e8e;
+    --accent: #7c3aed;
+    --accent-muted: rgba(124,58,237,0.15);
+    --accent-text: #a78bfa;
+    --font-mono: "Cascadia Mono", Consolas, "JetBrains Mono", monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--font-mono); font-size: 13px;
+    background: var(--bg-base); color: var(--text-primary);
+    padding: 48px 24px;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 15px; font-weight: 400; color: var(--text-tertiary); margin-bottom: 4px; }
+  .sub { color: var(--text-tertiary); margin-bottom: 28px; font-size: 12.5px; }
+  .divider { height: 1px; background: var(--border-subtle); margin-bottom: 12px; }
+  a.entry {
+    display: flex; align-items: baseline; gap: 12px;
+    padding: 12px; text-decoration: none;
+    color: var(--text-secondary); position: relative;
+  }
+  a.entry:hover { background: var(--bg-elevated); }
+  a.entry:hover .name { color: var(--text-primary); }
+  a.entry .prefix { color: var(--accent-text); width: 14px; flex-shrink: 0; }
+  a.entry .name { color: var(--text-primary); width: 190px; flex-shrink: 0; }
+  a.entry .desc { flex: 1; font-size: 12.5px; color: var(--text-tertiary); line-height: 1.5; }
+  .note { margin-top: 32px; color: var(--text-tertiary); font-size: 12px; line-height: 1.7; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>~/mockups/layout</h1>
+  <div class="sub">sidebar / sessions / tabs redesign explorations — all sessions visible and clickable without opening a project first</div>
+  <div class="divider"></div>
+
+  <a class="entry" href="a-tree.html">
+    <span class="prefix">&gt;</span>
+    <span class="name">a — session tree</span>
+    <span class="desc">Smallest change from today. Sidebar becomes a tree: sessions nested under each project, collapsible, with status glyphs per session. Per-project tab bar stays for in-project switching.</span>
+  </a>
+
+  <a class="entry" href="b-sessions-first.html">
+    <span class="prefix">&gt;</span>
+    <span class="name">b — sessions first</span>
+    <span class="desc">Sidebar replaces the tab bar entirely. Two-line session rows (title + status + elapsed) grouped under project headers. Terminal gains vertical space, only a slim breadcrumb strip remains on top.</span>
+  </a>
+
+  <a class="entry" href="c-attention-queue.html">
+    <span class="prefix">&gt;</span>
+    <span class="name">c — attention queue</span>
+    <span class="desc">Triage-first. Sidebar leads with "waiting on you" and "working" queues across all projects, sorted by what needs input. Idle sessions live in a compact project tree below.</span>
+  </a>
+
+  <a class="entry" href="d-top-deck.html">
+    <span class="prefix">&gt;</span>
+    <span class="name">d — top deck</span>
+    <span class="desc">No sidebar at all. One horizontal strip groups every project's sessions as chips with status glyphs. Terminal gets full width, git + settings move into a vim-style bottom statusline.</span>
+  </a>
+
+  <div class="note">
+    All variants share: per-project accent colors on session rows/chips, ? blink for waiting, * color-cycle for thinking, TUI style rules from system.md. Static mockups — hover states work, clicks do nothing.
+  </div>
+</div>
+</body>
+</html>

@@ -16,8 +16,6 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
   const {
     sessions,
     activeSessionId,
-    tabStatuses,
-    sessionTitles,
     projectSplits,
     clearSplit,
     setFocusedPane,
@@ -145,19 +143,8 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
       );
     }
 
-    const status = tabStatuses.get(sessionId) ?? null;
-    const title = sessionTitles.get(sessionId) ?? session.projectName;
-    return (
-      <div className="pane-header">
-        <span className="pane-header-prefix">{prefix}</span>
-        <span className="pane-header-title">{title}</span>
-        {status === "thinking" ? (
-          <span className="pane-header-status thinking">*</span>
-        ) : status === "waiting" ? (
-          <span className="pane-header-status waiting">?</span>
-        ) : null}
-      </div>
-    );
+    // terminals run headerless — the tab strip already names them
+    return null;
   }
 
   // --- Resize handle ---

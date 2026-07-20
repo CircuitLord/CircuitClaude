@@ -104,6 +104,8 @@ export interface SplitState {
 
 // --- Settings ---
 
+export type RightPanelTab = "files" | "source" | "notes" | "pins";
+
 export interface Settings {
   theme: ThemeName;
   syntaxTheme: SyntaxThemeName;
@@ -112,9 +114,8 @@ export interface Settings {
   piChatFontFamily: string;
   piChatFontSize: number;
   gitViewMode: "file" | "tree";
-  sidebarPanelMode: "source" | "files";
-  notesPanelOpen: boolean;
-  notesPanelWidth: number;
+  rightPanelTab: RightPanelTab | null;
+  rightPanelWidth: number;
   voiceEngine: VoiceEngine;
   voiceMicDeviceId: string;
   whisperModel: string;
@@ -131,9 +132,8 @@ export const DEFAULT_SETTINGS: Settings = {
   piChatFontFamily: "'Inter', -apple-system, system-ui, sans-serif",
   piChatFontSize: 15,
   gitViewMode: "file",
-  sidebarPanelMode: "source",
-  notesPanelOpen: false,
-  notesPanelWidth: 350,
+  rightPanelTab: "source",
+  rightPanelWidth: 350,
   voiceEngine: "edge",
   voiceMicDeviceId: "default",
   whisperModel: "medium.en",

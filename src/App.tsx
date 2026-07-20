@@ -1,13 +1,14 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Sidebar } from "./components/Sidebar";
 import { ProjectHeader } from "./components/ProjectHeader";
 import { TerminalTabs } from "./components/TerminalTabs";
 import { EmptyState } from "./components/EmptyState";
+import { SessionLauncher } from "./components/SessionLauncher";
 import { WindowControls } from "./components/WindowControls";
 import { DiffViewer } from "./components/DiffViewer";
 import { CommandPalette } from "./components/CommandPalette";
-import { NotesPanel } from "./components/NotesPanel";
+import { RightPanel } from "./components/RightPanel";
 import { useSessionStore } from "./stores/sessionStore";
 import { useNotesStore } from "./stores/notesStore";
 import { useSettingsStore } from "./stores/settingsStore";
@@ -17,14 +18,16 @@ import { usePinnedFilesStore } from "./stores/pinnedFilesStore";
 import { applyThemeToDOM, applySyntaxThemeToDOM } from "./lib/themes";
 import { useHotkeys } from "./hooks/useHotkeys";
 import { useUpdateCheck } from "./hooks/useUpdateCheck";
+import { useGitPolling } from "./hooks/useGitPolling";
 import "./App.css";
 
 function App() {
-  const { sessions, activeProjectPath } = useSessionStore();
+  const { sessions, activeProjectPath, activeSessionId } = useSessionStore();
   const projects = useProjectStore((s) => s.projects);
   const initializedRef = useRef(false);
   const { status: updateStatus, updateInfo, install: installUpdate, dismiss: dismissUpdate } = useUpdateCheck();
   useHotkeys();
+  useGitPolling();
 
   // Load settings and projects on startup
   useEffect(() => {
@@ -40,10 +43,6 @@ function App() {
     ])
       .then(() => {
         useGitStore.getState().initViewModeFromSettings();
-        const { notesPanelOpen } = useSettingsStore.getState().settings;
-        if (notesPanelOpen) {
-          useNotesStore.getState().toggle();
-        }
         // Preload notes for all projects so switching is instant
         const paths = useProjectStore.getState().projects.map((p) => p.path);
         useNotesStore.getState().preloadAll(paths);
@@ -56,16 +55,20 @@ function App() {
       });
   }, []);
 
-  // Apply project theme when active project changes
-  useEffect(() => {
+  // Apply project theme before paint so a switch never shows the old accent
+  const themedProjectPathRef = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    // instant on a project switch, animated when the current project's theme is edited
+    const instant = themedProjectPathRef.current !== activeProjectPath;
+    themedProjectPathRef.current = activeProjectPath;
+
     if (!activeProjectPath) {
-      const defaultTheme = useSettingsStore.getState().settings.theme;
-      applyThemeToDOM(defaultTheme);
+      applyThemeToDOM(useSettingsStore.getState().settings.theme, instant);
       return;
     }
     const project = projects.find((p) => p.path === activeProjectPath);
     if (project?.theme) {
-      applyThemeToDOM(project.theme);
+      applyThemeToDOM(project.theme, instant);
     }
   }, [activeProjectPath, projects]);
 
@@ -106,6 +109,9 @@ function App() {
     ? sessions.filter((s) => s.projectPath === activeProjectPath)
     : [];
 
+  // no tab selected (freshly switched project, or none exist) shows the launcher
+  const showLauncher = !!activeProjectPath && !activeProjectSessions.some((s) => s.id === activeSessionId);
+
   return (
     <>
       <div className="app">
@@ -141,13 +147,11 @@ function App() {
           <div className="main-content-area">
             <div className="terminal-content">
               {activeProjectPath ? (
-                <>
-                  {activeProjectSessions.length === 0 ? (
-                    <div className="terminal-area">
-                      <EmptyState variant="no-sessions" />
-                    </div>
-                  ) : null}
-                </>
+                showLauncher ? (
+                  <div className="terminal-area">
+                    <SessionLauncher projectPath={activeProjectPath} />
+                  </div>
+                ) : null
               ) : (
                 <div className="terminal-area">
                   <EmptyState />
@@ -159,13 +163,13 @@ function App() {
                   key={path}
                   className="terminal-grid-wrapper"
                   data-project={path}
-                  style={{ display: path === activeProjectPath ? "flex" : "none" }}
+                  style={{ display: path === activeProjectPath && !showLauncher ? "flex" : "none" }}
                 >
                   <TerminalTabs projectPath={path} />
                 </div>
               ))}
             </div>
-            {activeProjectPath && <NotesPanel />}
+            {activeProjectPath && <RightPanel />}
           </div>
         </div>
       </div>

@@ -1,6 +1,6 @@
 import { useEffect, useCallback, useMemo, useState } from "react";
 import { useGitStore, type DiffViewerMode } from "../stores/gitStore";
-import { statusColor } from "./GitSection";
+import { statusColor } from "./GitPanel";
 import { highlightCode, detectLanguage } from "../lib/highlight";
 
 interface DiffLine {

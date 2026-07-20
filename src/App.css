@@ -212,13 +212,17 @@ body,
 
 /* --- TUI Project Entries --- */
 
+.sidebar-group {
+  margin-bottom: 6px;
+}
+
 .sidebar-entry {
   display: flex;
   flex-direction: column;
   justify-content: center;
   padding: 7px 12px;
   cursor: pointer;
-  color: var(--text-secondary);
+  color: var(--text-primary);
   font-size: 13px;
   position: relative;
   transition: background 0.1s, color 0.1s;
@@ -247,6 +251,7 @@ body,
 .sidebar-entry-line1 {
   display: flex;
   align-items: center;
+  min-height: 24px;
 }
 
 .sidebar-entry-prefix {
@@ -269,30 +274,38 @@ body,
 
 /* --- Session rows nested under a project --- */
 
-.sidebar-group + .sidebar-group {
-  margin-top: 6px;
-}
-
 .sidebar-sessions {
   display: flex;
   flex-direction: column;
+  position: relative;
+}
+
+/* guide line tying sessions to their project */
+.sidebar-sessions::before {
+  content: "";
+  position: absolute;
+  left: 16px;
+  top: 2px;
+  bottom: 4px;
+  width: 1px;
+  background: var(--border-subtle);
 }
 
 .sidebar-session {
   display: flex;
   align-items: center;
-  height: 26px;
-  padding: 0 8px 0 30px;
+  height: 34px;
+  padding: 0 8px 0 26px;
   position: relative;
   cursor: pointer;
-  font-size: 12px;
-  color: var(--text-tertiary);
+  font-size: 13px;
+  color: var(--text-secondary);
   transition: background 0.1s, color 0.1s;
 }
 
 .sidebar-session:hover {
   background: var(--bg-elevated);
-  color: var(--text-secondary);
+  color: var(--text-primary);
 }
 
 .sidebar-session.active {
@@ -329,13 +342,16 @@ body,
 }
 
 .sidebar-session-prefix {
-  width: 14px;
+  min-width: 14px;
   flex-shrink: 0;
+  padding-right: 4px;
   color: var(--text-tertiary);
+  opacity: 0.6;
 }
 
 .sidebar-session.active .sidebar-session-prefix {
   color: var(--accent-text);
+  opacity: 1;
 }
 
 .sidebar-session-name {
@@ -418,18 +434,20 @@ body,
 /* + button on the project row */
 
 .sidebar-entry-spawn {
-  display: none;
+  display: flex;
+  visibility: hidden;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   margin-left: 6px;
+  margin-right: -8px;
   background: transparent;
   border: none;
   border-radius: 3px;
   font-family: var(--font-mono);
-  font-size: 14px;
+  font-size: 18px;
   line-height: 1;
   color: var(--text-tertiary);
   cursor: pointer;
@@ -437,7 +455,7 @@ body,
 
 .sidebar-entry:hover .sidebar-entry-spawn,
 .sidebar-entry-spawn[aria-expanded="true"] {
-  display: flex;
+  visibility: visible;
 }
 
 .sidebar-entry-spawn:hover {
@@ -669,71 +687,8 @@ body,
 
 
 /* ========================================================================
-   Git Section (sidebar) — TUI style
+   Git Panel — TUI style
    ======================================================================== */
-
-.git-section {
-  flex: none;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.git-resize-handle {
-  height: 4px;
-  cursor: ns-resize;
-  flex-shrink: 0;
-  position: relative;
-}
-
-.git-resize-handle::after {
-  content: "";
-  position: absolute;
-  top: -2px;
-  left: 0;
-  right: 0;
-  height: 8px;
-}
-
-.git-resize-handle:hover {
-  background: var(--accent);
-}
-
-/* --- Section Header (matches ~/projects pattern) --- */
-
-.git-section-header {
-  display: flex;
-  align-items: stretch;
-  height: 36px;
-  padding: 0;
-  user-select: none;
-  flex-shrink: 0;
-  border-top: 1px solid var(--border-subtle);
-}
-
-.git-section-header .settings-segmented {
-  align-items: stretch;
-  gap: 0;
-}
-
-.git-section-header .settings-segmented-btn {
-  display: flex;
-  align-items: center;
-  padding: 0 2px;
-}
-
-.git-section-header .settings-segmented-btn:first-child {
-  padding-left: 12px;
-}
-
-.git-section-title {
-  display: flex;
-  align-items: stretch;
-  font-size: 13px;
-  font-weight: 400;
-  color: var(--text-tertiary);
-}
 
 .git-section-badge {
   display: flex;
@@ -744,10 +699,6 @@ body,
   margin-left: 4px;
 }
 
-.git-section-header .git-branch-label {
-  padding-right: 12px;
-}
-
 /* --- Section Body --- */
 
 .git-section-body {
@@ -755,6 +706,7 @@ body,
   min-height: 0;
   overflow-y: auto;
   padding: 2px 0;
+  user-select: none;
 }
 
 .git-section-body::-webkit-scrollbar {
@@ -1212,9 +1164,64 @@ body,
 .project-header-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  align-self: stretch;
+  gap: 0;
   flex-shrink: 0;
   padding-right: 8px;
+}
+
+/* --- Right panel tab strip (one-of-N, contiguous cells) --- */
+
+.panel-tabs {
+  display: flex;
+  align-items: stretch;
+  align-self: stretch;
+  -webkit-app-region: no-drag;
+}
+
+.panel-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  padding: 0 10px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  transition: color 0.1s, background 0.1s;
+}
+
+.panel-tab:hover:not(.active) {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.panel-tab.active {
+  background: var(--accent-muted);
+  color: var(--accent-text);
+}
+
+.panel-tab.active::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 6px;
+  right: 6px;
+  height: 1px;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
+}
+
+.panel-tab-badge {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.panel-tab.active .panel-tab-badge {
+  color: var(--accent-text);
 }
 
 .project-header-count {
@@ -1654,8 +1661,94 @@ body,
   color: var(--text-tertiary);
 }
 
-.empty-state-action {
+/* ========================================================================
+   Session Launcher (shown when a project has no sessions)
+   ======================================================================== */
+
+.session-launcher {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
   font-family: var(--font-mono);
+}
+
+.session-launcher-content {
+  width: 100%;
+  max-width: 420px;
+  padding: 0 24px;
+  text-align: center;
+}
+
+.session-launcher-ascii {
+  font-size: 24px;
+  color: var(--text-tertiary);
+  margin-bottom: 14px;
+}
+
+.session-launcher-cursor {
+  animation: tui-blink 1.2s step-end infinite;
+}
+
+.session-launcher-title {
+  font-size: var(--text-base);
+  color: var(--text-primary);
+}
+
+.session-launcher-project {
+  margin-top: 4px;
+  font-size: var(--text-xs);
+  color: var(--accent-text);
+}
+
+.session-launcher-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.session-launcher-entry {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 15px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s, color 0.1s;
+}
+
+.session-launcher-entry:hover {
+  background: var(--accent-muted);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.session-launcher-entry:active {
+  background: var(--bg-elevated);
+}
+
+.session-launcher-entry-prefix {
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+}
+
+.session-launcher-entry:hover .session-launcher-entry-prefix {
+  color: var(--accent-text);
+}
+
+.session-launcher-entry-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ========================================================================
@@ -2919,28 +3012,8 @@ body,
   flex-shrink: 0;
 }
 
-.pane-header-title {
-  color: var(--text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .pane-header-crumb {
   display: inline;
-}
-
-.pane-header-status {
-  margin-left: auto;
-  padding-left: 8px;
-  color: var(--accent-text);
-}
-
-.pane-header-status.thinking {
-  animation: tui-color-cycle 2.4s step-end infinite;
-}
-
-.pane-header-status.waiting {
-  animation: tui-blink 1.2s step-end infinite;
 }
 
 .editor-breadcrumb-sep {
@@ -3043,6 +3116,12 @@ body,
 
 .terminal-tabs-pane--focused .pane-header {
   background: color-mix(in srgb, var(--accent) 6%, var(--bg-surface));
+}
+
+/* terminal panes have no header, so the pane itself carries the focus cue */
+.terminal-tabs-pane--focused {
+  outline: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  outline-offset: -1px;
 }
 
 .terminal-tabs-pane--drop-target {
@@ -3393,10 +3472,10 @@ body,
 }
 
 /* ========================================================================
-   Notes Panel (right sidebar)
+   Right Panel (tabbed sidebar)
    ======================================================================== */
 
-.notes-panel {
+.right-panel {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -3404,9 +3483,10 @@ body,
   background: var(--bg-surface);
   border-left: 1px solid var(--border-subtle);
   flex-shrink: 0;
+  font-family: var(--font-mono);
 }
 
-.notes-panel > .resize-handle-vertical {
+.right-panel > .resize-handle-vertical {
   position: absolute;
   left: -1px;
   top: 0;
@@ -3414,27 +3494,63 @@ body,
   z-index: 10;
 }
 
-.notes-panel-header {
+.right-panel-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   height: 36px;
   padding: 0 12px;
-  border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
+  user-select: none;
 }
 
-.notes-panel-path {
+.right-panel-title {
   font-size: 13px;
   font-weight: 400;
   font-family: var(--font-mono);
   color: var(--text-tertiary);
 }
 
-.notes-panel-actions {
+.right-panel-header-actions {
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-left: auto;
+}
+
+.right-panel-action {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: color 0.1s;
+}
+
+.right-panel-action:hover {
+  color: var(--accent-text);
+}
+
+.right-panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 2px 0;
+  user-select: none;
+}
+
+.right-panel-body::-webkit-scrollbar {
+  width: 4px;
+}
+
+.right-panel-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.right-panel-body::-webkit-scrollbar-thumb {
+  background: var(--border-visible);
+  border-radius: 2px;
 }
 
 .notes-panel-status {
@@ -3448,22 +3564,6 @@ body,
   font-size: 13px;
   font-family: var(--font-mono);
   color: var(--text-tertiary);
-}
-
-.notes-panel-close {
-  background: transparent;
-  border: none;
-  padding: 0;
-  font-size: 13px;
-  font-family: var(--font-mono);
-  font-weight: 400;
-  color: var(--text-tertiary);
-  cursor: pointer;
-  transition: color 0.1s;
-}
-
-.notes-panel-close:hover {
-  color: var(--text-primary);
 }
 
 .notes-panel-body {
@@ -3848,9 +3948,9 @@ body,
   right: 0;
 }
 
+/* portaled to body, so it is placed from the button rect in JS */
 .new-session-dropdown--sidebar {
-  top: calc(100% + 2px);
-  right: 0;
+  position: fixed;
 }
 
 .sidebar-entry-line1 .new-session-menu {
@@ -3883,40 +3983,7 @@ body,
   color: var(--accent-text);
   flex-shrink: 0;
 }
-/* --- Pins Dropdown --- */
-
-.pins-menu {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  z-index: 10;
-}
-
-.pins-dropdown {
-  position: absolute;
-  top: calc(100% + 10px);
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--bg-surface);
-  border: 1px solid var(--border-visible);
-  border-radius: 2px;
-  padding: 0;
-  z-index: 10;
-  min-width: 200px;
-  max-height: 400px;
-  overflow-y: auto;
-}
-
-.pins-dropdown::-webkit-scrollbar {
-  width: 4px;
-}
-.pins-dropdown::-webkit-scrollbar-track {
-  background: transparent;
-}
-.pins-dropdown::-webkit-scrollbar-thumb {
-  background: var(--border-visible);
-  border-radius: 2px;
-}
+/* --- Pins Panel --- */
 
 .pins-empty {
   padding: 0 10px;
@@ -4002,25 +4069,4 @@ body,
   color: var(--text-primary);
 }
 
-.pins-add-row {
-  border-top: 1px solid var(--border-subtle);
-  padding: 4px 6px;
-}
-
-.pins-add-btn {
-  background: var(--accent-muted);
-  color: var(--accent-text);
-  border: 1px solid transparent;
-  border-radius: 4px;
-  padding: 4px 10px;
-  font-size: 13px;
-  font-family: var(--font-mono);
-  cursor: pointer;
-  transition: background 0.1s, border-color 0.1s;
-}
-
-.pins-add-btn:hover {
-  background: var(--accent-muted-hover);
-  border-color: var(--accent);
-}
 
