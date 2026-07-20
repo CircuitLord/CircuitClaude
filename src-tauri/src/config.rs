@@ -104,6 +104,27 @@ pub fn save_pinned_files(
     fs::write(&path, json).map_err(|e| e.to_string())
 }
 
+fn workspace_sessions_path(app_handle: &tauri::AppHandle) -> PathBuf {
+    config_dir(app_handle).join("workspace_sessions.json")
+}
+
+pub fn load_workspace_sessions(app_handle: &tauri::AppHandle) -> serde_json::Value {
+    let path = workspace_sessions_path(app_handle);
+    fs::read_to_string(path)
+        .ok()
+        .and_then(|contents| serde_json::from_str(&contents).ok())
+        .unwrap_or_else(|| serde_json::json!({ "sessions": [], "sessionTitles": {} }))
+}
+
+pub fn save_workspace_sessions(
+    app_handle: &tauri::AppHandle,
+    state: &serde_json::Value,
+) -> Result<(), String> {
+    let path = workspace_sessions_path(app_handle);
+    let json = serde_json::to_string_pretty(state).map_err(|e| e.to_string())?;
+    fs::write(path, json).map_err(|e| e.to_string())
+}
+
 fn pi_chat_settings_path(app_handle: &tauri::AppHandle) -> PathBuf {
     config_dir(app_handle).join("pi_chat_settings.json")
 }

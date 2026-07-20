@@ -2,6 +2,7 @@ import { useSessionStore, generateTabId } from "../stores/sessionStore";
 import { useProjectStore } from "../stores/projectStore";
 import { closePtySession } from "./pty";
 import { destroyPiSession } from "./pi";
+import { supportsAgentSessionResume } from "./sessionTypes";
 
 export function spawnNewSession(type: string = "claude", projectPath?: string) {
   const { activeProjectPath, addSession, setActiveProject } = useSessionStore.getState();
@@ -17,6 +18,8 @@ export function spawnNewSession(type: string = "claude", projectPath?: string) {
     projectName: name,
     projectPath: target,
     sessionId: null,
+    agentSessionId: supportsAgentSessionResume(type) ? crypto.randomUUID() : undefined,
+    hasStarted: false,
     createdAt: Date.now(),
     sessionType: type,
   }, "start");

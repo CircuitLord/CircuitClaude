@@ -104,6 +104,8 @@ pub fn run() {
             commands::save_settings,
             commands::load_pinned_files,
             commands::save_pinned_files,
+            commands::load_workspace_sessions,
+            commands::save_workspace_sessions,
             commands::load_note,
             commands::save_note,
             commands::get_git_status,

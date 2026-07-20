@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { Project, ThemeName } from "../types";
 import { loadProjects, saveProjects } from "../lib/config";
 import { THEMES } from "../lib/themes";
+import { useSessionStore } from "./sessionStore";
 
 const THEME_NAMES = Object.keys(THEMES) as ThemeName[];
 
@@ -56,6 +57,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   removeProject: async (path: string) => {
     const updated = get().projects.filter((p) => p.path !== path);
     await saveProjects(updated);
+    useSessionStore.getState().removeProjectSessions(path);
     set({ projects: updated });
   },
 

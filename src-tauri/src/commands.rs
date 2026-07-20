@@ -170,6 +170,19 @@ pub fn save_pinned_files(
 }
 
 #[tauri::command]
+pub fn load_workspace_sessions(app_handle: tauri::AppHandle) -> serde_json::Value {
+    config::load_workspace_sessions(&app_handle)
+}
+
+#[tauri::command]
+pub fn save_workspace_sessions(
+    app_handle: tauri::AppHandle,
+    state: serde_json::Value,
+) -> Result<(), String> {
+    config::save_workspace_sessions(&app_handle, &state)
+}
+
+#[tauri::command]
 pub async fn get_git_status(project_path: String) -> Result<git::GitStatus, String> {
     tauri::async_runtime::spawn_blocking(move || git::get_status(&project_path))
         .await
@@ -384,10 +397,11 @@ pub fn create_pi_session(
     app_handle: tauri::AppHandle,
     pi_manager: State<'_, PiManager>,
     project_path: String,
+    agent_session_id: String,
     on_event: Channel<PiRpcEvent>,
 ) -> Result<String, String> {
     let settings = config::load_pi_chat_settings(&app_handle);
-    pi_manager.create_session(&project_path, on_event, Some(settings))
+    pi_manager.create_session(&project_path, &agent_session_id, on_event, Some(settings))
 }
 
 #[tauri::command]

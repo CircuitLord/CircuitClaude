@@ -8,6 +8,7 @@ import { useSessionStore } from "../stores/sessionStore";
 interface UsePiSessionOptions {
   tabId: string;
   projectPath: string;
+  agentSessionId: string;
   title?: string;
 }
 
@@ -24,7 +25,7 @@ interface PendingCommand {
   reject: (error: Error) => void;
 }
 
-export function usePiSession({ tabId, projectPath, title = "pi chat" }: UsePiSessionOptions): UsePiSessionResult {
+export function usePiSession({ tabId, projectPath, agentSessionId, title = "pi chat" }: UsePiSessionOptions): UsePiSessionResult {
   const backendIdRef = useRef<string | null>(null);
   const pendingCommandsRef = useRef(new Map<string, PendingCommand>());
   const statusClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -37,12 +38,15 @@ export function usePiSession({ tabId, projectPath, title = "pi chat" }: UsePiSes
   const setTabStatus = useSessionStore((state) => state.setTabStatus);
   const setSessionTitle = useSessionStore((state) => state.setSessionTitle);
   const updateSessionPtyId = useSessionStore((state) => state.updateSessionPtyId);
+  const updateSession = useSessionStore((state) => state.updateSession);
 
   useEffect(() => {
     let cleanedUp = false;
     setReady(false);
     setBackendId(null);
-    setSessionTitle(tabId, title);
+    if (!useSessionStore.getState().sessionTitles.has(tabId)) {
+      setSessionTitle(tabId, title);
+    }
 
     const channel = new Channel<PiRpcEvent>();
     channel.onmessage = (event) => {
@@ -78,22 +82,26 @@ export function usePiSession({ tabId, projectPath, title = "pi chat" }: UsePiSes
       }
     };
 
-    createPiSession(projectPath, channel)
-      .then((backendId) => {
-        if (cleanedUp) {
-          destroyPiSession(backendId).catch(() => {});
-          return;
-        }
-        backendIdRef.current = backendId;
-        setBackendId(backendId);
-        updateSessionPtyId(tabId, backendId);
-        setReady(true);
-      })
-      .catch((err) => {
-        if (cleanedUp) return;
-        appendError(tabId, `Failed to start pi: ${String(err)}`);
-        setTabStatus(tabId, null);
-      });
+    queueMicrotask(() => {
+      if (cleanedUp) return;
+      createPiSession(projectPath, agentSessionId, channel)
+        .then((backendId) => {
+          if (cleanedUp) {
+            destroyPiSession(backendId).catch(() => {});
+            return;
+          }
+          backendIdRef.current = backendId;
+          setBackendId(backendId);
+          updateSessionPtyId(tabId, backendId);
+          updateSession(tabId, { hasStarted: true });
+          setReady(true);
+        })
+        .catch((err) => {
+          if (cleanedUp) return;
+          appendError(tabId, `Failed to start pi: ${String(err)}`);
+          setTabStatus(tabId, null);
+        });
+    });
 
     return () => {
       cleanedUp = true;
@@ -115,7 +123,7 @@ export function usePiSession({ tabId, projectPath, title = "pi chat" }: UsePiSes
       removeChat(tabId);
       setTabStatus(tabId, null);
     };
-  }, [appendError, appendEvent, projectPath, removeChat, setSessionTitle, setTabStatus, tabId, title, updateSessionPtyId]);
+  }, [agentSessionId, appendError, appendEvent, projectPath, removeChat, setSessionTitle, setTabStatus, tabId, title, updateSession, updateSessionPtyId]);
 
   const sendMessage = useCallback(async (message: string) => {
     const backendId = backendIdRef.current;

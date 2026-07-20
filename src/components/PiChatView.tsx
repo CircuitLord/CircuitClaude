@@ -37,6 +37,7 @@ const StopIcon = (
 interface PiChatViewProps {
   tabId: string;
   projectPath: string;
+  agentSessionId: string;
 }
 
 interface AvailableModelsResponse {
@@ -327,7 +328,7 @@ function PiChatSelect<T extends string>({
   );
 }
 
-export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
+export function PiChatView({ tabId, projectPath, agentSessionId }: PiChatViewProps) {
   const viewRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -370,7 +371,7 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
   const piChatFontFamily = useSettingsStore((state) => state.settings.piChatFontFamily);
   const piChatFontSize = useSettingsStore((state) => state.settings.piChatFontSize);
   const projectTheme = useProjectStore((state) => state.projects.find((project) => project.path === projectPath)?.theme ?? "midnight");
-  const { ready, backendId, sendMessage, sendCommand, interrupt } = usePiSession({ tabId, projectPath });
+  const { ready, backendId, sendMessage, sendCommand, interrupt } = usePiSession({ tabId, projectPath, agentSessionId });
 
   const changeSummaries = buildTurnChangeSummaries(messages, projectPath, showStreamingUi);
   const userMessageCount = messages.filter((message) => message.role === "user").length;
@@ -441,6 +442,7 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
         setAvailableModels(models);
         setCurrentModel(stateResponse.model ?? models[0] ?? null);
         if (stateResponse.thinkingLevel) setThinkingLevel(stateResponse.thinkingLevel);
+        if (stateResponse.sessionName) setSessionTitle(tabId, `pi: ${stateResponse.sessionName}`);
         setToolbarError(null);
       } catch (err) {
         if (cancelled) return;
@@ -453,7 +455,7 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
     return () => {
       cancelled = true;
     };
-  }, [ready, sendCommand]);
+  }, [ready, sendCommand, setSessionTitle, tabId]);
 
   useEffect(() => {
     if (!loadMenuOpen) return;
@@ -487,6 +489,10 @@ export function PiChatView({ tabId, projectPath }: PiChatViewProps) {
     setMessagesFromPi(tabId, Array.isArray(messagesResponse.messages) ? messagesResponse.messages : []);
     setRewindTargets(normalizeForkMessages(forkMessagesResponse));
   }, [sendCommand, setMessagesFromPi, tabId]);
+
+  useEffect(() => {
+    if (ready) void loadCurrentMessages();
+  }, [loadCurrentMessages, ready]);
 
   const refreshRewindTargets = useCallback(async () => {
     if (!ready) return;

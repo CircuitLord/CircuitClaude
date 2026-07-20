@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { PI_CHAT_SESSION_TYPE, PinnedFile, Project, Settings } from "../types";
+import type { PersistedSessionState } from "../types";
 
 export function loadProjects(): Promise<Project[]> {
   return invoke<Project[]>("load_projects");
@@ -29,6 +30,14 @@ export function loadPinnedFiles(): Promise<PinnedFile[]> {
 
 export function savePinnedFiles(pins: PinnedFile[]): Promise<void> {
   return invoke("save_pinned_files", { pins });
+}
+
+export function loadWorkspaceSessions(): Promise<PersistedSessionState> {
+  return invoke<PersistedSessionState>("load_workspace_sessions");
+}
+
+export function saveWorkspaceSessions(state: PersistedSessionState): Promise<void> {
+  return invoke("save_workspace_sessions", { state });
 }
 
 export function readClaudeMd(projectPath?: string): Promise<{ path: string; content: string }> {

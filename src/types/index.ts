@@ -39,11 +39,20 @@ export interface TerminalSession {
   projectName: string;
   projectPath: string;
   sessionId: string | null;
+  agentSessionId?: string;
+  hasStarted?: boolean;
+  isDormant?: boolean;
+  resumeSession?: boolean;
   createdAt: number;
   sessionType: SessionType;
   filePath?: string;
   fileName?: string;
   isPreview?: boolean;
+}
+
+export interface PersistedSessionState {
+  sessions: Array<Pick<TerminalSession, "id" | "projectName" | "projectPath" | "agentSessionId" | "hasStarted" | "createdAt" | "sessionType">>;
+  sessionTitles: Record<string, string>;
 }
 
 export type PtyOutputEvent =

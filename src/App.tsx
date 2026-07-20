@@ -41,10 +41,11 @@ function App() {
       useProjectStore.getState().load(),
       usePinnedFilesStore.getState().load(),
     ])
-      .then(() => {
+      .then(async () => {
         useGitStore.getState().initViewModeFromSettings();
-        // Preload notes for all projects so switching is instant
         const paths = useProjectStore.getState().projects.map((p) => p.path);
+        await useSessionStore.getState().load(paths);
+        // Preload notes for all projects so switching is instant
         useNotesStore.getState().preloadAll(paths);
       })
       .catch(() => {})
@@ -88,7 +89,10 @@ function App() {
       closing = true;
       // Give flush up to 2s, then force-close regardless
       await Promise.race([
-        useNotesStore.getState().flush(),
+        Promise.all([
+          useNotesStore.getState().flush(),
+          useSessionStore.getState().flush(),
+        ]),
         new Promise((r) => setTimeout(r, 2000)),
       ]);
       // destroy() bypasses onCloseRequested, avoiding re-entry

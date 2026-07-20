@@ -201,7 +201,7 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
     isFocusedPane?: boolean,
   ) {
     const session = sessionById.get(sessionId);
-    if (!session) return null;
+    if (!session || session.isDormant) return null;
     return (
       <div
         key={session.id}
@@ -220,6 +220,7 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
           <PiChatView
             tabId={session.id}
             projectPath={session.projectPath}
+            agentSessionId={session.agentSessionId!}
           />
         ) : (
           <TerminalView
@@ -227,6 +228,8 @@ export function TerminalTabs({ projectPath }: TerminalTabsProps) {
             projectPath={session.projectPath}
             projectName={session.projectName}
             sessionType={session.sessionType}
+            agentSessionId={session.agentSessionId}
+            resumeSession={session.resumeSession}
             hideTitleBar
             onClose={() => closeTab(session.id)}
           />

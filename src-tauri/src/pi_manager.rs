@@ -373,6 +373,7 @@ impl PiManager {
     pub fn create_session(
         &self,
         project_path: &str,
+        agent_session_id: &str,
         on_event: Channel<PiRpcEvent>,
         chat_settings: Option<PiChatSettingsConfig>,
     ) -> Result<String, String> {
@@ -381,6 +382,7 @@ impl PiManager {
 
         let mut cmd = build_pi_command()?;
         cmd.arg("--mode").arg("rpc");
+        cmd.arg("--session-id").arg(agent_session_id);
         // Fresh pichat tabs should be resumable, so do not pass --no-session.
         if let Some(settings) = &chat_settings {
             if let (Some(provider), Some(model)) = (&settings.provider, &settings.model) {

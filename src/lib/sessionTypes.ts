@@ -18,9 +18,29 @@ export function getTabPrefix(sessionType: string): string {
   return config?.prefix ?? ">";
 }
 
-export function getSessionCommand(sessionType: string): string {
+export function supportsAgentSessionResume(sessionType: string): boolean {
+  return sessionType === "claude" || sessionType === "pi" || sessionType === PI_CHAT_SESSION_TYPE.id;
+}
+
+export function getSessionCommand(
+  sessionType: string,
+  agentSessionId?: string,
+  resumeSession = false,
+): string {
   const config = getSessionTypeConfig(sessionType);
-  return config?.command ?? sessionType;
+  const command = config?.command ?? sessionType;
+  if (!agentSessionId) return command;
+
+  switch (sessionType) {
+    case "claude":
+      return resumeSession
+        ? `${command} --resume ${agentSessionId}`
+        : `${command} --session-id ${agentSessionId}`;
+    case "pi":
+      return `${command} --session-id ${agentSessionId}`;
+    default:
+      return command;
+  }
 }
 
 export function getSessionDisplayName(sessionType: string): string {

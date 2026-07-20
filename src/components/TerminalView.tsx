@@ -105,6 +105,8 @@ interface TerminalViewProps {
   projectPath: string;
   projectName: string;
   sessionType: string;
+  agentSessionId?: string;
+  resumeSession?: boolean;
   hideTitleBar?: boolean;
   onClose: () => void;
 }
@@ -144,7 +146,7 @@ function fitTerminal(terminal: Terminal, fitAddon: FitAddon, preserveScroll = fa
   }
 }
 
-export function TerminalView({ tabId, projectPath, projectName, sessionType, hideTitleBar, onClose }: TerminalViewProps) {
+export function TerminalView({ tabId, projectPath, projectName, sessionType, agentSessionId, resumeSession, hideTitleBar, onClose }: TerminalViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const title = useSessionStore((s) => s.sessionTitles.get(tabId) ?? projectName);
@@ -154,6 +156,7 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
   const spawnGenerationRef = useRef(0);
   const initializedRef = useRef(false);
   const updateSessionPtyId = useSessionStore((s) => s.updateSessionPtyId);
+  const updateSession = useSessionStore((s) => s.updateSession);
   const setSessionTitle = useSessionStore((s) => s.setSessionTitle);
   const setTabStatus = useSessionStore((s) => s.setTabStatus);
   const activeProjectPath = useSessionStore((s) => s.activeProjectPath);
@@ -207,6 +210,7 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
     terminalRef.current = terminal;
     fitAddonRef.current = fitAddon;
     requestAnimationFrame(() => {
+      if (cleanedUp || spawnGenerationRef.current !== spawnGeneration) return;
       fitTerminal(terminal, fitAddon);
       const channel = new Channel<PtyOutputEvent>();
       channel.onmessage = (event: PtyOutputEvent) => {
@@ -259,7 +263,7 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
             cols,
             rows,
             sessionType,
-            command: getSessionCommand(sessionType),
+            command: getSessionCommand(sessionType, agentSessionId, resumeSession),
           });
           sid = created.sessionId;
           if (cleanedUp || spawnGenerationRef.current !== spawnGeneration) {
@@ -267,6 +271,7 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
             return;
           }
           updateSessionPtyId(tabId, sid);
+          updateSession(tabId, { hasStarted: true });
         }
 
         if (cleanedUp || spawnGenerationRef.current !== spawnGeneration) return;
@@ -452,7 +457,7 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, hid
       logPtyLifecycle("mount:cleanup:done", { tabId, spawnGeneration });
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectPath, tabId, sessionType]);
+  }, [projectPath, tabId, sessionType, agentSessionId, resumeSession]);
 
   useEffect(() => {
     if (activeProjectPath !== projectPath) return;

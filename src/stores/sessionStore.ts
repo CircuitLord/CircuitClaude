@@ -1,13 +1,17 @@
 import { create } from "zustand";
-import { TerminalSession, TabStatus, SplitState, PaneState } from "../types";
+import { TerminalSession, TabStatus, SplitState, PaneState, PersistedSessionState } from "../types";
 import { useEditorStore } from "./editorStore";
+import { loadWorkspaceSessions, saveWorkspaceSessions } from "../lib/config";
 
 interface SessionStore {
   sessions: TerminalSession[];
+  loaded: boolean;
   activeSessionId: string | null;
   activeProjectPath: string | null;
   tabStatuses: Map<string, TabStatus>;
   sessionTitles: Map<string, string>;
+  load: (projectPaths: string[]) => Promise<void>;
+  flush: () => Promise<void>;
   addSession: (session: TerminalSession, position: "start" | "end") => void;
   removeSession: (id: string) => void;
   removeProjectSessions: (projectPath: string) => void;
@@ -19,7 +23,7 @@ interface SessionStore {
   updateSessionPtyId: (id: string, sessionId: string) => void;
   setTabStatus: (tabId: string, status: TabStatus | null) => void;
   setSessionTitle: (tabId: string, title: string) => void;
-  updateSession: (id: string, partial: Partial<Pick<TerminalSession, "isPreview">>) => void;
+  updateSession: (id: string, partial: Partial<Pick<TerminalSession, "isPreview" | "hasStarted">>) => void;
   reorderSessions: (projectPath: string, fromIndex: number, toIndex: number) => void;
   projectSplits: Map<string, SplitState>;
   setSplit: (projectPath: string, split: SplitState) => void;
@@ -48,13 +52,71 @@ function withUpdatedPane(split: SplitState, pane: 1 | 2, newPane: PaneState): Sp
   return pane === 1 ? { ...split, pane1: newPane } : { ...split, pane2: newPane };
 }
 
+let persistTimer: ReturnType<typeof setTimeout> | null = null;
+let persistChain = Promise.resolve();
+let lastPersistedKey = "";
+
+function enqueuePersistence(state: PersistedSessionState): Promise<void> {
+  persistChain = persistChain.then(() => saveWorkspaceSessions(state)).catch(() => {});
+  return persistChain;
+}
+
+function buildPersistedState(state: SessionStore): PersistedSessionState {
+  const sessions = state.sessions
+    .filter((session) => session.sessionType !== "editor")
+    .map(({ id, projectName, projectPath, agentSessionId, hasStarted, createdAt, sessionType }) => ({
+      id,
+      projectName,
+      projectPath,
+      agentSessionId,
+      hasStarted,
+      createdAt,
+      sessionType,
+    }));
+  const sessionIds = new Set(sessions.map((session) => session.id));
+  const sessionTitles = Object.fromEntries(
+    [...state.sessionTitles].filter(([id]) => sessionIds.has(id)),
+  );
+  return { sessions, sessionTitles };
+}
+
 export const useSessionStore = create<SessionStore>((set, get) => ({
   sessions: [],
+  loaded: false,
   activeSessionId: null,
   activeProjectPath: null,
   tabStatuses: new Map(),
   sessionTitles: new Map(),
   projectSplits: new Map(),
+
+  load: async (projectPaths) => {
+    const persisted = await loadWorkspaceSessions();
+    const validProjects = new Set(projectPaths);
+    const sessions = persisted.sessions
+      .filter((session) => validProjects.has(session.projectPath))
+      .map((session) => ({
+        ...session,
+        sessionId: null,
+        isDormant: true,
+        resumeSession: session.hasStarted === true,
+      }));
+    const sessionIds = new Set(sessions.map((session) => session.id));
+    const sessionTitles = new Map(
+      Object.entries(persisted.sessionTitles).filter(([id]) => sessionIds.has(id)),
+    );
+    lastPersistedKey = JSON.stringify(persisted);
+    set({ sessions, sessionTitles, loaded: true });
+  },
+
+  flush: async () => {
+    if (persistTimer) {
+      clearTimeout(persistTimer);
+      persistTimer = null;
+    }
+    const persisted = buildPersistedState(get());
+    lastPersistedKey = JSON.stringify(persisted);
+    await enqueuePersistence(persisted);
+  },
 
   addSession: (session, position) =>
     set((state) => {
@@ -207,6 +269,13 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       return;
     }
 
+    const session = state.sessions.find((candidate) => candidate.id === id);
+    if (session?.isDormant) {
+      set({
+        sessions: state.sessions.map((candidate) => candidate.id === id ? { ...candidate, isDormant: false } : candidate),
+      });
+    }
+
     if (state.activeProjectPath) {
       const split = state.projectSplits.get(state.activeProjectPath);
       if (split) {
@@ -236,6 +305,11 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     const state = get();
     const session = state.sessions.find((s) => s.id === id);
     if (!session) return;
+    if (session.isDormant) {
+      set((current) => ({
+        sessions: current.sessions.map((candidate) => candidate.id === id ? { ...candidate, isDormant: false } : candidate),
+      }));
+    }
     if (state.activeProjectPath !== session.projectPath) {
       get().setActiveProject(session.projectPath);
     }
@@ -397,3 +471,16 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       return { projectSplits };
     }),
 }));
+
+useSessionStore.subscribe((state) => {
+  if (!state.loaded) return;
+  const persisted = buildPersistedState(state);
+  const key = JSON.stringify(persisted);
+  if (key === lastPersistedKey) return;
+  lastPersistedKey = key;
+  if (persistTimer) clearTimeout(persistTimer);
+  persistTimer = setTimeout(() => {
+    persistTimer = null;
+    void enqueuePersistence(persisted);
+  }, 150);
+});

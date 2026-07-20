@@ -18,10 +18,12 @@ export interface PiSessionInfo {
 
 export function createPiSession(
   projectPath: string,
+  agentSessionId: string,
   onEvent: Channel<PiRpcEvent>,
 ): Promise<string> {
   return invoke<string>("create_pi_session", {
     projectPath,
+    agentSessionId,
     onEvent,
   });
 }
