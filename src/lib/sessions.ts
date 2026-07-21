@@ -80,7 +80,7 @@ export function openFileTab(filePath: string, fileName: string, preview = true) 
     filePath,
     fileName,
     isPreview: preview,
-  }, "end");
+  }, "start");
 }
 
 /** Promote a preview tab to a permanent tab. */
