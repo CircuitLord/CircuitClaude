@@ -180,6 +180,7 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, age
     let lastUserInputTime = 0;
     logPtyLifecycle("mount:init", { tabId, sessionType, projectPath, spawnGeneration });
 
+    const acceptTitleChangesAt = Date.now() + (resumeSession ? 5000 : 0);
     const currentSettings = useSettingsStore.getState().settings;
     const currentProjectTheme = useProjectStore.getState().projects.find((p) => p.path === projectPath)?.theme ?? "midnight";
     const terminal = new Terminal({
@@ -312,6 +313,7 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, age
     });
 
     const onTitleDisposable = terminal.onTitleChange((nextTitle) => {
+      if (Date.now() < acceptTitleChangesAt) return;
       const clean = nextTitle.replace(/^[^\x20-\x7E]+\s*/, "").trim() || nextTitle;
       setSessionTitle(tabId, clean);
     });

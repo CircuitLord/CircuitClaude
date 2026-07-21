@@ -541,7 +541,7 @@ dependencies = [
 
 [[package]]
 name = "circuitclaude"
-version = "0.4.6"
+version = "0.4.7"
 dependencies = [
  "chrono",
  "dirs 5.0.1",
