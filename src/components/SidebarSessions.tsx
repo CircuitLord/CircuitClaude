@@ -278,7 +278,17 @@ export function SidebarSessions({ projectPath }: SidebarSessionsProps) {
             }}
           >
             <span className="sidebar-session-prefix">{getTabPrefix(s.sessionType)}</span>
-            <span className="sidebar-session-name">{label}</span>
+            <span className="sidebar-session-name">
+              {Array.from(label).map((ch, i, chars) => (
+                <span
+                  key={i}
+                  className="shimmer-char"
+                  style={{ animationDelay: `${chars.length > 1 ? (i / (chars.length - 1)) * 4 : 0}s` }}
+                >
+                  {ch}
+                </span>
+              ))}
+            </span>
             <span className="sidebar-session-trailing">
               {row.pane && <span className="sidebar-session-pane">[{row.pane}]</span>}
               {dirty ? (

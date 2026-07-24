@@ -366,6 +366,23 @@ body,
   font-style: italic;
 }
 
+.shimmer-char {
+  display: inline-block;
+  width: 1ch;
+  --shimmer-base: var(--text-secondary);
+  color: var(--shimmer-base);
+  transition: color 0.4s ease;
+}
+
+.sidebar-session:hover .shimmer-char,
+.sidebar-session.active .shimmer-char {
+  --shimmer-base: var(--text-primary);
+}
+
+.sidebar-session.thinking .shimmer-char {
+  animation: char-shimmer 7.4s step-end infinite;
+}
+
 .sidebar-session-trailing {
   display: flex;
   align-items: center;
@@ -479,6 +496,13 @@ body,
 @keyframes tui-blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
+}
+
+@keyframes char-shimmer {
+  0%, 44%, 100% { color: var(--shimmer-base); }
+  7%, 37% { color: color-mix(in srgb, var(--shimmer-base) 75%, var(--sidebar-project-accent, var(--accent)) 25%); }
+  14%, 30% { color: color-mix(in srgb, var(--shimmer-base) 45%, var(--sidebar-project-accent-text, var(--accent-text)) 55%); }
+  22% { color: var(--sidebar-project-accent-text, var(--accent-text)); }
 }
 
 /* --- Edit Mode --- */
