@@ -210,6 +210,14 @@ export function useHotkeys() {
         return;
       }
 
+      // Ctrl+` — toggle docked bottom terminal for the active project
+      if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key === "`") {
+        e.preventDefault();
+        if (!activeProjectPath) return;
+        useSessionStore.getState().toggleBottomTerminal(activeProjectPath);
+        return;
+      }
+
       // Ctrl+Space — toggle voice-to-text capture for active terminal session
       if (isCtrlSpaceHotkey(e)) {
         e.preventDefault();

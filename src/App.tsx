@@ -9,6 +9,7 @@ import { WindowControls } from "./components/WindowControls";
 import { DiffViewer } from "./components/DiffViewer";
 import { CommandPalette } from "./components/CommandPalette";
 import { RightPanel } from "./components/RightPanel";
+import { BottomTerminal } from "./components/BottomTerminal";
 import { useSessionStore } from "./stores/sessionStore";
 import { useNotesStore } from "./stores/notesStore";
 import { useSettingsStore } from "./stores/settingsStore";
@@ -172,6 +173,7 @@ function App() {
                   <TerminalTabs projectPath={path} />
                 </div>
               ))}
+              <BottomTerminal />
             </div>
             {activeProjectPath && <RightPanel />}
           </div>

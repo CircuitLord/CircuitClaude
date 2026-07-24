@@ -18,6 +18,8 @@ export function ProjectHeader() {
   const activeProjectPath = useSessionStore((s) => s.activeProjectPath);
   const activeTab = useSettingsStore((s) => s.settings.rightPanelTab);
   const toggleRightPanelTab = useSettingsStore((s) => s.toggleRightPanelTab);
+  const bottomTerminalOpen = useSessionStore((s) => !!activeProjectPath && s.bottomTerminalProjects.has(activeProjectPath));
+  const toggleBottomTerminal = useSessionStore((s) => s.toggleBottomTerminal);
   const changeCount = useGitStore((s) =>
     activeProjectPath ? s.statuses[activeProjectPath]?.files.length ?? 0 : 0
   );
@@ -47,6 +49,16 @@ export function ProjectHeader() {
         </button>
       </div>
       <div className="project-header-actions">
+        <div className="panel-tabs">
+          <button
+            className={`panel-tab${bottomTerminalOpen ? " active" : ""}`}
+            onClick={() => toggleBottomTerminal(activeProjectPath)}
+            title="Toggle docked terminal (Ctrl+`)"
+          >
+            :terminal
+          </button>
+        </div>
+        <div className="panel-tabs-divider" />
         <div className="panel-tabs">
           {PANEL_TABS.map((t) => (
             <button

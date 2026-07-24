@@ -10,6 +10,8 @@ interface SessionStore {
   activeProjectPath: string | null;
   tabStatuses: Map<string, TabStatus>;
   sessionTitles: Map<string, string>;
+  bottomTerminalProjects: Set<string>;
+  toggleBottomTerminal: (projectPath: string) => void;
   load: (projectPaths: string[]) => Promise<void>;
   flush: () => Promise<void>;
   addSession: (session: TerminalSession, position: "start" | "end") => void;
@@ -88,6 +90,19 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   tabStatuses: new Map(),
   sessionTitles: new Map(),
   projectSplits: new Map(),
+  bottomTerminalProjects: new Set(),
+
+  // per-project docked terminal, in-memory so it resets on restart
+  toggleBottomTerminal: (projectPath) =>
+    set((state) => {
+      const next = new Set(state.bottomTerminalProjects);
+      if (next.has(projectPath)) {
+        next.delete(projectPath);
+      } else {
+        next.add(projectPath);
+      }
+      return { bottomTerminalProjects: next };
+    }),
 
   load: async (projectPaths) => {
     const persisted = await loadWorkspaceSessions();

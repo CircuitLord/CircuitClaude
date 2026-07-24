@@ -108,6 +108,7 @@ interface TerminalViewProps {
   agentSessionId?: string;
   resumeSession?: boolean;
   hideTitleBar?: boolean;
+  ephemeral?: boolean;
   onClose: () => void;
 }
 
@@ -146,7 +147,7 @@ function fitTerminal(terminal: Terminal, fitAddon: FitAddon, preserveScroll = fa
   }
 }
 
-export function TerminalView({ tabId, projectPath, projectName, sessionType, agentSessionId, resumeSession, hideTitleBar, onClose }: TerminalViewProps) {
+export function TerminalView({ tabId, projectPath, projectName, sessionType, agentSessionId, resumeSession, hideTitleBar, ephemeral, onClose }: TerminalViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const title = useSessionStore((s) => s.sessionTitles.get(tabId) ?? projectName);
@@ -313,6 +314,7 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, age
     });
 
     const onTitleDisposable = terminal.onTitleChange((nextTitle) => {
+      if (ephemeral) return; // docked shell has no visible title, skip store writes
       if (Date.now() < acceptTitleChangesAt) return;
       const clean = nextTitle.replace(/^[^\x20-\x7E]+\s*/, "").trim() || nextTitle;
       setSessionTitle(tabId, clean);
@@ -452,6 +454,10 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, age
       subscriberIdRef.current = null;
       if (sid && subscriberId) {
         void detachPtySessionStream(sid, subscriberId).catch(() => {});
+      }
+      // ephemeral shells (docked terminal) aren't tracked in sessionStore, so kill on unmount
+      if (ephemeral && sid) {
+        void closePtySession(sid).catch(() => {});
       }
 
       terminal.dispose();

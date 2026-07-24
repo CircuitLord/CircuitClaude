@@ -128,6 +128,7 @@ export interface Settings {
   gitViewMode: "file" | "tree";
   rightPanelTab: RightPanelTab | null;
   rightPanelWidth: number;
+  bottomTerminalHeight: number;
   voiceEngine: VoiceEngine;
   voiceMicDeviceId: string;
   whisperModel: string;
@@ -146,6 +147,7 @@ export const DEFAULT_SETTINGS: Settings = {
   gitViewMode: "file",
   rightPanelTab: "source",
   rightPanelWidth: 350,
+  bottomTerminalHeight: 240,
   voiceEngine: "edge",
   voiceMicDeviceId: "default",
   whisperModel: "medium.en",

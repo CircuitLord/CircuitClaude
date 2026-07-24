@@ -1170,6 +1170,14 @@ body,
   padding-right: 8px;
 }
 
+.panel-tabs-divider {
+  width: 1px;
+  align-self: center;
+  height: 18px;
+  background: var(--border-visible);
+  margin: 0 10px;
+}
+
 /* --- Right panel tab strip (one-of-N, contiguous cells) --- */
 
 .panel-tabs {
@@ -3469,6 +3477,32 @@ body,
   display: flex;
   flex-direction: column;
   min-width: 0;
+}
+
+/* --- Docked bottom terminal --- */
+
+.bottom-terminal {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  min-height: 0;
+  background: var(--bg-base);
+}
+
+.bottom-terminal-resize {
+  flex-shrink: 0;
+}
+
+.bottom-terminal-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.bottom-terminal-instance {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
 }
 
 /* ========================================================================
