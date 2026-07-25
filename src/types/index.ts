@@ -31,6 +31,19 @@ export interface Project {
   theme: ThemeName;
 }
 
+/** Connection details for an ssh host, entered in the add-project dialog. */
+export interface RemoteSpec {
+  host: string;
+  user?: string;
+  port?: number;
+  keyPath?: string;
+}
+
+export interface RemoteConfig {
+  authority: string;
+  keyPath: string | null;
+}
+
 export interface PinnedFile {
   path: string;
   name: string;

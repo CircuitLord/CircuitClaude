@@ -3,9 +3,10 @@ import { spawnNewSession } from "../lib/sessions";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useProjectStore } from "../stores/projectStore";
 import { useSessionStore } from "../stores/sessionStore";
-import { useAddProject } from "./AddProjectDialog";
-import { getSessionTypes } from "../lib/sessionTypes";
+import { AddProjectDialog } from "./AddProjectDialog";
+import { getProjectSessionTypes } from "../lib/sessionTypes";
 import { THEMES, THEME_OPTIONS } from "../lib/themes";
+import { displayPath, isRemotePath, remoteHostLabel } from "../lib/remote";
 import type { ThemeName } from "../types";
 
 export function SessionLauncher() {
@@ -15,9 +16,8 @@ export function SessionLauncher() {
   const removeProject = useProjectStore((s) => s.removeProject);
   const updateProjectTheme = useProjectStore((s) => s.updateProjectTheme);
   const editableSessionTypes = useSettingsStore((s) => s.settings.sessionTypes);
-  const sessionTypes = getSessionTypes(editableSessionTypes);
-  const handleAdd = useAddProject();
 
+  const [addOpen, setAddOpen] = useState(false);
   const [projectOpen, setProjectOpen] = useState(false);
   const [themeOpen, setThemeOpen] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
@@ -29,6 +29,7 @@ export function SessionLauncher() {
   const keyNavRef = useRef(false);
 
   const project = projects.find((p) => p.path === activeProjectPath) ?? null;
+  const sessionTypes = getProjectSessionTypes(project?.path ?? null, editableSessionTypes);
   const accent = THEMES[project?.theme ?? "midnight"]?.accent ?? THEMES.midnight.accent;
   const themeLabel = THEME_OPTIONS.find((o) => o.value === project?.theme)?.label ?? "theme";
 
@@ -104,8 +105,6 @@ export function SessionLauncher() {
   return (
     <div className={`session-launcher${openClass}`}>
       <div className="session-launcher-content">
-        <div className="session-launcher-ascii">{">"} <span className="session-launcher-cursor">_</span></div>
-
         <div className="launcher-project" onClick={(e) => e.stopPropagation()}>
           <button
             className="launcher-project-btn"
@@ -171,6 +170,9 @@ export function SessionLauncher() {
                             <span className="launcher-dropdown-marker">{isCursor ? ">" : ""}</span>
                             <span className="launcher-dropdown-swatch" style={{ color: THEMES[p.theme]?.accent }}>#</span>
                             <span className="launcher-dropdown-label">{p.name}</span>
+                            {isRemotePath(p.path) && (
+                              <span className="launcher-dropdown-remote">@{remoteHostLabel(p.path)}</span>
+                            )}
                           </button>
                           <button
                             className="launcher-dropdown-remove"
@@ -187,7 +189,7 @@ export function SessionLauncher() {
               </div>
               <button
                 className="launcher-dropdown-add"
-                onClick={() => { setProjectOpen(false); handleAdd(); }}
+                onClick={() => { setProjectOpen(false); setAddOpen(true); }}
               >
                 + add project
               </button>
@@ -198,7 +200,7 @@ export function SessionLauncher() {
         <div className="launcher-project-meta">
           {project ? (
             <>
-              <span className="launcher-project-path" title={project.path}>{project.path}</span>
+              <span className="launcher-project-path" title={project.path}>{displayPath(project.path)}</span>
               <span className="launcher-project-meta-sep">·</span>
               <div className="launcher-theme" onClick={(e) => e.stopPropagation()}>
                 <button
@@ -251,6 +253,7 @@ export function SessionLauncher() {
           </div>
         )}
       </div>
+      <AddProjectDialog isOpen={addOpen} onClose={() => setAddOpen(false)} />
     </div>
   );
 }

@@ -692,8 +692,12 @@ function SettingsHotkeysPage() {
       <div className="settings-section">
         <div className="settings-section-title">~hotkeys</div>
         <div className="settings-row">
-          <div className="settings-row-label"><span className="settings-row-name">new session</span></div>
+          <div className="settings-row-label"><span className="settings-row-name">new chat</span></div>
           <kbd className="settings-hotkey-kbd">ctrl+t</kbd>
+        </div>
+        <div className="settings-row">
+          <div className="settings-row-label"><span className="settings-row-name">new session</span></div>
+          <kbd className="settings-hotkey-kbd">ctrl+shift+t</kbd>
         </div>
         <div className="settings-row">
           <div className="settings-row-label"><span className="settings-row-name">close tab</span></div>

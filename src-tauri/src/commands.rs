@@ -1,10 +1,13 @@
 use crate::claude_manager::{ClaudeEvent, ClaudeManager};
-use crate::config::{self, PiChatSettingsConfig, PinnedFileConfig, ProjectConfig, SettingsConfig};
+use crate::config::{
+    self, PiChatSettingsConfig, PinnedFileConfig, ProjectConfig, RemoteConfig, SettingsConfig,
+};
 use crate::conversation;
 use crate::file_watcher::FileWatcherManager;
 use crate::git;
 use crate::pi_manager::{PiManager, PiRpcEvent, PiSessionInfo};
 use crate::pty_manager::{AttachStreamResult, PtyManager, PtyOutputEvent, PtySessionInfo};
+use crate::remote::{self, Location, SshTarget};
 use crate::whisper_manager::{DownloadProgress, ModelInfo, WhisperEvent, WhisperManager};
 use tauri::ipc::Channel;
 use tauri::State;
@@ -261,73 +264,102 @@ pub fn get_conversation_mtime(project_path: String, session_id: Option<String>) 
     conversation::get_mtime(&project_path, session_id.as_deref())
 }
 
-#[tauri::command]
-pub fn load_note(project_path: String) -> String {
-    let path = std::path::Path::new(&project_path).join("notes.md");
-    std::fs::read_to_string(&path).unwrap_or_default()
-}
-
-#[tauri::command]
-pub fn save_note(project_path: String, content: String) -> Result<(), String> {
-    let path = std::path::Path::new(&project_path).join("notes.md");
-    std::fs::write(&path, &content).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub fn read_claude_md(project_path: Option<String>) -> Result<ClaudeMdFile, String> {
-    let path = resolve_claude_md_path(project_path)?;
-
-    // Ensure parent directory exists and create file if missing
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+/// Reads a local path or `ssh://` url.
+fn read_path(path: &str) -> Result<String, String> {
+    match remote::locate(path) {
+        Location::Local(p) => {
+            std::fs::read_to_string(&p).map_err(|e| format!("Failed to read file: {}", e))
+        }
+        Location::Remote(target) => remote::read_text(&target, &target.path.clone()),
     }
-    if !path.exists() {
-        std::fs::write(&path, "").map_err(|e| e.to_string())?;
-    }
-
-    let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
-    Ok(ClaudeMdFile {
-        path: path.to_string_lossy().to_string(),
-        content,
-    })
 }
 
-fn resolve_claude_md_path(project_path: Option<String>) -> Result<std::path::PathBuf, String> {
-    if let Some(pp) = project_path {
-        Ok(std::path::PathBuf::from(pp).join("CLAUDE.md"))
-    } else {
-        dirs::home_dir()
+fn write_path(path: &str, content: &str) -> Result<(), String> {
+    match remote::locate(path) {
+        Location::Local(p) => {
+            std::fs::write(&p, content).map_err(|e| format!("Failed to write file: {}", e))
+        }
+        Location::Remote(target) => remote::write_text(&target, &target.path.clone(), content),
+    }
+}
+
+/// Reads a path, creating it (and its parent) empty if it does not exist yet.
+fn read_or_create(path: &str) -> Result<String, String> {
+    match remote::locate(path) {
+        Location::Local(p) => {
+            let p = std::path::PathBuf::from(p);
+            if let Some(parent) = p.parent() {
+                std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+            }
+            if !p.exists() {
+                std::fs::write(&p, "").map_err(|e| e.to_string())?;
+            }
+            std::fs::read_to_string(&p).map_err(|e| e.to_string())
+        }
+        Location::Remote(target) => {
+            let quoted = remote::q(&target.path);
+            let command = format!(
+                "mkdir -p -- \"$(dirname -- {})\" && touch -- {} && cat -- {}",
+                quoted, quoted, quoted
+            );
+            remote::run_checked(&target, None, &command)
+        }
+    }
+}
+
+fn resolve_project_doc(project_path: Option<String>, file_name: &str) -> Result<String, String> {
+    match project_path {
+        Some(pp) => Ok(remote::join_path(&pp, file_name)),
+        None => dirs::home_dir()
             .ok_or_else(|| "Could not find home directory".to_string())
-            .map(|h| h.join(".claude").join("CLAUDE.md"))
+            .map(|h| {
+                h.join(".claude")
+                    .join(file_name)
+                    .to_string_lossy()
+                    .to_string()
+            }),
     }
 }
 
 #[tauri::command]
-pub fn read_agents_md(project_path: Option<String>) -> Result<ClaudeMdFile, String> {
-    let path = resolve_agents_md_path(project_path)?;
-
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-    }
-    if !path.exists() {
-        std::fs::write(&path, "").map_err(|e| e.to_string())?;
-    }
-
-    let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
-    Ok(ClaudeMdFile {
-        path: path.to_string_lossy().to_string(),
-        content,
+pub async fn load_note(project_path: String) -> String {
+    tauri::async_runtime::spawn_blocking(move || {
+        read_path(&remote::join_path(&project_path, "notes.md")).unwrap_or_default()
     })
+    .await
+    .unwrap_or_default()
 }
 
-fn resolve_agents_md_path(project_path: Option<String>) -> Result<std::path::PathBuf, String> {
-    if let Some(pp) = project_path {
-        Ok(std::path::PathBuf::from(pp).join("agents.md"))
-    } else {
-        dirs::home_dir()
-            .ok_or_else(|| "Could not find home directory".to_string())
-            .map(|h| h.join(".claude").join("agents.md"))
-    }
+#[tauri::command]
+pub async fn save_note(project_path: String, content: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        write_path(&remote::join_path(&project_path, "notes.md"), &content)
+    })
+    .await
+    .map_err(|e| format!("Task join failed: {}", e))?
+}
+
+#[tauri::command]
+pub async fn read_claude_md(project_path: Option<String>) -> Result<ClaudeMdFile, String> {
+    read_project_doc(project_path, "CLAUDE.md").await
+}
+
+#[tauri::command]
+pub async fn read_agents_md(project_path: Option<String>) -> Result<ClaudeMdFile, String> {
+    read_project_doc(project_path, "agents.md").await
+}
+
+async fn read_project_doc(
+    project_path: Option<String>,
+    file_name: &'static str,
+) -> Result<ClaudeMdFile, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let path = resolve_project_doc(project_path, file_name)?;
+        let content = read_or_create(&path)?;
+        Ok(ClaudeMdFile { path, content })
+    })
+    .await
+    .map_err(|e| format!("Task join failed: {}", e))?
 }
 
 #[derive(serde::Serialize)]
@@ -458,8 +490,115 @@ pub fn destroy_pi_session(
 }
 
 #[tauri::command]
-pub fn read_directory(
+pub async fn read_directory(
     project_path: String,
+    dir_path: Option<String>,
+) -> Result<Vec<FileTreeEntry>, String> {
+    tauri::async_runtime::spawn_blocking(move || match remote::locate(&project_path) {
+        Location::Local(path) => read_directory_local(&path, dir_path),
+        Location::Remote(target) => read_directory_remote(&target, dir_path),
+    })
+    .await
+    .map_err(|e| format!("Task join failed: {}", e))?
+}
+
+/// Lists a remote directory, honouring .gitignore the same way the local walk does.
+fn read_directory_remote(
+    target: &SshTarget,
+    dir_path: Option<String>,
+) -> Result<Vec<FileTreeEntry>, String> {
+    let root = target.path.trim_end_matches('/').to_string();
+    let rel_dir = dir_path.unwrap_or_default();
+    let abs_dir = if rel_dir.is_empty() {
+        root.clone()
+    } else {
+        format!("{}/{}", root, rel_dir)
+    };
+
+    let command = format!(
+        "if [ -d {} ]; then echo 1; else echo 0; fi && ls -Ap1 -- {}",
+        remote::q(&format!("{}/.git", root)),
+        remote::q(&abs_dir)
+    );
+    let output = remote::run(target, None, &command)?;
+    if !output.ok {
+        return Err(format!("Failed to read directory: {}", output.err_text()));
+    }
+
+    let mut lines = output.stdout.lines().skip_while(|line| line.trim().is_empty());
+    let is_git_repo = lines.next().map(|l| l.trim() == "1").unwrap_or(false);
+
+    // (name, rel_path, full_path, is_dir)
+    let mut raw_entries: Vec<(String, String, String, bool)> = Vec::new();
+    for line in lines {
+        let entry = line.trim_end_matches('\r');
+        if entry.is_empty() {
+            continue;
+        }
+        let is_dir = entry.ends_with('/');
+        let name = entry.trim_end_matches('/').to_string();
+        if name == ".git" || name.is_empty() {
+            continue;
+        }
+        let rel_path = if rel_dir.is_empty() {
+            name.clone()
+        } else {
+            format!("{}/{}", rel_dir, name)
+        };
+        let full_path = target.url_for(&format!("{}/{}", abs_dir, name));
+        raw_entries.push((name, rel_path, full_path, is_dir));
+    }
+
+    let ignored: std::collections::HashSet<String> = if is_git_repo && !raw_entries.is_empty() {
+        let quoted: Vec<String> = raw_entries
+            .iter()
+            .map(|(_, rel, _, _)| remote::q(rel))
+            .collect();
+        let command = format!("git check-ignore -- {}", quoted.join(" "));
+        // exit code 1 just means nothing matched
+        match remote::run(target, Some(&root), &command) {
+            Ok(output) => output
+                .stdout
+                .lines()
+                .map(|l| l.trim().to_string())
+                .filter(|l| !l.is_empty())
+                .collect(),
+            Err(_) => std::collections::HashSet::new(),
+        }
+    } else {
+        std::collections::HashSet::new()
+    };
+
+    let filtered: Vec<(String, String, String, bool)> = raw_entries
+        .into_iter()
+        .filter(|(name, rel, _, _)| {
+            !HARDCODED_SKIP.contains(&name.as_str()) && !ignored.contains(rel)
+        })
+        .collect();
+
+    Ok(sort_entries(filtered))
+}
+
+/// Dirs first, then files, both case-insensitive.
+fn sort_entries(entries: Vec<(String, String, String, bool)>) -> Vec<FileTreeEntry> {
+    let mut dirs: Vec<_> = entries.iter().filter(|(_, _, _, d)| *d).collect();
+    let mut files: Vec<_> = entries.iter().filter(|(_, _, _, d)| !*d).collect();
+    dirs.sort_by(|a, b| a.0.to_lowercase().cmp(&b.0.to_lowercase()));
+    files.sort_by(|a, b| a.0.to_lowercase().cmp(&b.0.to_lowercase()));
+
+    dirs.into_iter()
+        .chain(files.into_iter())
+        .map(|(name, path, full_path, is_dir)| FileTreeEntry {
+            name: name.clone(),
+            path: path.clone(),
+            full_path: full_path.clone(),
+            is_dir: *is_dir,
+        })
+        .collect()
+}
+
+fn read_directory_local(
+    project_path: &str,
     dir_path: Option<String>,
 ) -> Result<Vec<FileTreeEntry>, String> {
     let base = std::path::Path::new(&project_path);
@@ -556,27 +695,43 @@ pub fn read_directory(
             .collect()
     };
 
-    // Sort: dirs first, then alphabetically (case-insensitive)
-    let mut dirs: Vec<_> = filtered.iter().filter(|(_, _, _, d)| *d).collect();
-    let mut files: Vec<_> = filtered.iter().filter(|(_, _, _, d)| !*d).collect();
-    dirs.sort_by(|a, b| a.0.to_lowercase().cmp(&b.0.to_lowercase()));
-    files.sort_by(|a, b| a.0.to_lowercase().cmp(&b.0.to_lowercase()));
-
-    let mut result: Vec<FileTreeEntry> = Vec::new();
-    for (name, path, full_path, is_dir) in dirs.into_iter().chain(files.into_iter()) {
-        result.push(FileTreeEntry {
-            name: name.clone(),
-            path: path.clone(),
-            full_path: full_path.clone(),
-            is_dir: *is_dir,
-        });
-    }
-
-    Ok(result)
+    Ok(sort_entries(filtered))
 }
 
 #[tauri::command]
-pub fn scan_project_files(project_path: String) -> Result<Vec<String>, String> {
+pub async fn scan_project_files(project_path: String) -> Result<Vec<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || match remote::locate(&project_path) {
+        Location::Local(path) => scan_project_files_local(&path),
+        Location::Remote(target) => scan_project_files_remote(&target),
+    })
+    .await
+    .map_err(|e| format!("Task join failed: {}", e))?
+}
+
+fn scan_project_files_remote(target: &SshTarget) -> Result<Vec<String>, String> {
+    // git knows the ignore rules; find is the fallback outside a repo
+    let command = format!(
+        "{{ git ls-files --cached --others --exclude-standard 2>/dev/null || find . -type f; }} | head -n {}",
+        SCAN_FILE_CAP
+    );
+    let stdout = remote::run_checked(target, Some(&target.path), &command)?;
+
+    let mut files: Vec<String> = stdout
+        .lines()
+        .map(|line| line.trim().trim_start_matches("./").to_string())
+        // ls-files reports nested repos as a trailing-slash dir — not a file
+        .filter(|line| !line.is_empty() && !line.ends_with('/'))
+        .filter(|line| !line.split('/').any(|part| HARDCODED_SKIP.contains(&part)))
+        .collect();
+
+    files.sort_unstable();
+    files.dedup();
+    Ok(files)
+}
+
+const SCAN_FILE_CAP: usize = 10_000;
+
+fn scan_project_files_local(project_path: &str) -> Result<Vec<String>, String> {
     use ignore::WalkBuilder;
 
     let base = std::path::Path::new(&project_path);
@@ -592,10 +747,9 @@ pub fn scan_project_files(project_path: String) -> Result<Vec<String>, String> {
         .build();
 
     let mut files: Vec<String> = Vec::new();
-    let cap = 10_000usize;
 
     for entry in walker {
-        if files.len() >= cap {
+        if files.len() >= SCAN_FILE_CAP {
             break;
         }
         let entry = match entry {
@@ -629,13 +783,99 @@ pub fn scan_project_files(project_path: String) -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
-pub fn read_file(file_path: String) -> Result<String, String> {
-    std::fs::read_to_string(&file_path).map_err(|e| format!("Failed to read file: {}", e))
+pub async fn read_file(file_path: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || read_path(&file_path))
+        .await
+        .map_err(|e| format!("Task join failed: {}", e))?
 }
 
 #[tauri::command]
-pub fn write_file(file_path: String, content: String) -> Result<(), String> {
-    std::fs::write(&file_path, &content).map_err(|e| format!("Failed to write file: {}", e))
+pub async fn write_file(file_path: String, content: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || write_path(&file_path, &content))
+        .await
+        .map_err(|e| format!("Task join failed: {}", e))?
+}
+
+// --- Remote (ssh) projects ---
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteSpec {
+    pub host: String,
+    #[serde(default)]
+    pub user: Option<String>,
+    #[serde(default)]
+    pub port: Option<u16>,
+    #[serde(default)]
+    pub key_path: Option<String>,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteListing {
+    /// Absolute path the listing came from, with `~` resolved.
+    pub path: String,
+    pub dirs: Vec<String>,
+    pub is_git_repo: bool,
+}
+
+#[tauri::command]
+pub fn load_remotes(app_handle: tauri::AppHandle) -> Vec<RemoteConfig> {
+    config::load_remotes(&app_handle)
+}
+
+#[tauri::command]
+pub fn save_remotes(
+    app_handle: tauri::AppHandle,
+    remotes: Vec<RemoteConfig>,
+) -> Result<(), String> {
+    config::save_remotes(&app_handle, &remotes)?;
+    config::sync_remotes(&app_handle);
+    Ok(())
+}
+
+/// Browses directories on a remote host. Doubles as the connection test in the add-project dialog.
+#[tauri::command]
+pub async fn list_remote_dirs(
+    spec: RemoteSpec,
+    path: Option<String>,
+) -> Result<RemoteListing, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let target = remote::make_target(
+            spec.user,
+            spec.host,
+            spec.port,
+            spec.key_path,
+            path.unwrap_or_default(),
+        );
+        // pwd -W is the msys spelling that yields "C:/..." instead of "/c/..."
+        let command = format!(
+            "{} && (pwd -W 2>/dev/null || pwd -P) && (if [ -d .git ]; then echo 1; else echo 0; fi) && ls -Ap1",
+            remote::cd_to(&target.path)
+        );
+        let output = remote::run(&target, None, &command)?;
+        if !output.ok {
+            return Err(output.err_text());
+        }
+
+        let mut lines = output.stdout.lines().filter(|line| !line.trim().is_empty());
+        let path = lines.next().unwrap_or("/").trim().to_string();
+        let is_git_repo = lines.next().map(|l| l.trim() == "1").unwrap_or(false);
+        let mut dirs: Vec<String> = lines
+            .filter(|line| line.ends_with('/'))
+            .map(|line| line.trim_end_matches('/').to_string())
+            .filter(|name| !name.is_empty())
+            .collect();
+        dirs.sort_by_key(|name| name.to_lowercase());
+
+        Ok(RemoteListing {
+            path,
+            dirs,
+            is_git_repo,
+        })
+    })
+    .await
+    .map_err(|e| format!("Task join failed: {}", e))?
 }
 
 #[tauri::command]
@@ -679,12 +919,17 @@ pub fn exit_app(app_handle: tauri::AppHandle) {
 
 // --- File watcher commands ---
 
+// remote files have nothing to watch — the notify backend is local only
+
 #[tauri::command]
 pub fn watch_file(
     file_watcher: State<'_, FileWatcherManager>,
     tab_id: String,
     file_path: String,
 ) -> Result<(), String> {
+    if remote::is_remote(&file_path) {
+        return Ok(());
+    }
     file_watcher.watch_file(&tab_id, &file_path)
 }
 
@@ -694,6 +939,9 @@ pub fn unwatch_file(
     tab_id: String,
     file_path: String,
 ) -> Result<(), String> {
+    if remote::is_remote(&file_path) {
+        return Ok(());
+    }
     file_watcher.unwatch_file(&tab_id, &file_path)
 }
 

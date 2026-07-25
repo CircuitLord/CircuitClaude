@@ -64,6 +64,52 @@ pub fn save(app_handle: &tauri::AppHandle, projects: &[ProjectConfig]) -> Result
     fs::write(&path, json).map_err(|e| e.to_string())
 }
 
+/// Saved ssh credentials, keyed by the authority that appears in `ssh://` project paths.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteConfig {
+    pub authority: String,
+    #[serde(default)]
+    pub key_path: Option<String>,
+}
+
+fn remotes_path(app_handle: &tauri::AppHandle) -> PathBuf {
+    config_dir(app_handle).join("remotes.json")
+}
+
+pub fn load_remotes(app_handle: &tauri::AppHandle) -> Vec<RemoteConfig> {
+    let path = remotes_path(app_handle);
+    match fs::read_to_string(&path) {
+        Ok(contents) => serde_json::from_str(&contents).unwrap_or_default(),
+        Err(_) => Vec::new(),
+    }
+}
+
+pub fn save_remotes(
+    app_handle: &tauri::AppHandle,
+    remotes: &[RemoteConfig],
+) -> Result<(), String> {
+    let path = remotes_path(app_handle);
+    let json = serde_json::to_string_pretty(remotes).map_err(|e| e.to_string())?;
+    fs::write(&path, json).map_err(|e| e.to_string())
+}
+
+/// Pushes saved credentials into the remote module's lookup table.
+pub fn sync_remotes(app_handle: &tauri::AppHandle) {
+    let entries = load_remotes(app_handle)
+        .into_iter()
+        .map(|r| {
+            (
+                r.authority,
+                crate::remote::RemoteInfo {
+                    key_path: r.key_path,
+                },
+            )
+        })
+        .collect();
+    crate::remote::set_remotes(entries);
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PinnedFileConfig {
     pub path: String,

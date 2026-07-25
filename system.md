@@ -33,6 +33,22 @@ Each navigable item is a flat row (36px tall), laid out as a single monospace li
 - Background: `var(--bg-elevated)`, text promoted to `--text-primary`
 - No border, no radius
 
+## Session Entry Pattern (two-line rows)
+
+Sidebar sessions are richer than a single-line entry, so they get their own rules. The row is a block, not a card: no radius, no border, but inset from the panel edge so the fill reads as a discrete unit.
+
+```
+~/project - kind                    4h
+session title text here        waiting
+```
+
+- **Block**: `margin: 0 6px 8px`, `padding: 12px`, 8px gap between the two lines
+- **Meta line** (line 1): 11px, 15px line-height, project path tinted with the project accent at `opacity: 0.45`, rising to `0.9` on hover/active. Age stamp right-aligned at `opacity: 0.6`, swapped for the `:archive` button on hover
+- **Title line** (line 2): 14px, 22px line-height, `--text-primary` at `opacity: 0.82`, rising to `1` on hover/active. This is the one place a label goes above 13px, since the title is the row's subject and needs to outweigh the 11px meta
+- Titles stay bright on every row. Selection is carried by the surface, not by promoting text brightness, so the list reads as content first and state second
+- **Active**: filled with the project's own `--accent-muted` (passed down as `--sidebar-project-accent-muted`), plus the standard glow underline in the project accent, inset `0` so it spans the full block width
+- Per-project colors come from `THEMES[project.theme].css`, forwarded as `--sidebar-project-*` inline vars
+
 ## Action Buttons
 
 Two tiers of action button, both monospace, no SVG icons.

@@ -1,4 +1,5 @@
 import { useSettingsStore } from "../stores/settingsStore";
+import { isRemotePath } from "./remote";
 import { PI_CHAT_SESSION_TYPE } from "../types";
 import type { SessionTypeConfig } from "../types";
 
@@ -6,6 +7,18 @@ export function getSessionTypes(editableTypes = useSettingsStore.getState().sett
   return editableTypes.some((type) => type.id === PI_CHAT_SESSION_TYPE.id)
     ? editableTypes
     : [...editableTypes, PI_CHAT_SESSION_TYPE];
+}
+
+/** Session types a project can actually run — pi chat drives a local process, so remotes can't use it. */
+export function getProjectSessionTypes(
+  projectPath: string | null,
+  editableTypes?: SessionTypeConfig[],
+): SessionTypeConfig[] {
+  const types = editableTypes ? getSessionTypes(editableTypes) : getSessionTypes();
+  if (projectPath && isRemotePath(projectPath)) {
+    return types.filter((type) => type.id !== PI_CHAT_SESSION_TYPE.id);
+  }
+  return types;
 }
 
 export function getSessionTypeConfig(id: string): SessionTypeConfig | undefined {

@@ -5,6 +5,7 @@ import { useGitStore } from "../stores/gitStore";
 import { WindowControls } from "./WindowControls";
 import { readClaudeMd, readAgentsMd } from "../lib/config";
 import { openFileTab } from "../lib/sessions";
+import { isRemotePath, remoteHostLabel } from "../lib/remote";
 import type { RightPanelTab } from "../types";
 
 const PANEL_TABS: Array<{ label: string; value: RightPanelTab }> = [
@@ -32,7 +33,12 @@ export function ProjectHeader() {
   return (
     <div className="project-header">
       <div className="project-header-info" data-tauri-drag-region>
-        <span className="project-header-name">{projectName}</span>
+        <span className="project-header-name">
+          {projectName}
+          {isRemotePath(activeProjectPath) && (
+            <span className="project-header-remote">@{remoteHostLabel(activeProjectPath)}</span>
+          )}
+        </span>
         <button
           className="project-header-text-btn"
           onClick={() => readClaudeMd(activeProjectPath).then((r) => openFileTab(r.path, "CLAUDE.md", false))}

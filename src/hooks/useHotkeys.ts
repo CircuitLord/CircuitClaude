@@ -302,11 +302,14 @@ export function useHotkeys() {
         return;
       }
 
-      // Ctrl+T — new session (before input guards so it works from editor/inputs)
-      if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key === "t") {
+      // Ctrl+T / Ctrl+Shift+T — new chat launcher / new default session (before input guards so they work from editor/inputs)
+      if (e.ctrlKey && !e.altKey && e.key.toLowerCase() === "t") {
         e.preventDefault();
-        const { defaultSessionType } = useSettingsStore.getState().settings;
-        spawnNewSession(defaultSessionType);
+        if (e.shiftKey) {
+          spawnNewSession(useSettingsStore.getState().settings.defaultSessionType);
+        } else {
+          setActiveSession(null);
+        }
         return;
       }
 

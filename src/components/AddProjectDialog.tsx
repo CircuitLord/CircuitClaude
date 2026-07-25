@@ -1,25 +1,282 @@
+import { useEffect, useRef, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useProjectStore } from "../stores/projectStore";
 import { getNextProjectTheme } from "../lib/themes";
+import { SegmentedControl } from "./SegmentedControl";
+import {
+  baseName,
+  isRootPath,
+  listRemoteDirs,
+  parentDir,
+  rememberRemote,
+  remoteUrl,
+  type RemoteListing,
+} from "../lib/remote";
+import type { RemoteSpec } from "../types";
 
-export function useAddProject() {
+type Mode = "local" | "remote";
+
+interface AddProjectDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export function AddProjectDialog({ isOpen, onClose }: AddProjectDialogProps) {
   const addProject = useProjectStore((s) => s.addProject);
 
-  async function handleAdd() {
-    const selected = await open({
-      directory: true,
-      multiple: false,
-      title: "Select project folder",
-    });
+  const [mode, setMode] = useState<Mode>("local");
+  const [localPath, setLocalPath] = useState("");
+  const [host, setHost] = useState("");
+  const [user, setUser] = useState("");
+  const [port, setPort] = useState("");
+  const [keyPath, setKeyPath] = useState("");
+  const [name, setName] = useState("");
+  const [nameEdited, setNameEdited] = useState(false);
+  const [listing, setListing] = useState<RemoteListing | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const hostRef = useRef<HTMLInputElement>(null);
 
-    if (selected && typeof selected === "string") {
-      const parts = selected.replace(/\\/g, "/").split("/");
-      const name = parts[parts.length - 1] || selected;
-      const theme = getNextProjectTheme(useProjectStore.getState().projects);
-      await addProject({ name, path: selected, theme });
+  useEffect(() => {
+    if (!isOpen) return;
+    setMode("local");
+    setLocalPath("");
+    setName("");
+    setNameEdited(false);
+    setListing(null);
+    setError(null);
+    setBusy(false);
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (isOpen && mode === "remote") hostRef.current?.focus();
+  }, [isOpen, mode]);
+
+  if (!isOpen) return null;
+
+  const spec: RemoteSpec = {
+    host: host.trim(),
+    user: user.trim() || undefined,
+    port: port.trim() ? Number(port.trim()) : undefined,
+    keyPath: keyPath.trim() || undefined,
+  };
+
+  function applyPath(path: string) {
+    if (!nameEdited) setName(baseName(path));
+  }
+
+  async function pickLocalFolder() {
+    const selected = await open({ directory: true, multiple: false, title: "Select project folder" });
+    if (typeof selected !== "string") return;
+    setLocalPath(selected);
+    applyPath(selected.replace(/\\/g, "/"));
+  }
+
+  async function pickKeyFile() {
+    const selected = await open({ multiple: false, title: "Select ssh private key" });
+    if (typeof selected === "string") setKeyPath(selected);
+  }
+
+  async function browse(path?: string) {
+    if (!spec.host) {
+      setError("host is required");
+      return;
+    }
+    if (port.trim() && !Number.isInteger(spec.port)) {
+      setError("port must be a number");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await listRemoteDirs(spec, path);
+      setListing(result);
+      applyPath(result.path);
+    } catch (e) {
+      setListing(null);
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
     }
   }
 
-  return handleAdd;
-}
+  const targetPath = mode === "local" ? localPath : listing?.path ?? "";
+  // say why the button is dead instead of leaving it mysteriously grey
+  const blockedReason = busy
+    ? null
+    : !targetPath
+      ? mode === "local"
+        ? "pick a folder"
+        : ":connect to pick a folder"
+      : !name.trim()
+        ? "name required"
+        : null;
+  const canAdd = !blockedReason && !busy;
 
+  async function handleAdd() {
+    if (!canAdd) return;
+    const theme = getNextProjectTheme(useProjectStore.getState().projects);
+    try {
+      if (mode === "remote") {
+        await rememberRemote(spec);
+        await addProject({ name: name.trim(), path: remoteUrl(spec, targetPath), theme });
+      } else {
+        await addProject({ name: name.trim(), path: targetPath, theme });
+      }
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  return (
+    <div className="dialog-overlay" onMouseDown={onClose}>
+      <div className="add-project-dialog" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="settings-dialog-header">
+          <span className="settings-dialog-header-title">add project</span>
+          <button className="settings-dialog-close" onClick={onClose}>:esc</button>
+        </div>
+
+        <div className="add-project-body">
+          <SegmentedControl<Mode>
+            value={mode}
+            options={[
+              { label: "local", value: "local" },
+              { label: "remote", value: "remote" },
+            ]}
+            onChange={(next) => { setMode(next); setError(null); }}
+          />
+
+          {mode === "local" ? (
+            <div className="add-project-field">
+              <span className="add-project-label">folder</span>
+              <span className="add-project-value" title={localPath}>
+                {localPath || "none selected"}
+              </span>
+              <button className="add-project-text-btn" onClick={pickLocalFolder}>:browse</button>
+            </div>
+          ) : (
+            <>
+              <div className="add-project-row">
+                <label className="add-project-field">
+                  <span className="add-project-label">host</span>
+                  <input
+                    ref={hostRef}
+                    className="add-project-input"
+                    value={host}
+                    placeholder="10.0.0.5 or box.local"
+                    spellCheck={false}
+                    onChange={(e) => setHost(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") browse(); }}
+                  />
+                </label>
+                <label className="add-project-field add-project-field--narrow">
+                  <span className="add-project-label">user</span>
+                  <input
+                    className="add-project-input"
+                    value={user}
+                    placeholder="ssh config"
+                    spellCheck={false}
+                    onChange={(e) => setUser(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") browse(); }}
+                  />
+                </label>
+                <label className="add-project-field add-project-field--tiny">
+                  <span className="add-project-label">port</span>
+                  <input
+                    className="add-project-input"
+                    value={port}
+                    placeholder="22"
+                    spellCheck={false}
+                    onChange={(e) => setPort(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") browse(); }}
+                  />
+                </label>
+              </div>
+
+              <div className="add-project-field">
+                <span className="add-project-label">key</span>
+                <input
+                  className="add-project-input"
+                  value={keyPath}
+                  placeholder="agent / ~/.ssh config"
+                  spellCheck={false}
+                  onChange={(e) => setKeyPath(e.target.value)}
+                />
+                <button className="add-project-text-btn" onClick={pickKeyFile}>:browse</button>
+              </div>
+
+              <div className="add-project-actions-inline">
+                <button className="add-project-connect" disabled={busy} onClick={() => browse()}>
+                  {busy ? ":connecting..." : listing ? ":reconnect" : ":connect"}
+                </button>
+                {listing && (
+                  <span className="add-project-cwd" title={listing.path}>
+                    {listing.path}
+                    {listing.isGitRepo && <span className="add-project-git"> [git]</span>}
+                  </span>
+                )}
+              </div>
+
+              {listing && (
+                <div className="add-project-browser">
+                  {!isRootPath(listing.path) && (
+                    <button
+                      className="add-project-dir"
+                      onClick={() => browse(parentDir(listing.path))}
+                    >
+                      <span className="add-project-dir-marker">^</span>..
+                    </button>
+                  )}
+                  {listing.dirs.length === 0 && (
+                    <div className="add-project-empty">no subdirectories</div>
+                  )}
+                  {listing.dirs.map((dir) => (
+                    <button
+                      key={dir}
+                      className="add-project-dir"
+                      onClick={() => browse(`${listing.path.replace(/\/+$/, "")}/${dir}`)}
+                    >
+                      <span className="add-project-dir-marker">&gt;</span>
+                      {dir}/
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          <label className="add-project-field">
+            <span className="add-project-label">name</span>
+            <input
+              className="add-project-input"
+              value={name}
+              placeholder="project name"
+              spellCheck={false}
+              onChange={(e) => { setName(e.target.value); setNameEdited(true); }}
+              onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
+            />
+          </label>
+
+          {error && <div className="add-project-error">{error}</div>}
+
+          <div className="add-project-actions">
+            {blockedReason && <span className="add-project-hint">{blockedReason}</span>}
+            <button className="add-project-submit" disabled={!canAdd} onClick={handleAdd}>
+              + add{mode === "remote" ? " remote" : ""} project
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -2,7 +2,7 @@ import { useSessionStore } from "../stores/sessionStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { readClaudeMd, readAgentsMd } from "./config";
 import { spawnNewSession, closeTab, openFileTab } from "./sessions";
-import { getSessionTypes } from "./sessionTypes";
+import { getProjectSessionTypes } from "./sessionTypes";
 
 export type PaletteMode = "files" | "commands" | "everything";
 
@@ -18,12 +18,20 @@ export function getPaletteCommands(): PaletteCommand[] {
   const commands: PaletteCommand[] = [];
 
   // Dynamic session commands from configured session types
-  const sessionTypes = getSessionTypes();
+  commands.push({
+    id: "new-chat",
+    label: "New chat",
+    shortcut: "Ctrl+T",
+    category: "session",
+    action: () => useSessionStore.getState().setActiveSession(null),
+  });
+
+  const sessionTypes = getProjectSessionTypes(useSessionStore.getState().activeProjectPath);
   for (const st of sessionTypes) {
     commands.push({
       id: `new-${st.id}`,
       label: `New ${st.name} session`,
-      shortcut: st.id === useSettingsStore.getState().settings.defaultSessionType ? "Ctrl+T" : undefined,
+      shortcut: st.id === useSettingsStore.getState().settings.defaultSessionType ? "Ctrl+Shift+T" : undefined,
       category: "session",
       action: () => spawnNewSession(st.id),
     });

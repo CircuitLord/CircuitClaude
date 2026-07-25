@@ -174,13 +174,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         projectSplits.set(session.projectPath, withUpdatedPane(split, split.focusedPane, newPane));
       }
 
-      const sessions = [...state.sessions];
-      if (position === "start") {
-        const firstProjectSessionIndex = sessions.findIndex((existing) => existing.projectPath === session.projectPath);
-        sessions.splice(firstProjectSessionIndex === -1 ? sessions.length : firstProjectSessionIndex, 0, session);
-      } else {
-        sessions.push(session);
-      }
+      const sessions = position === "start" ? [session, ...state.sessions] : [...state.sessions, session];
 
       const lastActivity = new Map(state.lastActivity);
       lastActivity.set(session.id, session.createdAt);
@@ -297,15 +291,26 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     });
   },
 
-  restoreSession: (id) =>
-    set((state) => {
-      const entry = state.archivedSessions.find((a) => a.id === id);
-      if (!entry) return {};
-      return {
-        archivedSessions: state.archivedSessions.filter((a) => a.id !== id),
-        sessions: [entry, ...state.sessions],
-      };
-    }),
+  restoreSession: (id) => {
+    const state = get();
+    const entry = state.archivedSessions.find((a) => a.id === id);
+    if (!entry) return;
+
+    const projectSplits = new Map(state.projectSplits);
+    const split = projectSplits.get(entry.projectPath);
+    if (split) {
+      const pane = getPaneState(split, split.focusedPane);
+      const newPane: PaneState = { sessionIds: [entry.id, ...pane.sessionIds], activeSessionId: entry.id };
+      projectSplits.set(entry.projectPath, withUpdatedPane(split, split.focusedPane, newPane));
+    }
+
+    set({
+      archivedSessions: state.archivedSessions.filter((a) => a.id !== id),
+      sessions: [entry, ...state.sessions],
+      projectSplits,
+    });
+    get().activateSession(id);
+  },
 
   removeProjectSessions: (projectPath) =>
     set((state) => {

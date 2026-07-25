@@ -1,3 +1,4 @@
+use crate::remote;
 use portable_pty::{native_pty_system, CommandBuilder, MasterPty, PtySize};
 use serde::Serialize;
 use std::collections::{HashMap, VecDeque};
@@ -308,10 +309,24 @@ impl PtyManager {
     }
 
     fn build_command(project_path: &str, command: &str) -> Result<CommandBuilder, String> {
-        let mut cmd = CommandBuilder::new("cmd.exe");
-        cmd.args(["/c", command]);
-        cmd.cwd(project_path);
-        Ok(cmd)
+        match remote::locate(project_path) {
+            remote::Location::Local(path) => {
+                let mut cmd = CommandBuilder::new("cmd.exe");
+                cmd.args(["/c", command]);
+                cmd.cwd(path);
+                Ok(cmd)
+            }
+            remote::Location::Remote(target) => {
+                let mut cmd = CommandBuilder::new(remote::find_ssh_exe()?);
+                for arg in remote::ssh_args(&target, true) {
+                    cmd.arg(arg);
+                }
+                cmd.arg(remote::login_script(&target, command));
+                // ssh forwards TERM to the remote pty, and the app process has none
+                cmd.env("TERM", "xterm-256color");
+                Ok(cmd)
+            }
+        }
     }
 
     fn reader_loop(

@@ -8,6 +8,7 @@ mod file_watcher;
 mod git;
 mod pi_manager;
 mod pty_manager;
+mod remote;
 mod whisper_manager;
 
 #[cfg(not(debug_assertions))]
@@ -74,6 +75,8 @@ pub fn run() {
             app.manage(whisper_manager::WhisperManager::new(models_dir));
             app.manage(file_watcher::FileWatcherManager::new(app.handle().clone()));
 
+            config::sync_remotes(&app.handle());
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -106,6 +109,9 @@ pub fn run() {
             commands::save_pinned_files,
             commands::load_workspace_sessions,
             commands::save_workspace_sessions,
+            commands::load_remotes,
+            commands::save_remotes,
+            commands::list_remote_dirs,
             commands::load_note,
             commands::save_note,
             commands::get_git_status,
@@ -152,6 +158,7 @@ pub fn run() {
                 whisper_manager.cancel_all();
                 let file_watcher = app.state::<file_watcher::FileWatcherManager>();
                 file_watcher.cleanup();
+                remote::shutdown();
                 config::cleanup_old_screenshots(&app.app_handle());
             }
         });

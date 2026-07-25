@@ -38,11 +38,37 @@ Rust Backend (Tauri commands → managers → portable-pty / whisper-rs)
 - `claude_manager.rs` — Claude API integration
 - `conversation.rs` — Conversation state
 - `git.rs` — Git operations
+- `remote.rs` — Remote (ssh) projects: `ssh://user@host:port/path` project paths, persistent command channel
 - `whisper_manager.rs` — Speech-to-text (CUDA-accelerated)
 - `file_watcher.rs` — File system watching with debouncing
 - `claude_title.rs` / `codex_title.rs` — Title generation
 
 **Terminal I/O flow**: xterm.js → `writeSession()` invoke → Rust PTY stdin. PTY stdout → reader thread → `Channel.send()` → xterm.js `terminal.write()`.
+
+## Remote projects
+
+A project path starting with `ssh://` is remote. Everything that touches the project (PTY spawn, git,
+file tree, file read/write, notes) branches on `remote::locate(path)`.
+
+- **Commands** (git, ls, cat) share one long-lived `ssh <host> bash -l` per host, framed by exit-code
+  markers. Windows OpenSSH has no connection multiplexing, so per-command connects would re-handshake
+- **Sessions** spawn through the same ConPTY as local ones, wrapped in ssh
+- Credentials live in `remotes.json` keyed by authority (`user@host:port`); ssh-agent and `~/.ssh/config`
+  cover everything else. The command channel runs with `BatchMode=yes`, so keys must not prompt
+- Local-only features are gated off for remote projects: pi chat, file watching, Everything search
+
+Both remote flavors are supported, distinguished by the path shape (a drive letter means windows):
+
+| | unix remote (`/srv/app`) | windows remote (`C:/Projects/app`) |
+|---|---|---|
+| session | `cd '<path>' && exec bash -lc '<cmd>'` | `cd /d "<path>" && <cmd>` (cmd.exe, same as local) |
+| command channel | `bash -l` | `"C:\Program Files\Git\bin\bash.exe" -l` |
+| requires | bash, git, coreutils | Git for Windows (msys bash + coreutils) |
+
+`Conn::open` tries the shell launchers in order and keeps the one that works. A windows host must land
+on an msys shell (`uname -s` starting MINGW/MSYS/CYGWIN) or `C:/...` paths would resolve against the
+wrong filesystem, so a WSL bash on PATH is rejected. `host_is_windows` settles the ambiguous case
+(browsing before a path is picked) by checking whether the server expands `%COMSPEC%`.
 
 ## Key Conventions
 

@@ -8,6 +8,7 @@ import { useProjectStore } from "../stores/projectStore";
 import { archiveTab, pinTab } from "../lib/sessions";
 import { getSessionDisplayName } from "../lib/sessionTypes";
 import { formatAge } from "../lib/time";
+import { isRemotePath, remoteHostLabel } from "../lib/remote";
 import { THEMES } from "../lib/themes";
 import type { SplitDirection, PaneState } from "../types";
 
@@ -69,7 +70,7 @@ export function SidebarSessions() {
 
   const handleDragStart = useCallback((e: React.MouseEvent, index: number) => {
     if (e.button !== 0) return;
-    if ((e.target as HTMLElement).closest(".sidebar-session-close")) return;
+    if ((e.target as HTMLElement).closest(".sidebar-session-archive")) return;
     e.preventDefault();
     e.stopPropagation();
 
@@ -210,6 +211,8 @@ export function SidebarSessions() {
         const style: CSSProperties = {
           "--sidebar-project-accent": theme.css["--accent"],
           "--sidebar-project-accent-text": theme.css["--accent-text"],
+          "--sidebar-project-accent-muted": theme.css["--accent-muted"],
+          "--sidebar-project-accent-muted-hover": theme.css["--accent-muted-hover"],
           "--sidebar-project-text-tertiary": theme.css["--text-tertiary"],
         } as CSSProperties;
 
@@ -248,8 +251,20 @@ export function SidebarSessions() {
             }}
           >
             <div className="sidebar-session-meta">
-              <span className="sidebar-session-project">~/{project?.name ?? s.projectName}</span>
+              <span className="sidebar-session-project">
+                {`~/${project?.name ?? s.projectName}${isRemotePath(s.projectPath) ? `@${remoteHostLabel(s.projectPath)}` : ""}`}
+                <span className="sidebar-session-kind"> - {kind}</span>
+              </span>
               <span className="sidebar-session-age">{formatAge(lastActivity.get(s.id) ?? s.createdAt)}</span>
+              <button
+                type="button"
+                className="sidebar-session-archive"
+                aria-label={isEditor ? `Close ${label}` : `Archive ${label}`}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => { e.stopPropagation(); archiveTab(s.id); }}
+              >
+                {isEditor ? ":close" : ":archive"}
+              </button>
             </div>
             <div className="sidebar-session-main">
               <span className="sidebar-session-name">
@@ -263,29 +278,12 @@ export function SidebarSessions() {
                   </span>
                 ))}
               </span>
-            </div>
-            <div className="sidebar-session-sub">
-              <span className="sidebar-session-kind">{kind}</span>
               {dirty ? (
                 <span className="sidebar-session-status dirty">unsaved</span>
-              ) : status === "thinking" ? (
-                <span className="sidebar-session-status thinking">thinking</span>
               ) : status === "waiting" ? (
                 <span className="sidebar-session-status waiting">waiting</span>
               ) : null}
-              <span className="sidebar-session-trailing">
-                {pane && <span className="sidebar-session-pane">[{pane}]</span>}
-                <button
-                  type="button"
-                  className="sidebar-session-close"
-                  aria-label={isEditor ? `Close ${label}` : `Archive ${label}`}
-                  title={isEditor ? "Close" : "Archive"}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onClick={(e) => { e.stopPropagation(); archiveTab(s.id); }}
-                >
-                  x
-                </button>
-              </span>
+              {pane && <span className="sidebar-session-pane">[{pane}]</span>}
             </div>
           </div>
         );
