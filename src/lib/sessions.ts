@@ -3,6 +3,7 @@ import { useProjectStore } from "../stores/projectStore";
 import { closePtySession } from "./pty";
 import { destroyPiSession } from "./pi";
 import { supportsAgentSessionResume } from "./sessionTypes";
+import type { TerminalSession } from "../types";
 
 export function spawnNewSession(type: string = "claude", projectPath?: string) {
   const { activeProjectPath, addSession, setActiveProject } = useSessionStore.getState();
@@ -92,17 +93,35 @@ export function pinTab(tabId: string) {
   }
 }
 
+function killSessionProcess(session: TerminalSession) {
+  if (session.sessionType === "pi-chat" && session.sessionId) {
+    destroyPiSession(session.sessionId).catch(() => {});
+  } else if (session.sessionType !== "editor" && session.sessionId) {
+    closePtySession(session.sessionId).catch(() => {});
+  }
+}
+
 /** Close a tab — handles both editor and terminal sessions. */
 export function closeTab(tabId: string) {
   const state = useSessionStore.getState();
   const session = state.sessions.find((s) => s.id === tabId);
   if (!session) return;
 
-  if (session.sessionType === "pi-chat" && session.sessionId) {
-    destroyPiSession(session.sessionId).catch(() => {});
-  } else if (session.sessionType !== "editor" && session.sessionId) {
-    closePtySession(session.sessionId).catch(() => {});
+  killSessionProcess(session);
+  state.removeSession(tabId);
+}
+
+/** Stop a session and move it to the archive. Editor tabs have nothing to resume, so they just close. */
+export function archiveTab(tabId: string) {
+  const state = useSessionStore.getState();
+  const session = state.sessions.find((s) => s.id === tabId);
+  if (!session) return;
+
+  if (session.sessionType === "editor") {
+    closeTab(tabId);
+    return;
   }
 
-  state.removeSession(tabId);
+  killSessionProcess(session);
+  state.archiveSession(tabId);
 }

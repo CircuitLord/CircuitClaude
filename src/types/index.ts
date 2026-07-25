@@ -53,9 +53,14 @@ export interface TerminalSession {
   isPreview?: boolean;
 }
 
+export type PersistedSession = Pick<TerminalSession, "id" | "projectName" | "projectPath" | "agentSessionId" | "hasStarted" | "createdAt" | "sessionType">;
+
 export interface PersistedSessionState {
-  sessions: Array<Pick<TerminalSession, "id" | "projectName" | "projectPath" | "agentSessionId" | "hasStarted" | "createdAt" | "sessionType">>;
+  sessions: PersistedSession[];
+  archivedSessions: PersistedSession[];
   sessionTitles: Record<string, string>;
+  lastActivity: Record<string, number>;
+  activeProjectPath: string | null;
 }
 
 export type PtyOutputEvent =

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { usePiSession } from "../hooks/usePiSession";
 import { listPiSessions, savePiChatSettings, type PiSessionInfo } from "../lib/pi";
 import { THEMES } from "../lib/themes";
+import { formatAge } from "../lib/time";
 import { usePiChatStore, type PiChatMessage } from "../stores/piChatStore";
 import { useProjectStore } from "../stores/projectStore";
 import { useSessionStore } from "../stores/sessionStore";
@@ -127,16 +128,6 @@ function isSelectableChatTarget(target: EventTarget | null): boolean {
 
 function sessionDisplayName(session: PiSessionInfo): string {
   return session.name || session.firstMessage || session.id;
-}
-
-function formatSessionAge(timestamp: number): string {
-  if (!timestamp) return "old";
-  const ageMs = Date.now() - timestamp;
-  const minutes = Math.max(0, Math.floor(ageMs / 60_000));
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 48) return `${hours}h`;
-  return `${Math.floor(hours / 24)}d`;
 }
 
 function useSettledStreaming(isStreaming: boolean, delayMs = 450): boolean {
@@ -886,7 +877,7 @@ export function PiChatView({ tabId, projectPath, agentSessionId }: PiChatViewPro
                 <span className="pi-chat-load-marker">{">"}</span>
                 <span className="pi-chat-load-main">
                   <span className="pi-chat-load-name">{sessionDisplayName(session)}</span>
-                  <span className="pi-chat-load-meta">{session.messageCount} msg · {formatSessionAge(session.modified)} ago</span>
+                  <span className="pi-chat-load-meta">{session.messageCount} msg · {formatAge(session.modified)} ago</span>
                 </span>
               </button>
             ))}

@@ -3,7 +3,6 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Sidebar } from "./components/Sidebar";
 import { ProjectHeader } from "./components/ProjectHeader";
 import { TerminalTabs } from "./components/TerminalTabs";
-import { EmptyState } from "./components/EmptyState";
 import { SessionLauncher } from "./components/SessionLauncher";
 import { WindowControls } from "./components/WindowControls";
 import { DiffViewer } from "./components/DiffViewer";
@@ -110,12 +109,8 @@ function App() {
     ...new Set(sessions.map((s) => s.projectPath)),
   ];
 
-  const activeProjectSessions = activeProjectPath
-    ? sessions.filter((s) => s.projectPath === activeProjectPath)
-    : [];
-
-  // no tab selected (freshly switched project, or none exist) shows the launcher
-  const showLauncher = !!activeProjectPath && !activeProjectSessions.some((s) => s.id === activeSessionId);
+  // no session selected shows the new-session launcher
+  const showLauncher = !sessions.some((s) => s.id === activeSessionId);
 
   return (
     <>
@@ -151,15 +146,9 @@ function App() {
           )}
           <div className="main-content-area">
             <div className="terminal-content">
-              {activeProjectPath ? (
-                showLauncher ? (
-                  <div className="terminal-area">
-                    <SessionLauncher projectPath={activeProjectPath} />
-                  </div>
-                ) : null
-              ) : (
+              {showLauncher && (
                 <div className="terminal-area">
-                  <EmptyState />
+                  <SessionLauncher />
                 </div>
               )}
               {/* Render all project terminals simultaneously; only the active one is visible */}

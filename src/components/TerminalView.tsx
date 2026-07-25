@@ -220,6 +220,7 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, age
         if (event.type === "Data") {
           const bytes = new Uint8Array(event.data.bytes);
           terminal.write(bytes);
+          useSessionStore.getState().touchSession(tabId);
           const timeSinceInput = Date.now() - lastUserInputTime;
           if (timeSinceInput > 150) {
             setTabStatus(tabId, "thinking");
@@ -298,6 +299,7 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, age
 
     const onDataDisposable = terminal.onData((data) => {
       lastUserInputTime = Date.now();
+      useSessionStore.getState().touchSession(tabId);
       const currentStatus = useSessionStore.getState().tabStatuses.get(tabId);
       if (currentStatus === "waiting") {
         setTabStatus(tabId, null);

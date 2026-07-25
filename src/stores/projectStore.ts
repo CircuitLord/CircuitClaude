@@ -12,7 +12,6 @@ interface ProjectStore {
   load: () => Promise<void>;
   addProject: (project: Project) => Promise<void>;
   removeProject: (path: string) => Promise<void>;
-  reorderProjects: (paths: string[]) => Promise<void>;
   updateProjectTheme: (path: string, theme: ThemeName) => Promise<void>;
 }
 
@@ -59,14 +58,6 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     await saveProjects(updated);
     useSessionStore.getState().removeProjectSessions(path);
     set({ projects: updated });
-  },
-
-  reorderProjects: async (paths: string[]) => {
-    const current = get().projects;
-    const byPath = new Map(current.map((p) => [p.path, p]));
-    const reordered = paths.map((path) => byPath.get(path)!).filter(Boolean);
-    await saveProjects(reordered);
-    set({ projects: reordered });
   },
 
   updateProjectTheme: async (path: string, theme: ThemeName) => {

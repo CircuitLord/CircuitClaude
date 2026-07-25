@@ -1,21 +1,27 @@
 import { create } from "zustand";
-import { TerminalSession, TabStatus, SplitState, PaneState, PersistedSessionState } from "../types";
+import { TerminalSession, TabStatus, SplitState, PaneState, PersistedSession, PersistedSessionState } from "../types";
 import { useEditorStore } from "./editorStore";
 import { loadWorkspaceSessions, saveWorkspaceSessions } from "../lib/config";
 
 interface SessionStore {
   sessions: TerminalSession[];
+  archivedSessions: TerminalSession[];
   loaded: boolean;
   activeSessionId: string | null;
   activeProjectPath: string | null;
   tabStatuses: Map<string, TabStatus>;
   sessionTitles: Map<string, string>;
+  lastActivity: Map<string, number>;
   bottomTerminalProjects: Set<string>;
   toggleBottomTerminal: (projectPath: string) => void;
   load: (projectPaths: string[]) => Promise<void>;
   flush: () => Promise<void>;
   addSession: (session: TerminalSession, position: "start" | "end") => void;
   removeSession: (id: string) => void;
+  /** drop a session out of the active list but keep it recoverable */
+  archiveSession: (id: string) => void;
+  /** put an archived session back at the top of the active list, dormant */
+  restoreSession: (id: string) => void;
   removeProjectSessions: (projectPath: string) => void;
   setActiveSession: (id: string | null) => void;
   /** Switching project always lands on the new-session launcher, not a remembered tab */
@@ -25,22 +31,27 @@ interface SessionStore {
   updateSessionPtyId: (id: string, sessionId: string) => void;
   setTabStatus: (tabId: string, status: TabStatus | null) => void;
   setSessionTitle: (tabId: string, title: string) => void;
+  /** stamp a session as interacted with, throttled so streaming output doesn't thrash the store */
+  touchSession: (id: string) => void;
   updateSession: (id: string, partial: Partial<Pick<TerminalSession, "isPreview" | "hasStarted">>) => void;
-  reorderSessions: (projectPath: string, fromIndex: number, toIndex: number) => void;
+  /** reorder within the flat cross-project session list */
+  moveSession: (fromIndex: number, toIndex: number) => void;
   projectSplits: Map<string, SplitState>;
   setSplit: (projectPath: string, split: SplitState) => void;
   clearSplit: (projectPath: string) => void;
   setFocusedPane: (projectPath: string, pane: 1 | 2) => void;
   moveSessionToPane: (projectPath: string, sessionId: string, targetPane: 1 | 2, insertIndex?: number) => void;
-  reorderPaneSessions: (projectPath: string, pane: 1 | 2, fromIndex: number, toIndex: number) => void;
 }
+
+const TOUCH_THROTTLE_MS = 15_000;
+const MAX_ARCHIVED = 10;
 
 export function generateTabId(): string {
   return crypto.randomUUID();
 }
 
 /** Find which pane contains a session, or null if not in split */
-function findPane(split: SplitState, sessionId: string): 1 | 2 | null {
+export function findPane(split: SplitState, sessionId: string): 1 | 2 | null {
   if (split.pane1.sessionIds.includes(sessionId)) return 1;
   if (split.pane2.sessionIds.includes(sessionId)) return 2;
   return null;
@@ -63,32 +74,39 @@ function enqueuePersistence(state: PersistedSessionState): Promise<void> {
   return persistChain;
 }
 
+function toPersistedSession({ id, projectName, projectPath, agentSessionId, hasStarted, createdAt, sessionType }: TerminalSession): PersistedSession {
+  return { id, projectName, projectPath, agentSessionId, hasStarted, createdAt, sessionType };
+}
+
+/** restored from disk or from the archive: no pty yet, resume only if it ever ran */
+function toDormantSession(session: PersistedSession): TerminalSession {
+  return { ...session, sessionId: null, isDormant: true, resumeSession: session.hasStarted === true };
+}
+
 function buildPersistedState(state: SessionStore): PersistedSessionState {
   const sessions = state.sessions
     .filter((session) => session.sessionType !== "editor")
-    .map(({ id, projectName, projectPath, agentSessionId, hasStarted, createdAt, sessionType }) => ({
-      id,
-      projectName,
-      projectPath,
-      agentSessionId,
-      hasStarted,
-      createdAt,
-      sessionType,
-    }));
-  const sessionIds = new Set(sessions.map((session) => session.id));
+    .map(toPersistedSession);
+  const archivedSessions = state.archivedSessions.map(toPersistedSession);
+  const known = new Set([...sessions, ...archivedSessions].map((session) => session.id));
   const sessionTitles = Object.fromEntries(
-    [...state.sessionTitles].filter(([id]) => sessionIds.has(id)),
+    [...state.sessionTitles].filter(([id]) => known.has(id)),
   );
-  return { sessions, sessionTitles };
+  const lastActivity = Object.fromEntries(
+    [...state.lastActivity].filter(([id]) => known.has(id)),
+  );
+  return { sessions, archivedSessions, sessionTitles, lastActivity, activeProjectPath: state.activeProjectPath };
 }
 
 export const useSessionStore = create<SessionStore>((set, get) => ({
   sessions: [],
+  archivedSessions: [],
   loaded: false,
   activeSessionId: null,
   activeProjectPath: null,
   tabStatuses: new Map(),
   sessionTitles: new Map(),
+  lastActivity: new Map(),
   projectSplits: new Map(),
   bottomTerminalProjects: new Set(),
 
@@ -109,18 +127,26 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     const validProjects = new Set(projectPaths);
     const sessions = persisted.sessions
       .filter((session) => validProjects.has(session.projectPath))
-      .map((session) => ({
-        ...session,
-        sessionId: null,
-        isDormant: true,
-        resumeSession: session.hasStarted === true,
-      }));
-    const sessionIds = new Set(sessions.map((session) => session.id));
+      .map(toDormantSession);
+    const archivedSessions = (persisted.archivedSessions ?? [])
+      .filter((session) => validProjects.has(session.projectPath))
+      .slice(0, MAX_ARCHIVED)
+      .map(toDormantSession);
+    const known = new Set([...sessions, ...archivedSessions].map((session) => session.id));
     const sessionTitles = new Map(
-      Object.entries(persisted.sessionTitles).filter(([id]) => sessionIds.has(id)),
+      Object.entries(persisted.sessionTitles).filter(([id]) => known.has(id)),
     );
-    lastPersistedKey = JSON.stringify(persisted);
-    set({ sessions, sessionTitles, loaded: true });
+    const lastActivity = new Map(
+      Object.entries(persisted.lastActivity ?? {}).filter(([id]) => known.has(id)),
+    );
+    for (const session of [...sessions, ...archivedSessions]) {
+      if (!lastActivity.has(session.id)) lastActivity.set(session.id, session.createdAt);
+    }
+    const activeProjectPath = persisted.activeProjectPath && validProjects.has(persisted.activeProjectPath)
+      ? persisted.activeProjectPath
+      : projectPaths[0] ?? null;
+    set({ sessions, archivedSessions, sessionTitles, lastActivity, activeProjectPath, loaded: true });
+    lastPersistedKey = JSON.stringify(buildPersistedState(get()));
   },
 
   flush: async () => {
@@ -156,11 +182,15 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         sessions.push(session);
       }
 
+      const lastActivity = new Map(state.lastActivity);
+      lastActivity.set(session.id, session.createdAt);
+
       return {
         sessions,
         activeSessionId: session.id,
         activeProjectPath: session.projectPath,
         projectSplits,
+        lastActivity,
       };
     }),
 
@@ -226,6 +256,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       tabStatuses.delete(id);
       const sessionTitles = new Map(state.sessionTitles);
       sessionTitles.delete(id);
+      const lastActivity = new Map(state.lastActivity);
+      lastActivity.delete(id);
 
       return {
         sessions,
@@ -233,7 +265,45 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         activeProjectPath: state.activeProjectPath,
         tabStatuses,
         sessionTitles,
+        lastActivity,
         projectSplits,
+      };
+    }),
+
+  archiveSession: (id) => {
+    const state = get();
+    const session = state.sessions.find((s) => s.id === id);
+    if (!session) return;
+    const title = state.sessionTitles.get(id);
+    const activity = state.lastActivity.get(id) ?? session.createdAt;
+
+    get().removeSession(id);
+
+    set((current) => {
+      const archivedSessions = [
+        toDormantSession(toPersistedSession(session)),
+        ...current.archivedSessions.filter((a) => a.id !== id),
+      ];
+      const dropped = archivedSessions.splice(MAX_ARCHIVED);
+      const sessionTitles = new Map(current.sessionTitles);
+      const lastActivity = new Map(current.lastActivity);
+      if (title !== undefined) sessionTitles.set(id, title);
+      lastActivity.set(id, activity);
+      for (const entry of dropped) {
+        sessionTitles.delete(entry.id);
+        lastActivity.delete(entry.id);
+      }
+      return { archivedSessions, sessionTitles, lastActivity };
+    });
+  },
+
+  restoreSession: (id) =>
+    set((state) => {
+      const entry = state.archivedSessions.find((a) => a.id === id);
+      if (!entry) return {};
+      return {
+        archivedSessions: state.archivedSessions.filter((a) => a.id !== id),
+        sessions: [entry, ...state.sessions],
       };
     }),
 
@@ -254,26 +324,31 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         state.activeProjectPath === projectPath
           ? null
           : state.activeProjectPath;
+      const archivedSessions = state.archivedSessions.filter((s) => s.projectPath !== projectPath);
       const projectSplits = new Map(state.projectSplits);
       projectSplits.delete(projectPath);
       const removedIds = new Set(
-        state.sessions
+        [...state.sessions, ...state.archivedSessions]
           .filter((s) => s.projectPath === projectPath)
           .map((s) => s.id)
       );
       const tabStatuses = new Map(state.tabStatuses);
       const sessionTitles = new Map(state.sessionTitles);
+      const lastActivity = new Map(state.lastActivity);
       for (const id of removedIds) {
         tabStatuses.delete(id);
         sessionTitles.delete(id);
+        lastActivity.delete(id);
       }
       return {
         sessions,
+        archivedSessions,
         activeSessionId,
         activeProjectPath,
         projectSplits,
         tabStatuses,
         sessionTitles,
+        lastActivity,
       };
     }),
 
@@ -346,6 +421,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     })),
 
   setTabStatus: (tabId, status) => {
+    get().touchSession(tabId);
     const current = get().tabStatuses.get(tabId) ?? null;
     if (current === status) return;
     set((state) => {
@@ -366,27 +442,37 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       return { sessionTitles: next };
     }),
 
-  reorderSessions: (projectPath, fromIndex, toIndex) =>
+  touchSession: (id) => {
+    const now = Date.now();
+    const previous = get().lastActivity.get(id) ?? 0;
+    if (now - previous < TOUCH_THROTTLE_MS) return;
+    set((state) => {
+      const next = new Map(state.lastActivity);
+      next.set(id, now);
+      return { lastActivity: next };
+    });
+  },
+
+  moveSession: (fromIndex, toIndex) =>
     set((state) => {
       if (fromIndex === toIndex) return {};
-      const projectSessions = state.sessions.filter((s) => s.projectPath === projectPath);
-      if (fromIndex < 0 || fromIndex >= projectSessions.length || toIndex < 0 || toIndex >= projectSessions.length) return {};
+      const sessions = [...state.sessions];
+      if (fromIndex < 0 || fromIndex >= sessions.length || toIndex < 0 || toIndex >= sessions.length) return {};
 
-      const [moved] = projectSessions.splice(fromIndex, 1);
-      projectSessions.splice(toIndex, 0, moved);
+      const [moved] = sessions.splice(fromIndex, 1);
+      sessions.splice(toIndex, 0, moved);
 
-      const reorderedIds = new Set(projectSessions.map((s) => s.id));
-      const otherSessions = state.sessions.filter((s) => !reorderedIds.has(s.id));
+      // keep the split pane's tab order in sync with the sidebar order
+      const split = state.projectSplits.get(moved.projectPath);
+      const pane = split ? findPane(split, moved.id) : null;
+      if (!split || !pane) return { sessions };
 
-      // Re-insert project sessions at the position of the first original occurrence
-      const firstOriginalIndex = state.sessions.findIndex((s) => s.projectPath === projectPath);
-      const sessions = [
-        ...otherSessions.slice(0, firstOriginalIndex),
-        ...projectSessions,
-        ...otherSessions.slice(firstOriginalIndex),
-      ];
-
-      return { sessions };
+      const paneState = getPaneState(split, pane);
+      const paneIds = new Set(paneState.sessionIds);
+      const sessionIds = sessions.filter((s) => paneIds.has(s.id)).map((s) => s.id);
+      const projectSplits = new Map(state.projectSplits);
+      projectSplits.set(moved.projectPath, withUpdatedPane(split, pane, { ...paneState, sessionIds }));
+      return { sessions, projectSplits };
     }),
 
   setSplit: (projectPath, split) =>
@@ -465,25 +551,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 
       projectSplits.set(projectPath, newSplit);
       return { projectSplits, activeSessionId: sessionId };
-    }),
-
-  reorderPaneSessions: (projectPath, pane, fromIndex, toIndex) =>
-    set((state) => {
-      if (fromIndex === toIndex) return {};
-      const split = state.projectSplits.get(projectPath);
-      if (!split) return {};
-
-      const paneState = getPaneState(split, pane);
-      if (fromIndex < 0 || fromIndex >= paneState.sessionIds.length || toIndex < 0 || toIndex >= paneState.sessionIds.length) return {};
-
-      const newIds = [...paneState.sessionIds];
-      const [moved] = newIds.splice(fromIndex, 1);
-      newIds.splice(toIndex, 0, moved);
-
-      const newPane: PaneState = { ...paneState, sessionIds: newIds };
-      const projectSplits = new Map(state.projectSplits);
-      projectSplits.set(projectPath, withUpdatedPane(split, pane, newPane));
-      return { projectSplits };
     }),
 }));
 
