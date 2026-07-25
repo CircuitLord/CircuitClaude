@@ -12,7 +12,9 @@ interface ProjectStore {
   load: () => Promise<void>;
   addProject: (project: Project) => Promise<void>;
   removeProject: (path: string) => Promise<void>;
+  reorderProjects: (paths: string[]) => Promise<void>;
   updateProjectTheme: (path: string, theme: ThemeName) => Promise<void>;
+  togglePinned: (path: string) => Promise<void>;
 }
 
 export const useProjectStore = create<ProjectStore>((set, get) => ({
@@ -60,9 +62,24 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     set({ projects: updated });
   },
 
+  reorderProjects: async (paths: string[]) => {
+    const byPath = new Map(get().projects.map((p) => [p.path, p]));
+    const reordered = paths.map((path) => byPath.get(path)!).filter(Boolean);
+    await saveProjects(reordered);
+    set({ projects: reordered });
+  },
+
   updateProjectTheme: async (path: string, theme: ThemeName) => {
     const updated = get().projects.map((p) =>
       p.path === path ? { ...p, theme } : p
+    );
+    await saveProjects(updated);
+    set({ projects: updated });
+  },
+
+  togglePinned: async (path: string) => {
+    const updated = get().projects.map((p) =>
+      p.path === path ? { ...p, pinned: !p.pinned } : p
     );
     await saveProjects(updated);
     set({ projects: updated });

@@ -5,21 +5,20 @@ import { useProjectStore } from "../stores/projectStore";
 import { useSessionStore } from "../stores/sessionStore";
 import { AddProjectDialog } from "./AddProjectDialog";
 import { getProjectSessionTypes } from "../lib/sessionTypes";
-import { THEMES, THEME_OPTIONS } from "../lib/themes";
+import { THEMES } from "../lib/themes";
 import { displayPath, isRemotePath, remoteHostLabel } from "../lib/remote";
-import type { ThemeName } from "../types";
 
 export function SessionLauncher() {
   const activeProjectPath = useSessionStore((s) => s.activeProjectPath);
   const setActiveProject = useSessionStore((s) => s.setActiveProject);
   const projects = useProjectStore((s) => s.projects);
   const removeProject = useProjectStore((s) => s.removeProject);
-  const updateProjectTheme = useProjectStore((s) => s.updateProjectTheme);
+  const togglePinned = useProjectStore((s) => s.togglePinned);
   const editableSessionTypes = useSettingsStore((s) => s.settings.sessionTypes);
+  const defaultSessionType = useSettingsStore((s) => s.settings.defaultSessionType);
 
   const [addOpen, setAddOpen] = useState(false);
   const [projectOpen, setProjectOpen] = useState(false);
-  const [themeOpen, setThemeOpen] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [highlight, setHighlight] = useState(0);
@@ -30,19 +29,18 @@ export function SessionLauncher() {
 
   const project = projects.find((p) => p.path === activeProjectPath) ?? null;
   const sessionTypes = getProjectSessionTypes(project?.path ?? null, editableSessionTypes);
-  const accent = THEMES[project?.theme ?? "midnight"]?.accent ?? THEMES.midnight.accent;
-  const themeLabel = THEME_OPTIONS.find((o) => o.value === project?.theme)?.label ?? "theme";
 
   const needle = query.trim().toLowerCase();
+  // pinned projects are the ones you reach for, so they lead the list
+  const ordered = [...projects].sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned));
   const filtered = needle
-    ? projects.filter((p) => p.name.toLowerCase().includes(needle) || p.path.toLowerCase().includes(needle))
-    : projects;
+    ? ordered.filter((p) => p.name.toLowerCase().includes(needle) || p.path.toLowerCase().includes(needle))
+    : ordered;
 
   useEffect(() => {
-    if (!projectOpen && !themeOpen) return;
+    if (!projectOpen) return;
     function closeAll() {
       setProjectOpen(false);
-      setThemeOpen(false);
       setConfirmingDelete(null);
     }
     function onKey(e: KeyboardEvent) {
@@ -54,13 +52,13 @@ export function SessionLauncher() {
       window.removeEventListener("click", closeAll);
       window.removeEventListener("keydown", onKey);
     };
-  }, [projectOpen, themeOpen]);
+  }, [projectOpen]);
 
   // opening starts fresh, with the cursor on the project you're already in
   useEffect(() => {
     if (!projectOpen) return;
     setQuery("");
-    const current = projects.findIndex((p) => p.path === activeProjectPath);
+    const current = ordered.findIndex((p) => p.path === activeProjectPath);
     keyNavRef.current = true;
     setHighlight(current === -1 ? 0 : current);
     inputRef.current?.focus();
@@ -79,11 +77,6 @@ export function SessionLauncher() {
     setProjectOpen(false);
   }
 
-  function handleSelectTheme(theme: ThemeName) {
-    if (project) updateProjectTheme(project.path, theme);
-    setThemeOpen(false);
-  }
-
   function handleSearchKeyDown(e: React.KeyboardEvent) {
     if (e.key === "ArrowDown") {
       e.preventDefault();
@@ -96,11 +89,18 @@ export function SessionLauncher() {
     } else if (e.key === "Enter") {
       e.preventDefault();
       const picked = filtered[highlight];
-      if (picked) handleSelectProject(picked.path);
+      if (!picked) return;
+      // enter is the fast path — straight into a default session; shift just switches project
+      if (e.shiftKey) {
+        handleSelectProject(picked.path);
+      } else {
+        setProjectOpen(false);
+        spawnNewSession(defaultSessionType, picked.path);
+      }
     }
   }
 
-  const openClass = projectOpen ? " project-open" : themeOpen ? " theme-open" : "";
+  const openClass = projectOpen ? " project-open" : "";
 
   return (
     <div className={`session-launcher${openClass}`}>
@@ -109,7 +109,7 @@ export function SessionLauncher() {
           <button
             className="launcher-project-btn"
             aria-expanded={projectOpen}
-            onClick={() => { setProjectOpen((v) => !v); setThemeOpen(false); }}
+            onClick={() => setProjectOpen((v) => !v)}
           >
             <span className="launcher-project-label">
               <span className="launcher-project-prefix">~/</span>
@@ -175,6 +175,13 @@ export function SessionLauncher() {
                             )}
                           </button>
                           <button
+                            className={`launcher-dropdown-pin${p.pinned ? " pinned" : ""}`}
+                            title={p.pinned ? "Unpin from sidebar" : "Keep in sidebar"}
+                            onClick={() => togglePinned(p.path)}
+                          >
+                            {p.pinned ? "[*]" : "[ ]"}
+                          </button>
+                          <button
                             className="launcher-dropdown-remove"
                             title="Remove project"
                             onClick={() => setConfirmingDelete(p.path)}
@@ -199,39 +206,7 @@ export function SessionLauncher() {
 
         <div className="launcher-project-meta">
           {project ? (
-            <>
-              <span className="launcher-project-path" title={project.path}>{displayPath(project.path)}</span>
-              <span className="launcher-project-meta-sep">·</span>
-              <div className="launcher-theme" onClick={(e) => e.stopPropagation()}>
-                <button
-                  className="launcher-theme-btn"
-                  aria-expanded={themeOpen}
-                  title="Project theme"
-                  onClick={() => { setThemeOpen((v) => !v); setProjectOpen(false); }}
-                >
-                  <span className="launcher-theme-swatch" style={{ color: accent }}>#</span>
-                  {themeLabel}
-                </button>
-                {themeOpen && (
-                  <div className="launcher-dropdown launcher-dropdown--theme">
-                    <div className="launcher-dropdown-list">
-                      {THEME_OPTIONS.map((opt) => (
-                        <div
-                          key={opt.value}
-                          className={`launcher-dropdown-row${opt.value === project.theme ? " active" : ""}`}
-                        >
-                          <button className="launcher-dropdown-option" onClick={() => handleSelectTheme(opt.value)}>
-                            <span className="launcher-dropdown-marker">{opt.value === project.theme ? ">" : ""}</span>
-                            <span className="launcher-dropdown-swatch" style={{ color: opt.accent }}>#</span>
-                            <span className="launcher-dropdown-label">{opt.label}</span>
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </>
+            <span className="launcher-project-path" title={project.path}>{displayPath(project.path)}</span>
           ) : (
             <span className="launcher-project-path">pick a project to start a session</span>
           )}

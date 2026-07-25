@@ -13,6 +13,8 @@ pub struct ProjectConfig {
     pub path: String,
     #[serde(default = "default_project_theme")]
     pub theme: String,
+    #[serde(default)]
+    pub pinned: bool,
 }
 
 pub fn config_dir(app_handle: &tauri::AppHandle) -> PathBuf {

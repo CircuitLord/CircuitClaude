@@ -34,8 +34,8 @@ interface SessionStore {
   /** stamp a session as interacted with, throttled so streaming output doesn't thrash the store */
   touchSession: (id: string) => void;
   updateSession: (id: string, partial: Partial<Pick<TerminalSession, "isPreview" | "hasStarted">>) => void;
-  /** reorder within the flat cross-project session list */
-  moveSession: (fromIndex: number, toIndex: number) => void;
+  /** reorder within one project's sidebar section, indices relative to that project */
+  moveProjectSession: (projectPath: string, fromIndex: number, toIndex: number) => void;
   projectSplits: Map<string, SplitState>;
   setSplit: (projectPath: string, split: SplitState) => void;
   clearSplit: (projectPath: string) => void;
@@ -458,17 +458,21 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     });
   },
 
-  moveSession: (fromIndex, toIndex) =>
+  moveProjectSession: (projectPath, fromIndex, toIndex) =>
     set((state) => {
       if (fromIndex === toIndex) return {};
-      const sessions = [...state.sessions];
-      if (fromIndex < 0 || fromIndex >= sessions.length || toIndex < 0 || toIndex >= sessions.length) return {};
+      const group = state.sessions.filter((s) => s.projectPath === projectPath);
+      if (fromIndex < 0 || fromIndex >= group.length || toIndex < 0 || toIndex >= group.length) return {};
 
-      const [moved] = sessions.splice(fromIndex, 1);
-      sessions.splice(toIndex, 0, moved);
+      const [moved] = group.splice(fromIndex, 1);
+      group.splice(toIndex, 0, moved);
+
+      // write the new order back into the slots this project already occupies
+      let cursor = 0;
+      const sessions = state.sessions.map((s) => (s.projectPath === projectPath ? group[cursor++] : s));
 
       // keep the split pane's tab order in sync with the sidebar order
-      const split = state.projectSplits.get(moved.projectPath);
+      const split = state.projectSplits.get(projectPath);
       const pane = split ? findPane(split, moved.id) : null;
       if (!split || !pane) return { sessions };
 
@@ -476,7 +480,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       const paneIds = new Set(paneState.sessionIds);
       const sessionIds = sessions.filter((s) => paneIds.has(s.id)).map((s) => s.id);
       const projectSplits = new Map(state.projectSplits);
-      projectSplits.set(moved.projectPath, withUpdatedPane(split, pane, { ...paneState, sessionIds }));
+      projectSplits.set(projectPath, withUpdatedPane(split, pane, { ...paneState, sessionIds }));
       return { sessions, projectSplits };
     }),
 

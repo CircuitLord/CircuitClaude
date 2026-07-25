@@ -6,11 +6,11 @@ import type { DropZone } from "../stores/sessionDragStore";
 import { useEditorStore } from "../stores/editorStore";
 import { useProjectStore } from "../stores/projectStore";
 import { archiveTab, pinTab } from "../lib/sessions";
-import { getSessionDisplayName } from "../lib/sessionTypes";
+import { getTabPrefix } from "../lib/sessionTypes";
 import { formatAge } from "../lib/time";
 import { isRemotePath, remoteHostLabel } from "../lib/remote";
 import { THEMES } from "../lib/themes";
-import type { SplitDirection, PaneState } from "../types";
+import type { SplitDirection, PaneState, Project, TerminalSession, ThemeName } from "../types";
 
 function paneAreaFor(projectPath: string, pane: 1 | 2): HTMLElement | null {
   return document.querySelector<HTMLElement>(
@@ -41,47 +41,85 @@ function computeDropZone(el: HTMLElement, x: number, y: number): DropZone {
   return null;
 }
 
+interface SessionGroup {
+  path: string;
+  name: string;
+  pinned: boolean;
+  theme: ThemeName;
+  sessions: TerminalSession[];
+}
+
+function lastTouched(sessions: TerminalSession[], lastActivity: Map<string, number>): number {
+  let max = 0;
+  for (const s of sessions) max = Math.max(max, lastActivity.get(s.id) ?? s.createdAt);
+  return max;
+}
+
+/** pinned projects always get a section, unpinned ones only while they hold sessions */
+function buildGroups(
+  projects: Project[],
+  sessions: TerminalSession[],
+  lastActivity: Map<string, number>,
+): SessionGroup[] {
+  const toGroup = (p: Project): SessionGroup => ({
+    path: p.path,
+    name: p.name,
+    pinned: p.pinned === true,
+    theme: p.theme,
+    sessions: sessions.filter((s) => s.projectPath === p.path),
+  });
+
+  const pinned = projects.filter((p) => p.pinned).map(toGroup);
+  const transient = projects
+    .filter((p) => !p.pinned && sessions.some((s) => s.projectPath === p.path))
+    .map(toGroup)
+    .sort((a, b) => lastTouched(b.sessions, lastActivity) - lastTouched(a.sessions, lastActivity));
+
+  return [...pinned, ...transient];
+}
+
 export function SidebarSessions() {
   const sessions = useSessionStore((s) => s.sessions);
   const archivedSessions = useSessionStore((s) => s.archivedSessions);
   const restoreSession = useSessionStore((s) => s.restoreSession);
   const activeSessionId = useSessionStore((s) => s.activeSessionId);
+  const activeProjectPath = useSessionStore((s) => s.activeProjectPath);
   const tabStatuses = useSessionStore((s) => s.tabStatuses);
   const sessionTitles = useSessionStore((s) => s.sessionTitles);
   const lastActivity = useSessionStore((s) => s.lastActivity);
   const projectSplits = useSessionStore((s) => s.projectSplits);
   const activateSession = useSessionStore((s) => s.activateSession);
+  const setActiveSession = useSessionStore((s) => s.setActiveSession);
+  const setActiveProject = useSessionStore((s) => s.setActiveProject);
   const projects = useProjectStore((s) => s.projects);
   // subscribe so dirty markers refresh
   const editorFiles = useEditorStore((s) => s.files);
 
   const [archiveOpen, setArchiveOpen] = useState(false);
-  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [drag, setDrag] = useState<{ path: string; index: number } | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
   const dropIndexRef = useRef<number | null>(null);
-  const listRef = useRef<HTMLDivElement>(null);
 
-  // re-render so the "x ago" stamps stay honest
+  // re-render so the archive's "x ago" stamps stay honest
   const [, setTick] = useState(0);
   useEffect(() => {
     const timer = setInterval(() => setTick((n) => n + 1), 30_000);
     return () => clearInterval(timer);
   }, []);
 
-  const handleDragStart = useCallback((e: React.MouseEvent, index: number) => {
+  const handleDragStart = useCallback((e: React.MouseEvent, projectPath: string, index: number, sessionId: string) => {
     if (e.button !== 0) return;
-    if ((e.target as HTMLElement).closest(".sidebar-session-archive")) return;
+    if ((e.target as HTMLElement).closest(".sidebar-session-close")) return;
     e.preventDefault();
     e.stopPropagation();
 
-    const dragged = useSessionStore.getState().sessions[index];
+    const dragged = useSessionStore.getState().sessions.find((s) => s.id === sessionId);
     if (!dragged) return;
-    const projectPath = dragged.projectPath;
 
-    setDragIndex(index);
+    setDrag({ path: projectPath, index });
     document.body.style.cursor = "grabbing";
 
-    const drag = useSessionDragStore.getState();
+    const drop = useSessionDragStore.getState();
     let overTerminal = false;
 
     const onMove = (ev: MouseEvent) => {
@@ -101,12 +139,12 @@ export function SidebarSessions() {
           if (targetPane && targetPane !== draggedPane) {
             if (!overTerminal) {
               overTerminal = true;
-              drag.start(dragged.id, projectPath);
-              setDragIndex(null);
+              drop.start(dragged.id, projectPath);
+              setDrag(null);
               setDropIndex(null);
               dropIndexRef.current = null;
             }
-            drag.setTarget(null, targetPane);
+            drop.setTarget(null, targetPane);
             return;
           }
         } else if (projectSessionCount >= 2) {
@@ -114,12 +152,12 @@ export function SidebarSessions() {
           if (contains(panels, ev.clientX, ev.clientY)) {
             if (!overTerminal) {
               overTerminal = true;
-              drag.start(dragged.id, projectPath);
-              setDragIndex(null);
+              drop.start(dragged.id, projectPath);
+              setDrag(null);
               setDropIndex(null);
               dropIndexRef.current = null;
             }
-            drag.setTarget(computeDropZone(panels!, ev.clientX, ev.clientY), null);
+            drop.setTarget(computeDropZone(panels!, ev.clientX, ev.clientY), null);
             return;
           }
         }
@@ -128,14 +166,16 @@ export function SidebarSessions() {
       if (overTerminal) {
         overTerminal = false;
         useSessionDragStore.getState().end();
-        setDragIndex(index);
+        setDrag({ path: projectPath, index });
       }
 
-      if (!listRef.current) return;
-      const entries = listRef.current.querySelectorAll<HTMLElement>(".sidebar-session");
-      let newDrop = entries.length;
-      for (let i = 0; i < entries.length; i++) {
-        const rect = entries[i].getBoundingClientRect();
+      // reordering is confined to the section it started in — a session can't change project
+      const rows = document.querySelectorAll<HTMLElement>(
+        `.sidebar-project-children[data-project="${CSS.escape(projectPath)}"] .sidebar-session`
+      );
+      let newDrop = rows.length;
+      for (let i = 0; i < rows.length; i++) {
+        const rect = rows[i].getBoundingClientRect();
         if (ev.clientY < rect.top + rect.height / 2) {
           newDrop = i;
           break;
@@ -180,10 +220,10 @@ export function SidebarSessions() {
       } else if (dropIndexRef.current !== null) {
         let target = dropIndexRef.current;
         if (target > index) target--;
-        store.moveSession(index, target);
+        store.moveProjectSession(projectPath, index, target);
       }
 
-      setDragIndex(null);
+      setDrag(null);
       setDropIndex(null);
       dropIndexRef.current = null;
     };
@@ -192,22 +232,15 @@ export function SidebarSessions() {
     window.addEventListener("mouseup", onUp);
   }, []);
 
+  const groups = buildGroups(projects, sessions, lastActivity);
+
   return (
-    <div className="sidebar-list" ref={listRef}>
-      {sessions.length === 0 && <div className="sidebar-sessions-empty">no sessions yet</div>}
-      {sessions.map((s, index) => {
-        const isEditor = s.sessionType === "editor";
-        const isActive = s.id === activeSessionId;
-        const isPreview = s.isPreview === true;
-        const status = isEditor ? null : tabStatuses.get(s.id) ?? null;
-        const editorFile = editorFiles.get(s.id);
-        const dirty = isEditor && !!editorFile && editorFile.content !== editorFile.savedContent;
-        const label = isEditor ? s.fileName ?? "file" : sessionTitles.get(s.id) ?? s.projectName;
-        const project = projects.find((p) => p.path === s.projectPath);
-        const split = projectSplits.get(s.projectPath);
-        const pane = split ? findPane(split, s.id) : null;
-        const kind = isEditor ? "file" : getSessionDisplayName(s.sessionType);
-        const theme = THEMES[project?.theme ?? "midnight"] ?? THEMES.midnight;
+    <div className="sidebar-list">
+      <button className="sidebar-new-chat" title="New chat (Ctrl+T)" onClick={() => setActiveSession(null)}>
+        + new chat
+      </button>
+      {groups.map((group) => {
+        const theme = THEMES[group.theme] ?? THEMES.midnight;
         const style: CSSProperties = {
           "--sidebar-project-accent": theme.css["--accent"],
           "--sidebar-project-accent-text": theme.css["--accent-text"],
@@ -215,75 +248,108 @@ export function SidebarSessions() {
           "--sidebar-project-accent-muted-hover": theme.css["--accent-muted-hover"],
           "--sidebar-project-text-tertiary": theme.css["--text-tertiary"],
         } as CSSProperties;
-
-        let dropClass = "";
-        if (dragIndex !== null && dropIndex !== null && dropIndex !== dragIndex && dropIndex !== dragIndex + 1) {
-          if (dropIndex === index) dropClass = "drop-before";
-          else if (dropIndex === sessions.length && index === sessions.length - 1) dropClass = "drop-after";
-        }
-
-        const classes = [
-          "sidebar-session",
-          isActive && "active",
-          isPreview && "preview",
-          status === "thinking" && "thinking",
-          dragIndex === index && "dragging",
-          dropClass,
-        ].filter(Boolean).join(" ");
+        const isActiveProject = group.path === activeProjectPath;
 
         return (
-          <div
-            key={s.id}
-            className={classes}
-            style={style}
-            role="tab"
-            aria-selected={isActive}
-            tabIndex={0}
-            title={label}
-            onClick={(e) => { e.stopPropagation(); activateSession(s.id); }}
-            onDoubleClick={() => { if (isPreview) pinTab(s.id); }}
-            onMouseDown={(e) => handleDragStart(e, index)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                activateSession(s.id);
-              }
-            }}
-          >
-            <div className="sidebar-session-meta">
-              <span className="sidebar-session-project">
-                {`~/${project?.name ?? s.projectName}${isRemotePath(s.projectPath) ? `@${remoteHostLabel(s.projectPath)}` : ""}`}
-                <span className="sidebar-session-kind"> - {kind}</span>
-              </span>
-              <span className="sidebar-session-age">{formatAge(lastActivity.get(s.id) ?? s.createdAt)}</span>
+          <div className="sidebar-project" key={group.path} style={style}>
+            <div className={`sidebar-project-header${isActiveProject ? " active" : ""}`}>
               <button
-                type="button"
-                className="sidebar-session-archive"
-                aria-label={isEditor ? `Close ${label}` : `Archive ${label}`}
-                onMouseDown={(e) => e.stopPropagation()}
-                onClick={(e) => { e.stopPropagation(); archiveTab(s.id); }}
+                className="sidebar-project-btn"
+                title={group.path}
+                onClick={() => setActiveProject(group.path)}
               >
-                {isEditor ? ":close" : ":archive"}
+                <span className="sidebar-project-prefix">~/</span>
+                <span className="sidebar-project-name">{group.name}</span>
+                {isRemotePath(group.path) && (
+                  <span className="sidebar-project-remote">@{remoteHostLabel(group.path)}</span>
+                )}
+                {group.pinned && <span className="sidebar-project-pinned" title="pinned">[*]</span>}
               </button>
+              {group.sessions.length > 0 && (
+                <span className="sidebar-project-count">[{group.sessions.length}]</span>
+              )}
             </div>
-            <div className="sidebar-session-main">
-              <span className="sidebar-session-name">
-                {Array.from(label).map((ch, i, chars) => (
-                  <span
-                    key={i}
-                    className="shimmer-char"
-                    style={{ animationDelay: `${chars.length > 1 ? (i / (chars.length - 1)) * 4 : 0}s` }}
+
+            <div className="sidebar-project-children" data-project={group.path}>
+              {group.sessions.map((s, index) => {
+                const isEditor = s.sessionType === "editor";
+                const isActive = s.id === activeSessionId;
+                const isPreview = s.isPreview === true;
+                const status = isEditor ? null : tabStatuses.get(s.id) ?? null;
+                const editorFile = editorFiles.get(s.id);
+                const dirty = isEditor && !!editorFile && editorFile.content !== editorFile.savedContent;
+                const label = isEditor ? s.fileName ?? "file" : sessionTitles.get(s.id) ?? s.projectName;
+                const split = projectSplits.get(s.projectPath);
+                const pane = split ? findPane(split, s.id) : null;
+                const dragging = drag?.path === group.path && drag.index === index;
+
+                let dropClass = "";
+                if (drag?.path === group.path && dropIndex !== null && dropIndex !== drag.index && dropIndex !== drag.index + 1) {
+                  if (dropIndex === index) dropClass = "drop-before";
+                  else if (dropIndex === group.sessions.length && index === group.sessions.length - 1) dropClass = "drop-after";
+                }
+
+                const classes = [
+                  "sidebar-session",
+                  isActive && "active",
+                  isPreview && "preview",
+                  status === "thinking" && "thinking",
+                  dragging && "dragging",
+                  dropClass,
+                ].filter(Boolean).join(" ");
+
+                return (
+                  <div
+                    key={s.id}
+                    className={classes}
+                    role="tab"
+                    aria-selected={isActive}
+                    tabIndex={0}
+                    title={label}
+                    onClick={(e) => { e.stopPropagation(); activateSession(s.id); }}
+                    onDoubleClick={() => { if (isPreview) pinTab(s.id); }}
+                    onMouseDown={(e) => handleDragStart(e, group.path, index, s.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        activateSession(s.id);
+                      }
+                    }}
                   >
-                    {ch}
-                  </span>
-                ))}
-              </span>
-              {dirty ? (
-                <span className="sidebar-session-status dirty">unsaved</span>
-              ) : status === "waiting" ? (
-                <span className="sidebar-session-status waiting">waiting</span>
-              ) : null}
-              {pane && <span className="sidebar-session-pane">[{pane}]</span>}
+                    <span className="sidebar-session-prefix">{getTabPrefix(s.sessionType)}</span>
+                    <span className="sidebar-session-name">
+                      {Array.from(label).map((ch, i, chars) => (
+                        <span
+                          key={i}
+                          className="shimmer-char"
+                          style={{ animationDelay: `${chars.length > 1 ? (i / (chars.length - 1)) * 4 : 0}s` }}
+                        >
+                          {ch}
+                        </span>
+                      ))}
+                    </span>
+                    <span className="sidebar-session-trailing">
+                      {pane && <span className="sidebar-session-pane">[{pane}]</span>}
+                      {dirty ? (
+                        <span className="sidebar-session-status dirty">*</span>
+                      ) : status === "thinking" ? (
+                        <span className="sidebar-session-status thinking">*</span>
+                      ) : status === "waiting" ? (
+                        <span className="sidebar-session-status waiting">?</span>
+                      ) : null}
+                      <button
+                        type="button"
+                        className="sidebar-session-close"
+                        aria-label={isEditor ? `Close ${label}` : `Archive ${label}`}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={(e) => { e.stopPropagation(); archiveTab(s.id); }}
+                      >
+                        x
+                      </button>
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         );

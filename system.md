@@ -33,21 +33,60 @@ Each navigable item is a flat row (36px tall), laid out as a single monospace li
 - Background: `var(--bg-elevated)`, text promoted to `--text-primary`
 - No border, no radius
 
-## Session Entry Pattern (two-line rows)
+## Sidebar Header
 
-Sidebar sessions are richer than a single-line entry, so they get their own rules. The row is a block, not a card: no radius, no border, but inset from the panel edge so the fill reads as a discrete unit.
+`~/sessions` on the left, actions on the right: `:edit` (text button, only with projects) and `+ add` (accent pill). Edit mode swaps the label to `~/projects` and the actions to a single `:done`.
+
+## New Chat Button
+
+`+ new chat` sits at the top of the session list, above every project section, as an accent pill button inset 12px to match the divider. It is an action, not a list entry, so it carries no selected state — nothing in the sidebar lights up for the new-chat page. Project headers never take a fill either; only session rows do.
+
+## Project Sections
+
+The sidebar groups sessions under the project they belong to. A section exists if the project is pinned or currently holds sessions, so one-offs disappear when their last session closes.
 
 ```
-~/project - kind                    4h
-session title text here        waiting
+~/ProjectName                    [2]
+ │ > session title text here      *
+ │ > another session title
 ```
 
-- **Block**: `margin: 0 6px 8px`, `padding: 12px`, 8px gap between the two lines
-- **Meta line** (line 1): 11px, 15px line-height, project path tinted with the project accent at `opacity: 0.45`, rising to `0.9` on hover/active. Age stamp right-aligned at `opacity: 0.6`, swapped for the `:archive` button on hover
-- **Title line** (line 2): 14px, 22px line-height, `--text-primary` at `opacity: 0.82`, rising to `1` on hover/active. This is the one place a label goes above 13px, since the title is the row's subject and needs to outweigh the 11px meta
-- Titles stay bright on every row. Selection is carried by the surface, not by promoting text brightness, so the list reads as content first and state second
-- **Active**: filled with the project's own `--accent-muted` (passed down as `--sidebar-project-accent-muted`), plus the standard glow underline in the project accent, inset `0` so it spans the full block width
-- Per-project colors come from `THEMES[project.theme].css`, forwarded as `--sidebar-project-*` inline vars
+- **Header**: 38px tall, `padding: 0 12px`, 13px `--text-primary` with a fixed 18px `~/` prefix column in `--text-tertiary`. Hover fills with `--bg-elevated`. While it is the active project, prefix and name take the project's `--accent-text`. Clicking it makes the project active and lands on the new-session launcher. The name button is `align-self: stretch` so the full row height is the click target
+- **Pinned marker `[*]`**: 11px, directly after the name, `--text-tertiary` (project `--accent-text` when active). Same glyph the launcher and edit mode use for the pin toggle, so `[*]` means pinned everywhere. Unpinned sections show nothing
+- **Count `[N]`**: 11px, far right, same colors as the marker, hidden when the section is empty
+- **Guide line**: 1px `--border-subtle` vertical rule from the children container's `::before`, `left: 16px`, which lands between the header's `~/` prefix and the rows' 26px text indent. That line is what marks the rows as children, so they carry no project label of their own
+- Pinned sections come first in project order and never move; unpinned ones follow, most recently active first
+- An empty pinned section is just its header — no placeholder row. Clicking the header is how you start a session there
+- Pinning is toggled in edit mode (or the launcher's project picker), not from the section itself
+
+## Edit Mode
+
+`:edit` replaces the session list with the full project list — the one place projects are managed.
+
+```
+≡ ProjectName            [*] # x
+```
+
+- **Row**: 34px flat row, `padding: 0 12px`, 18px `≡` drag handle column (`cursor: grab`) that reorders projects and therefore the order of pinned sections
+- **Pin `[*]`/`[ ]`**: filled when pinned and colored `--accent-text`, empty brackets when not
+- **Theme `#`**: colored with the project's accent, opens a compact dropdown of `> # label` options
+- **Remove `x`**: `--git-deleted` on hover, then swaps the row for an inline `remove? y/n` confirm that also takes y/n/Escape from the keyboard
+- Drop indicators reuse the standard 1px accent line with glow, inset 12px
+- Per-project colors come from `THEMES[project.theme].css`, forwarded as `--sidebar-project-*` inline vars on the section wrapper so both the header and its rows inherit them
+
+## Session Entry Pattern
+
+Session rows follow the standard flat-row entry, one monospace line each, nested under their project section.
+
+```
+> session title text here     [1] *
+```
+
+- **Row**: 34px tall, `padding: 0 8px 0 26px` so the text clears the guide line, no radius or border
+- **Prefix**: the session type's own glyph (`>` claude, `c>` codex, `>_` terminal, `#` file) in `--text-tertiary` at `opacity: 0.6`, promoted to the project `--accent-text` at full opacity when active
+- **Name**: flex:1, truncated, `--text-secondary` rising to `--text-primary` on hover/active. Preview (single-click file) tabs are italic
+- **Trailing**: pane marker `[1]`/`[2]`, then one status glyph — `*` dirty (`--text-secondary`), `*` thinking (`tui-color-cycle`), `?` waiting (blinking amber). The status is swapped for the `x` close button on hover
+- **Active**: filled with the project's own `--accent-muted` (passed down as `--sidebar-project-accent-muted`), no underline — the section header above owns the path context, so the fill alone carries selection
 
 ## Action Buttons
 

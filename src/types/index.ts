@@ -29,6 +29,8 @@ export interface Project {
   name: string;
   path: string;
   theme: ThemeName;
+  /** pinned projects keep a sidebar section even with no live sessions */
+  pinned?: boolean;
 }
 
 /** Connection details for an ssh host, entered in the add-project dialog. */
