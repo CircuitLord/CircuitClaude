@@ -2962,84 +2962,139 @@ body,
    Add Project Dialog — TUI Style
    ======================================================================== */
 
+.add-project-overlay {
+  align-items: flex-start;
+  padding-top: 72px;
+  backdrop-filter: blur(3px);
+}
+
 .add-project-dialog {
+  position: relative;
   background: var(--bg-surface);
   border: 1px solid var(--border-visible);
   border-radius: 2px;
-  width: 520px;
+  width: 680px;
   max-width: calc(100vw - 32px);
   font-family: var(--font-mono);
+  overflow: hidden;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+}
+
+.add-project-dialog::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 12px;
+  right: 12px;
+  height: 1px;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
+}
+
+.add-project-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 36px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.add-project-title {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-tertiary);
 }
 
 .add-project-body {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 12px;
+  padding: 4px 0 8px;
 }
 
 .add-project-row {
   display: flex;
-  gap: 10px;
-}
-
-.add-project-field {
-  display: flex;
   align-items: center;
   gap: 8px;
-  flex: 1;
-  min-width: 0;
+  min-height: 34px;
+  padding: 0 12px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  cursor: text;
+  transition: background 0.1s;
 }
 
-.add-project-field--narrow {
-  flex: 0 0 150px;
+.add-project-row--button {
+  width: 100%;
+  background: none;
+  border: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
-.add-project-field--tiny {
-  flex: 0 0 90px;
+.add-project-row--static {
+  cursor: default;
+}
+
+.add-project-row--button:hover {
+  background: var(--bg-elevated);
+}
+
+.add-project-marker {
+  flex-shrink: 0;
+  width: 14px;
+  text-align: center;
+  color: var(--text-tertiary);
+  opacity: 0.5;
+  transition: color 0.1s, opacity 0.1s;
+}
+
+.add-project-row:focus-within .add-project-marker,
+.add-project-row--button:hover .add-project-marker {
+  color: var(--accent-text);
+  opacity: 1;
 }
 
 .add-project-label {
   flex-shrink: 0;
-  width: 40px;
-  font-size: 13px;
+  width: 56px;
   color: var(--text-tertiary);
 }
 
 .add-project-input {
   flex: 1;
   min-width: 0;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-subtle);
-  border-radius: 2px;
+  align-self: stretch;
+  background: transparent;
+  border: none;
   color: var(--text-primary);
   font-size: 13px;
   font-family: var(--font-mono);
-  padding: 4px 8px;
+  padding: 0;
   outline: none;
-}
-
-.add-project-input:focus {
-  border-color: var(--accent);
+  caret-color: var(--accent-text);
 }
 
 .add-project-input::placeholder {
   color: var(--text-tertiary);
+  opacity: 0.6;
 }
 
 .add-project-value {
   flex: 1;
   min-width: 0;
-  font-size: 13px;
-  color: var(--text-secondary);
+  color: var(--text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  text-align: left;
 }
 
-.add-project-text-btn,
-.add-project-connect {
+.add-project-value--empty {
+  color: var(--text-tertiary);
+}
+
+.add-project-action {
   flex-shrink: 0;
   background: transparent;
   border: none;
@@ -3051,27 +3106,17 @@ body,
   transition: color 0.1s;
 }
 
-.add-project-text-btn:hover,
-.add-project-connect:hover:not(:disabled) {
+.add-project-action:hover:not(:disabled) {
   color: var(--accent-text);
 }
 
-.add-project-connect:disabled {
-  color: var(--text-tertiary);
+.add-project-action:disabled {
   cursor: default;
-}
-
-.add-project-actions-inline {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
 }
 
 .add-project-cwd {
   flex: 1;
   min-width: 0;
-  font-size: 12px;
   color: var(--text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3087,6 +3132,7 @@ body,
   flex-direction: column;
   max-height: 200px;
   overflow-y: auto;
+  margin: 4px 0;
   border-top: 1px solid var(--border-subtle);
   border-bottom: 1px solid var(--border-subtle);
 }
@@ -3107,8 +3153,9 @@ body,
 .add-project-dir {
   display: flex;
   align-items: center;
-  height: 24px;
-  padding: 0 6px;
+  gap: 8px;
+  height: 26px;
+  padding: 0 12px;
   background: none;
   border: none;
   color: var(--text-secondary);
@@ -3130,25 +3177,34 @@ body,
   color: var(--text-tertiary);
 }
 
+.add-project-dir:hover .add-project-dir-marker {
+  color: var(--accent-text);
+}
+
 .add-project-empty {
-  padding: 4px 6px;
+  padding: 4px 12px;
   font-size: 13px;
   color: var(--text-tertiary);
 }
 
 .add-project-error {
   font-size: 12px;
+  font-family: var(--font-mono);
   color: var(--git-deleted);
   background: rgba(248, 81, 73, 0.08);
-  padding: 4px 6px;
+  margin: 4px 12px;
+  padding: 4px 8px;
   border-radius: 2px;
   white-space: pre-wrap;
 }
 
-.add-project-actions {
+.add-project-footer {
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  gap: 12px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border-subtle);
 }
 
 .add-project-hint {
@@ -4654,6 +4710,20 @@ body,
   color: var(--text-tertiary);
   font-size: 13px;
   min-width: 0;
+}
+
+.action-menu-add {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.action-menu-add-label {
+  color: var(--text-tertiary);
+}
+
+.action-menu-add:hover .action-menu-add-label,
+.action-menu-add.action-menu-item--active .action-menu-add-label {
+  color: var(--text-primary);
 }
 
 .action-menu-footer {

@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useActionMenuStore, type ActionId } from "../stores/actionMenuStore";
 import { useProjectStore } from "../stores/projectStore";
+import { AddProjectDialog } from "./AddProjectDialog";
 import { spawnNewSession } from "../lib/sessions";
 import { getProjectSessionTypes } from "../lib/sessionTypes";
 import { fuzzyMatch } from "../lib/fuzzy";
@@ -37,14 +38,16 @@ function ActionMenuPanel({ initialAction, close }: { initialAction: ActionId | n
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [project, setProject] = useState<Project | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const activeItemRef = useRef<HTMLDivElement>(null);
 
   const searchQuery = query.trim();
 
+  // focus on mount and again when returning from the add-project dialog
   useEffect(() => {
-    requestAnimationFrame(() => inputRef.current?.focus());
-  }, []);
+    if (!addOpen) requestAnimationFrame(() => inputRef.current?.focus());
+  }, [addOpen]);
 
   useEffect(() => {
     activeItemRef.current?.scrollIntoView({ block: "nearest" });
@@ -97,10 +100,14 @@ function ActionMenuPanel({ initialAction, close }: { initialAction: ActionId | n
     }));
   }, [step, searchQuery, projects, project, enterProjectStep, selectProject, launchSession]);
 
+  // in the project step the pinned add row sits one index past the results
+  const addRowIndex = step === "project" ? results.length : -1;
+  const maxIndex = step === "project" ? results.length : Math.max(0, results.length - 1);
+
   // clamp selection when results change
   useEffect(() => {
-    setSelectedIndex((prev) => Math.min(prev, Math.max(0, results.length - 1)));
-  }, [results.length]);
+    setSelectedIndex((prev) => Math.min(prev, maxIndex));
+  }, [maxIndex]);
 
   const goBack = useCallback(() => {
     if (step === "tool") {
@@ -126,7 +133,7 @@ function ActionMenuPanel({ initialAction, close }: { initialAction: ActionId | n
       }
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        setSelectedIndex((i) => Math.min(i + 1, results.length - 1));
+        setSelectedIndex((i) => Math.min(i + 1, maxIndex));
         return;
       }
       if (e.key === "ArrowUp") {
@@ -136,15 +143,33 @@ function ActionMenuPanel({ initialAction, close }: { initialAction: ActionId | n
       }
       if (e.key === "Enter") {
         e.preventDefault();
-        results[selectedIndex]?.execute();
+        if (selectedIndex === addRowIndex) {
+          setAddOpen(true);
+        } else {
+          results[selectedIndex]?.execute();
+        }
         return;
       }
     },
-    [results, selectedIndex, close, query, step, goBack],
+    [results, selectedIndex, close, query, step, goBack, maxIndex, addRowIndex],
   );
 
   const placeholder =
     step === "action" ? "select action..." : step === "project" ? "select project..." : "select tool...";
+
+  // the dialog replaces the menu while open so it owns focus and escape, menu state survives underneath
+  if (addOpen) {
+    return (
+      <AddProjectDialog
+        isOpen
+        onClose={() => setAddOpen(false)}
+        onAdded={(p) => {
+          setAddOpen(false);
+          selectProject(p);
+        }}
+      />
+    );
+  }
 
   return (
     <div
@@ -195,6 +220,20 @@ function ActionMenuPanel({ initialAction, close }: { initialAction: ActionId | n
             </div>
           ))}
         </div>
+
+        {step === "project" && (
+          <div
+            className={`action-menu-item action-menu-add${selectedIndex === addRowIndex ? " action-menu-item--active" : ""}`}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              setAddOpen(true);
+            }}
+            onMouseEnter={() => setSelectedIndex(addRowIndex)}
+          >
+            <span className="action-menu-item-marker">{selectedIndex === addRowIndex ? ">" : "+"}</span>
+            <span className="action-menu-add-label">add project</span>
+          </div>
+        )}
 
         <div className="action-menu-footer">
           <span className="action-menu-hint">enter select</span>

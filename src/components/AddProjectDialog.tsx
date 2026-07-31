@@ -12,16 +12,17 @@ import {
   remoteUrl,
   type RemoteListing,
 } from "../lib/remote";
-import type { RemoteSpec } from "../types";
+import type { Project, RemoteSpec } from "../types";
 
 type Mode = "local" | "remote";
 
 interface AddProjectDialogProps {
   isOpen: boolean;
   onClose: () => void;
+  onAdded?: (project: Project) => void;
 }
 
-export function AddProjectDialog({ isOpen, onClose }: AddProjectDialogProps) {
+export function AddProjectDialog({ isOpen, onClose, onAdded }: AddProjectDialogProps) {
   const addProject = useProjectStore((s) => s.addProject);
 
   const [mode, setMode] = useState<Mode>("local");
@@ -126,27 +127,22 @@ export function AddProjectDialog({ isOpen, onClose }: AddProjectDialogProps) {
     if (!canAdd) return;
     const theme = getNextProjectTheme(useProjectStore.getState().projects);
     try {
-      if (mode === "remote") {
-        await rememberRemote(spec);
-        await addProject({ name: name.trim(), path: remoteUrl(spec, targetPath), theme });
-      } else {
-        await addProject({ name: name.trim(), path: targetPath, theme });
-      }
+      const path = mode === "remote" ? remoteUrl(spec, targetPath) : targetPath;
+      if (mode === "remote") await rememberRemote(spec);
+      const project: Project = { name: name.trim(), path, theme };
+      await addProject(project);
       onClose();
+      onAdded?.(project);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
   }
 
   return (
-    <div className="dialog-overlay" onMouseDown={onClose}>
+    <div className="dialog-overlay add-project-overlay" onMouseDown={onClose}>
       <div className="add-project-dialog" onMouseDown={(e) => e.stopPropagation()}>
-        <div className="settings-dialog-header">
-          <span className="settings-dialog-header-title">add project</span>
-          <button className="settings-dialog-close" onClick={onClose}>:esc</button>
-        </div>
-
-        <div className="add-project-body">
+        <div className="add-project-header">
+          <span className="add-project-title">~/add-project</span>
           <SegmentedControl<Mode>
             value={mode}
             options={[
@@ -155,55 +151,60 @@ export function AddProjectDialog({ isOpen, onClose }: AddProjectDialogProps) {
             ]}
             onChange={(next) => { setMode(next); setError(null); }}
           />
+          <button className="settings-dialog-close" onClick={onClose}>:esc</button>
+        </div>
 
+        <div className="add-project-body">
           {mode === "local" ? (
-            <div className="add-project-field">
+            <button className="add-project-row add-project-row--button" onClick={pickLocalFolder}>
+              <span className="add-project-marker">&gt;</span>
               <span className="add-project-label">folder</span>
-              <span className="add-project-value" title={localPath}>
+              <span className={`add-project-value${localPath ? "" : " add-project-value--empty"}`} title={localPath}>
                 {localPath || "none selected"}
               </span>
-              <button className="add-project-text-btn" onClick={pickLocalFolder}>:browse</button>
-            </div>
+              <span className="add-project-action">:browse</span>
+            </button>
           ) : (
             <>
-              <div className="add-project-row">
-                <label className="add-project-field">
-                  <span className="add-project-label">host</span>
-                  <input
-                    ref={hostRef}
-                    className="add-project-input"
-                    value={host}
-                    placeholder="10.0.0.5 or box.local"
-                    spellCheck={false}
-                    onChange={(e) => setHost(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") browse(); }}
-                  />
-                </label>
-                <label className="add-project-field add-project-field--narrow">
-                  <span className="add-project-label">user</span>
-                  <input
-                    className="add-project-input"
-                    value={user}
-                    placeholder="ssh config"
-                    spellCheck={false}
-                    onChange={(e) => setUser(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") browse(); }}
-                  />
-                </label>
-                <label className="add-project-field add-project-field--tiny">
-                  <span className="add-project-label">port</span>
-                  <input
-                    className="add-project-input"
-                    value={port}
-                    placeholder="22"
-                    spellCheck={false}
-                    onChange={(e) => setPort(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") browse(); }}
-                  />
-                </label>
-              </div>
-
-              <div className="add-project-field">
+              <label className="add-project-row">
+                <span className="add-project-marker">&gt;</span>
+                <span className="add-project-label">host</span>
+                <input
+                  ref={hostRef}
+                  className="add-project-input"
+                  value={host}
+                  placeholder="10.0.0.5 or box.local"
+                  spellCheck={false}
+                  onChange={(e) => setHost(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") browse(); }}
+                />
+              </label>
+              <label className="add-project-row">
+                <span className="add-project-marker">&gt;</span>
+                <span className="add-project-label">user</span>
+                <input
+                  className="add-project-input"
+                  value={user}
+                  placeholder="defaults to ssh config"
+                  spellCheck={false}
+                  onChange={(e) => setUser(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") browse(); }}
+                />
+              </label>
+              <label className="add-project-row">
+                <span className="add-project-marker">&gt;</span>
+                <span className="add-project-label">port</span>
+                <input
+                  className="add-project-input"
+                  value={port}
+                  placeholder="22"
+                  spellCheck={false}
+                  onChange={(e) => setPort(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") browse(); }}
+                />
+              </label>
+              <label className="add-project-row">
+                <span className="add-project-marker">&gt;</span>
                 <span className="add-project-label">key</span>
                 <input
                   className="add-project-input"
@@ -212,11 +213,17 @@ export function AddProjectDialog({ isOpen, onClose }: AddProjectDialogProps) {
                   spellCheck={false}
                   onChange={(e) => setKeyPath(e.target.value)}
                 />
-                <button className="add-project-text-btn" onClick={pickKeyFile}>:browse</button>
-              </div>
+                <button
+                  className="add-project-action"
+                  onClick={(e) => { e.preventDefault(); pickKeyFile(); }}
+                >
+                  :browse
+                </button>
+              </label>
 
-              <div className="add-project-actions-inline">
-                <button className="add-project-connect" disabled={busy} onClick={() => browse()}>
+              <div className="add-project-row add-project-row--static">
+                <span className="add-project-marker">{" "}</span>
+                <button className="add-project-action" disabled={busy} onClick={() => browse()}>
                   {busy ? ":connecting..." : listing ? ":reconnect" : ":connect"}
                 </button>
                 {listing && (
@@ -255,7 +262,8 @@ export function AddProjectDialog({ isOpen, onClose }: AddProjectDialogProps) {
             </>
           )}
 
-          <label className="add-project-field">
+          <label className="add-project-row">
+            <span className="add-project-marker">&gt;</span>
             <span className="add-project-label">name</span>
             <input
               className="add-project-input"
@@ -268,13 +276,13 @@ export function AddProjectDialog({ isOpen, onClose }: AddProjectDialogProps) {
           </label>
 
           {error && <div className="add-project-error">{error}</div>}
+        </div>
 
-          <div className="add-project-actions">
-            {blockedReason && <span className="add-project-hint">{blockedReason}</span>}
-            <button className="add-project-submit" disabled={!canAdd} onClick={handleAdd}>
-              + add{mode === "remote" ? " remote" : ""} project
-            </button>
-          </div>
+        <div className="add-project-footer">
+          {blockedReason && <span className="add-project-hint">{blockedReason}</span>}
+          <button className="add-project-submit" disabled={!canAdd} onClick={handleAdd}>
+            + add{mode === "remote" ? " remote" : ""} project
+          </button>
         </div>
       </div>
     </div>
