@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useProjectStore } from "../stores/projectStore";
 import { SidebarSessions } from "./SidebarSessions";
 import { SidebarProjects } from "./SidebarProjects";
+import { SidebarArchive } from "./SidebarArchive";
 import { SettingsDialog } from "./SettingsDialog";
 import { AddProjectDialog } from "./AddProjectDialog";
 import { readClaudeMd } from "../lib/config";
@@ -28,7 +29,7 @@ export function Sidebar() {
     <div className="sidebar">
       <div className="sidebar-header" data-tauri-drag-region>
         <span className="sidebar-header-label" data-tauri-drag-region>
-          {editMode ? "~/projects" : "~/sessions"}
+          ~/projects
         </span>
         <div className="sidebar-header-actions">
           {editMode ? (
@@ -42,8 +43,8 @@ export function Sidebar() {
                   :edit
                 </button>
               )}
-              <button className="sidebar-header-btn" onClick={() => setAddOpen(true)} title="Add project">
-                + add
+              <button className="sidebar-header-text-btn" onClick={() => setAddOpen(true)} title="Add project">
+                :add
               </button>
             </>
           )}
@@ -51,6 +52,7 @@ export function Sidebar() {
       </div>
       <div className="sidebar-divider" />
       {editMode ? <SidebarProjects /> : <SidebarSessions />}
+      {!editMode && <SidebarArchive />}
       <div className="sidebar-footer">
         <button className="sidebar-footer-btn" onClick={() => readClaudeMd().then((r) => openFileTab(r.path, "CLAUDE.md", false))}>
           :claude.md

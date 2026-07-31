@@ -6,7 +6,7 @@ import { voiceInputController, type VoiceInputState } from "../lib/voiceInput";
 import { whisperDownloadModel, whisperGetModelStatus, type DownloadProgress } from "../lib/whisper";
 import { useVoiceStore } from "../stores/voiceStore";
 import { useSettingsStore } from "../stores/settingsStore";
-import { useCommandPaletteStore } from "../stores/commandPaletteStore";
+import { useActionMenuStore } from "../stores/actionMenuStore";
 import { Channel } from "@tauri-apps/api/core";
 
 function isCtrlSpaceHotkey(e: KeyboardEvent): boolean {
@@ -179,14 +179,14 @@ export function useHotkeys() {
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      // Ctrl+P / Ctrl+Shift+P — command palette (works even over dialogs/inputs)
+      // Ctrl+P — action menu (works even over dialogs/inputs)
       if (e.ctrlKey && !e.altKey && !e.metaKey && e.key.toLowerCase() === "p") {
         e.preventDefault();
-        const palette = useCommandPaletteStore.getState();
-        if (palette.isOpen) {
-          palette.close();
+        const menu = useActionMenuStore.getState();
+        if (menu.isOpen) {
+          menu.close();
         } else {
-          palette.open(e.shiftKey ? "commands" : "files");
+          menu.open();
         }
         return;
       }
@@ -302,13 +302,13 @@ export function useHotkeys() {
         return;
       }
 
-      // Ctrl+T / Ctrl+Shift+T — new chat launcher / new default session (before input guards so they work from editor/inputs)
+      // Ctrl+T / Ctrl+Shift+T — new chat menu / new default session (before input guards so they work from editor/inputs)
       if (e.ctrlKey && !e.altKey && e.key.toLowerCase() === "t") {
         e.preventDefault();
         if (e.shiftKey) {
           spawnNewSession(useSettingsStore.getState().settings.defaultSessionType);
         } else {
-          setActiveSession(null);
+          useActionMenuStore.getState().open("new-chat");
         }
         return;
       }

@@ -1,13 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { useSessionStore, findPane } from "../stores/sessionStore";
 import { useSessionDragStore } from "../stores/sessionDragStore";
 import type { DropZone } from "../stores/sessionDragStore";
 import { useEditorStore } from "../stores/editorStore";
 import { useProjectStore } from "../stores/projectStore";
+import { useActionMenuStore } from "../stores/actionMenuStore";
 import { archiveTab, pinTab } from "../lib/sessions";
 import { getTabPrefix } from "../lib/sessionTypes";
-import { formatAge } from "../lib/time";
 import { isRemotePath, remoteHostLabel } from "../lib/remote";
 import { THEMES } from "../lib/themes";
 import type { SplitDirection, PaneState, Project, TerminalSession, ThemeName } from "../types";
@@ -49,18 +49,44 @@ interface SessionGroup {
   sessions: TerminalSession[];
 }
 
-function lastTouched(sessions: TerminalSession[], lastActivity: Map<string, number>): number {
-  let max = 0;
-  for (const s of sessions) max = Math.max(max, lastActivity.get(s.id) ?? s.createdAt);
-  return max;
+function ShimmerTitle({ label }: { label: string }) {
+  const titleRef = useRef<HTMLSpanElement>(null);
+  const charWidthRef = useRef(0);
+  const [capacity, setCapacity] = useState<number | null>(null);
+  const chars = Array.from(label);
+  const visibleChars = capacity !== null && chars.length > capacity
+    ? [...chars.slice(0, Math.max(0, capacity - 1)), ...Array(Math.min(1, capacity)).fill("…")]
+    : chars;
+
+  useLayoutEffect(() => {
+    const title = titleRef.current!;
+    const measure = () => {
+      charWidthRef.current ||= title.firstElementChild!.getBoundingClientRect().width;
+      setCapacity(Math.max(0, Math.floor(title.clientWidth / charWidthRef.current)));
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(title);
+    measure();
+    return () => observer.disconnect();
+  }, [label]);
+
+  return (
+    <span ref={titleRef} className="sidebar-session-name">
+      {visibleChars.map((ch, i) => (
+        <span
+          key={i}
+          className="shimmer-char"
+          style={{ animationDelay: `${visibleChars.length > 1 ? (i / (visibleChars.length - 1)) * 4 : 0}s` }}
+        >
+          {ch}
+        </span>
+      ))}
+    </span>
+  );
 }
 
-/** pinned projects always get a section, unpinned ones only while they hold sessions */
-function buildGroups(
-  projects: Project[],
-  sessions: TerminalSession[],
-  lastActivity: Map<string, number>,
-): SessionGroup[] {
+/** pinned projects always get a section, unpinned ones only while they hold sessions. both keep the user's project order */
+function buildGroups(projects: Project[], sessions: TerminalSession[]): SessionGroup[] {
   const toGroup = (p: Project): SessionGroup => ({
     path: p.path,
     name: p.name,
@@ -72,40 +98,27 @@ function buildGroups(
   const pinned = projects.filter((p) => p.pinned).map(toGroup);
   const transient = projects
     .filter((p) => !p.pinned && sessions.some((s) => s.projectPath === p.path))
-    .map(toGroup)
-    .sort((a, b) => lastTouched(b.sessions, lastActivity) - lastTouched(a.sessions, lastActivity));
+    .map(toGroup);
 
   return [...pinned, ...transient];
 }
 
 export function SidebarSessions() {
   const sessions = useSessionStore((s) => s.sessions);
-  const archivedSessions = useSessionStore((s) => s.archivedSessions);
-  const restoreSession = useSessionStore((s) => s.restoreSession);
   const activeSessionId = useSessionStore((s) => s.activeSessionId);
   const activeProjectPath = useSessionStore((s) => s.activeProjectPath);
   const tabStatuses = useSessionStore((s) => s.tabStatuses);
   const sessionTitles = useSessionStore((s) => s.sessionTitles);
-  const lastActivity = useSessionStore((s) => s.lastActivity);
   const projectSplits = useSessionStore((s) => s.projectSplits);
   const activateSession = useSessionStore((s) => s.activateSession);
-  const setActiveSession = useSessionStore((s) => s.setActiveSession);
   const setActiveProject = useSessionStore((s) => s.setActiveProject);
   const projects = useProjectStore((s) => s.projects);
   // subscribe so dirty markers refresh
   const editorFiles = useEditorStore((s) => s.files);
 
-  const [archiveOpen, setArchiveOpen] = useState(false);
   const [drag, setDrag] = useState<{ path: string; index: number } | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
   const dropIndexRef = useRef<number | null>(null);
-
-  // re-render so the archive's "x ago" stamps stay honest
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const timer = setInterval(() => setTick((n) => n + 1), 30_000);
-    return () => clearInterval(timer);
-  }, []);
 
   const handleDragStart = useCallback((e: React.MouseEvent, projectPath: string, index: number, sessionId: string) => {
     if (e.button !== 0) return;
@@ -232,12 +245,17 @@ export function SidebarSessions() {
     window.addEventListener("mouseup", onUp);
   }, []);
 
-  const groups = buildGroups(projects, sessions, lastActivity);
+  const groups = buildGroups(projects, sessions);
 
   return (
     <div className="sidebar-list">
-      <button className="sidebar-new-chat" title="New chat (Ctrl+T)" onClick={() => setActiveSession(null)}>
-        + new chat
+      <button
+        className={`sidebar-new-chat${activeProjectPath === null ? " selected" : ""}`}
+        title="New chat (Ctrl+T)"
+        onClick={() => useActionMenuStore.getState().open("new-chat")}
+      >
+        <span className="sidebar-new-chat-prefix">+</span>
+        <span>new chat</span>
       </button>
       {groups.map((group) => {
         const theme = THEMES[group.theme] ?? THEMES.midnight;
@@ -249,10 +267,14 @@ export function SidebarSessions() {
           "--sidebar-project-text-tertiary": theme.css["--text-tertiary"],
         } as CSSProperties;
         const isActiveProject = group.path === activeProjectPath;
+        // the launcher is showing for this project, so the header itself is the selected row
+        const isSelected = isActiveProject && activeSessionId === null;
+        const headerClasses = ["sidebar-project-header", isActiveProject && "active", isSelected && "selected"]
+          .filter(Boolean).join(" ");
 
         return (
           <div className="sidebar-project" key={group.path} style={style}>
-            <div className={`sidebar-project-header${isActiveProject ? " active" : ""}`}>
+            <div className={headerClasses}>
               <button
                 className="sidebar-project-btn"
                 title={group.path}
@@ -264,10 +286,10 @@ export function SidebarSessions() {
                   <span className="sidebar-project-remote">@{remoteHostLabel(group.path)}</span>
                 )}
                 {group.pinned && <span className="sidebar-project-pinned" title="pinned">[*]</span>}
+                {group.sessions.length > 0 && (
+                  <span className="sidebar-project-count">[{group.sessions.length}]</span>
+                )}
               </button>
-              {group.sessions.length > 0 && (
-                <span className="sidebar-project-count">[{group.sessions.length}]</span>
-              )}
             </div>
 
             <div className="sidebar-project-children" data-project={group.path}>
@@ -304,6 +326,7 @@ export function SidebarSessions() {
                     className={classes}
                     role="tab"
                     aria-selected={isActive}
+                    aria-label={label}
                     tabIndex={0}
                     title={label}
                     onClick={(e) => { e.stopPropagation(); activateSession(s.id); }}
@@ -317,17 +340,7 @@ export function SidebarSessions() {
                     }}
                   >
                     <span className="sidebar-session-prefix">{getTabPrefix(s.sessionType)}</span>
-                    <span className="sidebar-session-name">
-                      {Array.from(label).map((ch, i, chars) => (
-                        <span
-                          key={i}
-                          className="shimmer-char"
-                          style={{ animationDelay: `${chars.length > 1 ? (i / (chars.length - 1)) * 4 : 0}s` }}
-                        >
-                          {ch}
-                        </span>
-                      ))}
-                    </span>
+                    <ShimmerTitle label={label} />
                     <span className="sidebar-session-trailing">
                       {pane && <span className="sidebar-session-pane">[{pane}]</span>}
                       {dirty ? (
@@ -355,39 +368,6 @@ export function SidebarSessions() {
         );
       })}
 
-      {archivedSessions.length > 0 && (
-        <>
-          <div className="sidebar-divider" />
-          <button className="sidebar-archive-header" onClick={() => setArchiveOpen((v) => !v)}>
-            <span className="sidebar-archive-caret">{archiveOpen ? "v" : ">"}</span>
-            <span className="sidebar-archive-label">~/archive</span>
-            <span className="sidebar-archive-count">[{archivedSessions.length}]</span>
-          </button>
-          {archiveOpen && archivedSessions.map((s) => {
-            const label = sessionTitles.get(s.id) ?? s.projectName;
-            return (
-              <div
-                key={s.id}
-                className="sidebar-archived"
-                role="button"
-                tabIndex={0}
-                title={`${label} — click to restore`}
-                onClick={() => restoreSession(s.id)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    restoreSession(s.id);
-                  }
-                }}
-              >
-                <span className="sidebar-archived-name">{label}</span>
-                <span className="sidebar-archived-age">{formatAge(lastActivity.get(s.id) ?? s.createdAt)}</span>
-                <span className="sidebar-archived-undo">undo</span>
-              </div>
-            );
-          })}
-        </>
-      )}
     </div>
   );
 }

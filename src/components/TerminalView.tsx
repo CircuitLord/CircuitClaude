@@ -318,7 +318,10 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, age
     const onTitleDisposable = terminal.onTitleChange((nextTitle) => {
       if (ephemeral) return; // docked shell has no visible title, skip store writes
       if (Date.now() < acceptTitleChangesAt) return;
-      const clean = nextTitle.replace(/^[^\x20-\x7E]+\s*/, "").trim() || nextTitle;
+      const clean = nextTitle
+        .replace(/^Administrator:\s*/i, "") // conhost prepends this when the shell is elevated (ssh sessions are)
+        .replace(/^[^\x20-\x7E]+\s*/, "")
+        .trim() || nextTitle;
       setSessionTitle(tabId, clean);
     });
 

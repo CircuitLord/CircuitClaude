@@ -165,23 +165,6 @@ body,
   -webkit-app-region: no-drag;
 }
 
-.sidebar-header-btn {
-  background: var(--accent-muted);
-  border: 1px solid transparent;
-  border-radius: 4px;
-  padding: 4px 10px;
-  color: var(--accent-text);
-  cursor: pointer;
-  font-size: 13px;
-  font-family: var(--font-mono);
-  transition: background 0.1s, border-color 0.1s;
-}
-
-.sidebar-header-btn:hover {
-  background: var(--accent-muted-hover);
-  border-color: var(--accent);
-}
-
 .sidebar-header-text-btn {
   padding: 4px 6px;
   background: none;
@@ -228,24 +211,50 @@ body,
 
 /* --- New chat entry --- */
 
+/* peer of the project headers: same rhythm, same selection treatment, no project accent of its own */
 .sidebar-new-chat {
-  display: block;
-  width: calc(100% - 24px);
-  margin: 2px 12px 8px;
-  padding: 6px 10px;
-  background: var(--accent-muted);
-  border: 1px solid transparent;
-  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 38px;
+  margin-bottom: 8px;
+  padding: 0 12px;
+  background: none;
+  border: none;
   font-family: inherit;
   font-size: 13px;
-  color: var(--accent-text);
+  text-align: left;
+  color: var(--text-primary);
   cursor: pointer;
-  transition: background 0.1s, border-color 0.1s;
+  transition: background 0.1s;
 }
 
 .sidebar-new-chat:hover {
+  background: var(--bg-elevated);
+}
+
+.sidebar-new-chat.selected {
+  background: var(--accent-muted);
+}
+
+.sidebar-new-chat.selected:hover {
   background: var(--accent-muted-hover);
-  border-color: var(--accent);
+}
+
+.sidebar-new-chat:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
+/* matches .sidebar-project-prefix so labels align with the project rows below */
+.sidebar-new-chat-prefix {
+  width: 18px;
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+}
+
+.sidebar-new-chat.selected .sidebar-new-chat-prefix {
+  color: var(--accent-text);
 }
 
 /* --- Project sections --- */
@@ -268,10 +277,23 @@ body,
   background: var(--bg-elevated);
 }
 
-/* active project only tints — the selected row carries the fill */
+/* active project tints while one of its sessions holds the fill */
 .sidebar-project-header.active .sidebar-project-prefix,
 .sidebar-project-header.active .sidebar-project-name {
   color: var(--sidebar-project-accent-text, var(--accent-text));
+}
+
+/* no session selected, so the header is the current row and takes the fill like a session does */
+.sidebar-project-header.selected {
+  background: var(--sidebar-project-accent-muted, var(--accent-muted));
+}
+
+.sidebar-project-header.selected:hover {
+  background: var(--sidebar-project-accent-muted-hover, var(--accent-muted-hover));
+}
+
+.sidebar-project-header.selected .sidebar-project-name {
+  color: var(--text-primary);
 }
 
 /* stretched so the whole row height is clickable, not just the text */
@@ -298,6 +320,7 @@ body,
 }
 
 .sidebar-project-name {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -319,6 +342,11 @@ body,
 
 .sidebar-project-pinned {
   margin-left: 5px;
+}
+
+.sidebar-project-count {
+  margin-left: auto;
+  padding-left: 6px;
 }
 
 .sidebar-project-header.active .sidebar-project-pinned,
@@ -617,26 +645,52 @@ body,
   color: var(--text-tertiary);
 }
 
-/* --- Archive section --- */
+/* --- Archive section: pinned above the footer, list expands upward --- */
+
+.sidebar-archive {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.sidebar-archive-list {
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.sidebar-archive-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar-archive-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-archive-list::-webkit-scrollbar-thumb {
+  background: var(--border-visible);
+  border-radius: 2px;
+}
 
 .sidebar-archive-header {
   display: flex;
   align-items: center;
   gap: 6px;
   width: 100%;
-  height: 30px;
-  padding: 0 16px;
+  height: 26px;
+  padding: 0 12px;
   background: none;
   border: none;
   color: var(--text-tertiary);
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 12px;
+  opacity: 0.65;
   cursor: pointer;
-  transition: color 0.1s;
+  transition: color 0.1s, opacity 0.1s;
 }
 
 .sidebar-archive-header:hover {
   color: var(--text-secondary);
+  opacity: 1;
 }
 
 .sidebar-archive-caret {
@@ -653,7 +707,7 @@ body,
   align-items: center;
   gap: 8px;
   height: 26px;
-  padding: 0 16px 0 29px;
+  padding: 0 12px 0 24px;
   cursor: pointer;
   font-size: 12px;
   color: var(--text-tertiary);
@@ -713,7 +767,6 @@ body,
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -735,7 +788,7 @@ body,
 }
 
 .sidebar-session.thinking .shimmer-char {
-  animation: char-shimmer 7.4s step-end infinite;
+  animation: char-shimmer 3.4s step-end infinite;
 }
 
 .sidebar-session-trailing {
@@ -4467,33 +4520,46 @@ body,
 .cm-md-task-done { color: var(--text-tertiary); text-decoration: line-through; text-decoration-color: var(--text-tertiary); }
 
 /* ========================================================================
-   Command Palette
+   Action Menu
    ======================================================================== */
 
-.command-palette-overlay {
+.action-menu-overlay {
   position: fixed;
   inset: 0;
   z-index: 9999;
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(3px);
   display: flex;
   justify-content: center;
   align-items: flex-start;
   padding-top: 72px;
 }
 
-.command-palette {
-  width: 560px;
-  max-height: 420px;
+.action-menu {
+  position: relative;
+  width: 680px;
+  max-height: 520px;
   background: var(--bg-surface);
   border: 1px solid var(--border-visible);
   border-radius: 2px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
 }
 
-.command-palette-input-row {
+.action-menu::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 12px;
+  right: 12px;
+  height: 1px;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
+}
+
+.action-menu-input-row {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -4501,120 +4567,103 @@ body,
   border-bottom: 1px solid var(--border-subtle);
 }
 
-.command-palette-mode-badge {
+.action-menu-token {
+  flex-shrink: 0;
+  background: var(--accent-muted);
+  color: var(--accent-text);
+  border-radius: 2px;
+  padding: 1px 6px;
   font-family: var(--font-mono);
   font-size: 13px;
-  color: var(--accent-text);
-  flex-shrink: 0;
-  width: 14px;
-  text-align: center;
+  white-space: nowrap;
 }
 
-.command-palette-input {
+.action-menu-input {
   flex: 1;
   background: transparent;
   border: none;
   outline: none;
   color: var(--text-primary);
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 14px;
   caret-color: var(--accent-text);
 }
 
-.command-palette-input::placeholder {
+.action-menu-input::placeholder {
   color: var(--text-tertiary);
 }
 
-.command-palette-list {
+.action-menu-list {
   flex: 1;
   overflow-y: auto;
   padding: 4px 0;
 }
 
-.command-palette-list::-webkit-scrollbar { width: 4px; }
-.command-palette-list::-webkit-scrollbar-track { background: transparent; }
-.command-palette-list::-webkit-scrollbar-thumb { background: var(--border-visible); border-radius: 2px; }
+.action-menu-list::-webkit-scrollbar { width: 4px; }
+.action-menu-list::-webkit-scrollbar-track { background: transparent; }
+.action-menu-list::-webkit-scrollbar-thumb { background: var(--border-visible); border-radius: 2px; }
 
-.command-palette-empty {
+.action-menu-empty {
   padding: 12px 16px;
   color: var(--text-tertiary);
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 14px;
 }
 
-.command-palette-action {
-  color: var(--accent-text);
-  cursor: pointer;
-}
-.command-palette-action:hover {
-  text-decoration: underline;
-}
-
-.command-palette-item {
+.action-menu-item {
   display: flex;
   align-items: center;
   gap: 6px;
   padding: 4px 12px;
-  height: 32px;
+  height: 34px;
   cursor: pointer;
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-secondary);
 }
 
-.command-palette-item:hover,
-.command-palette-item--active {
+.action-menu-item:hover,
+.action-menu-item--active {
   background: var(--bg-elevated);
   color: var(--text-primary);
 }
 
-.command-palette-item--active {
+.action-menu-item--active {
   background: var(--accent-muted);
 }
 
-.command-palette-item-marker {
+.action-menu-item-marker {
   width: 14px;
   flex-shrink: 0;
   color: var(--accent-text);
   text-align: center;
 }
 
-.command-palette-item-label {
+.action-menu-item-label {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   color: var(--text-primary);
 }
 
-.command-palette-item-detail {
+.action-menu-item-detail {
   flex: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   color: var(--text-tertiary);
-  font-size: 12px;
+  font-size: 13px;
   min-width: 0;
 }
 
-.command-palette-item-kbd {
-  flex-shrink: 0;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-subtle);
-  border-radius: 2px;
-  padding: 1px 6px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--text-tertiary);
-}
-
-.command-palette-footer {
+.action-menu-footer {
   display: flex;
   gap: 16px;
   padding: 6px 12px;
   border-top: 1px solid var(--border-subtle);
 }
 
-.command-palette-hint {
+.action-menu-hint {
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-tertiary);

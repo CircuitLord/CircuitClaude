@@ -6,7 +6,7 @@ import { TerminalTabs } from "./components/TerminalTabs";
 import { SessionLauncher } from "./components/SessionLauncher";
 import { WindowControls } from "./components/WindowControls";
 import { DiffViewer } from "./components/DiffViewer";
-import { CommandPalette } from "./components/CommandPalette";
+import { ActionMenu } from "./components/ActionMenu";
 import { RightPanel } from "./components/RightPanel";
 import { BottomTerminal } from "./components/BottomTerminal";
 import { useSessionStore } from "./stores/sessionStore";
@@ -169,7 +169,7 @@ function App() {
         </div>
       </div>
       <DiffViewer />
-      <CommandPalette />
+      <ActionMenu />
     </>
   );
 }

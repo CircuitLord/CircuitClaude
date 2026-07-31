@@ -712,12 +712,8 @@ function SettingsHotkeysPage() {
           <kbd className="settings-hotkey-kbd">ctrl+shift+pgup/pgdn</kbd>
         </div>
         <div className="settings-row">
-          <div className="settings-row-label"><span className="settings-row-name">command palette</span></div>
+          <div className="settings-row-label"><span className="settings-row-name">action menu</span></div>
           <kbd className="settings-hotkey-kbd">ctrl+p</kbd>
-        </div>
-        <div className="settings-row">
-          <div className="settings-row-label"><span className="settings-row-name">command palette (commands)</span></div>
-          <kbd className="settings-hotkey-kbd">ctrl+shift+p</kbd>
         </div>
       </div>
       <div className="settings-section">
