@@ -37,6 +37,7 @@ impl CmdOutput {
 #[derive(Debug, Clone, Default)]
 pub struct RemoteInfo {
     pub key_path: Option<String>,
+    pub password: Option<String>,
 }
 
 fn registry() -> &'static Mutex<HashMap<String, RemoteInfo>> {
@@ -49,10 +50,28 @@ pub fn set_remotes(entries: Vec<(String, RemoteInfo)>) {
         Ok(reg) => reg,
         Err(poisoned) => poisoned.into_inner(),
     };
+    let passwords: HashMap<String, String> = reg
+        .iter()
+        .filter_map(|(authority, info)| {
+            info.password
+                .clone()
+                .map(|password| (authority.clone(), password))
+        })
+        .collect();
     reg.clear();
-    for (authority, info) in entries {
+    for (authority, mut info) in entries {
+        info.password = passwords.get(&authority).cloned();
         reg.insert(authority, info);
     }
+}
+
+pub fn remember_password(authority: &str, password: Option<String>) {
+    let Some(password) = password else { return };
+    let mut reg = match registry().lock() {
+        Ok(reg) => reg,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+    reg.entry(authority.to_string()).or_default().password = Some(password);
 }
 
 fn lookup(authority: &str) -> RemoteInfo {
@@ -76,6 +95,7 @@ pub struct SshTarget {
     pub port: Option<u16>,
     pub path: String,
     pub key_path: Option<String>,
+    pub password: Option<String>,
     /// The path lives on a windows filesystem, so sessions run under cmd.exe.
     pub windows: bool,
 }
@@ -149,6 +169,7 @@ pub fn target_from_url(url: &str) -> Result<SshTarget, String> {
         port,
         path,
         key_path: info.key_path,
+        password: info.password,
     })
 }
 
@@ -170,6 +191,7 @@ pub fn make_target(
         authority.push(':');
         authority.push_str(&port.to_string());
     }
+    let password = lookup(&authority).password;
     SshTarget {
         windows: is_windows_path(&path),
         authority,
@@ -178,6 +200,7 @@ pub fn make_target(
         port,
         path,
         key_path,
+        password,
     }
 }
 
@@ -279,10 +302,19 @@ pub fn ssh_args(target: &SshTarget, tty: bool) -> Vec<String> {
     if tty {
         args.push("-t".into());
     } else {
-        // no prompts on the command channel — a hung password prompt would wedge every request
-        args.push("-o".into());
-        args.push("BatchMode=yes".into());
+        if target.password.is_none() {
+            args.push("-o".into());
+            args.push("BatchMode=yes".into());
+        }
         args.push("-T".into());
+    }
+    if target.password.is_some() {
+        args.push("-o".into());
+        args.push("PubkeyAuthentication=no".into());
+        args.push("-o".into());
+        args.push("PreferredAuthentications=keyboard-interactive,password".into());
+        args.push("-o".into());
+        args.push("NumberOfPasswordPrompts=1".into());
     }
     if let Some(port) = target.port {
         args.push("-p".into());
@@ -296,6 +328,22 @@ pub fn ssh_args(target: &SshTarget, tty: bool) -> Vec<String> {
     }
     args.push(target.user_host());
     args
+}
+
+pub fn ssh_env(target: &SshTarget) -> Result<Vec<(String, String)>, String> {
+    let Some(password) = &target.password else {
+        return Ok(Vec::new());
+    };
+    let askpass = std::env::current_exe()
+        .map_err(|e| format!("Failed to locate ssh askpass helper: {}", e))?
+        .to_string_lossy()
+        .to_string();
+    Ok(vec![
+        ("SSH_ASKPASS".into(), askpass),
+        ("SSH_ASKPASS_REQUIRE".into(), "force".into()),
+        ("CIRCUITCLAUDE_ASKPASS".into(), "1".into()),
+        ("CIRCUITCLAUDE_SSH_PASSWORD".into(), password.clone()),
+    ])
 }
 
 fn is_windows_shell(command: &str) -> bool {
@@ -378,6 +426,9 @@ fn host_is_windows(target: &SshTarget) -> bool {
         let mut cmd = Command::new(find_ssh_exe().ok()?);
         cmd.args(ssh_args(target, false));
         cmd.arg("echo %COMSPEC%");
+        for (name, value) in ssh_env(target).ok()? {
+            cmd.env(name, value);
+        }
         cmd.stdout(Stdio::piped()).stderr(Stdio::null());
         #[cfg(windows)]
         cmd.creation_flags(CREATE_NO_WINDOW);
@@ -448,6 +499,9 @@ impl Conn {
         let mut cmd = Command::new(ssh);
         cmd.args(ssh_args(target, false));
         cmd.arg(launcher);
+        for (name, value) in ssh_env(target)? {
+            cmd.env(name, value);
+        }
         Conn::spawn(cmd)
     }
 
@@ -852,6 +906,19 @@ mod tests {
 
         let target = make_target(None, "box".into(), Some(2222), None, "/srv".into());
         assert_eq!(target.authority, "box:2222");
+    }
+
+    #[test]
+    fn password_auth_uses_askpass_instead_of_batch_mode() {
+        let mut target = make_target(None, "box".into(), None, None, "/srv".into());
+        target.password = Some("secret".into());
+
+        let args = ssh_args(&target, false);
+        assert!(args.iter().any(|arg| arg == "PubkeyAuthentication=no"));
+        assert!(!args.iter().any(|arg| arg == "BatchMode=yes"));
+
+        let env = ssh_env(&target).unwrap();
+        assert!(env.iter().any(|(name, value)| name == "SSH_ASKPASS_REQUIRE" && value == "force"));
     }
 
     #[test]

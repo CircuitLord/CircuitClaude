@@ -31,6 +31,7 @@ export function AddProjectDialog({ isOpen, onClose, onAdded }: AddProjectDialogP
   const [user, setUser] = useState("");
   const [port, setPort] = useState("");
   const [keyPath, setKeyPath] = useState("");
+  const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [nameEdited, setNameEdited] = useState(false);
   const [listing, setListing] = useState<RemoteListing | null>(null);
@@ -42,6 +43,7 @@ export function AddProjectDialog({ isOpen, onClose, onAdded }: AddProjectDialogP
     if (!isOpen) return;
     setMode("local");
     setLocalPath("");
+    setPassword("");
     setName("");
     setNameEdited(false);
     setListing(null);
@@ -69,6 +71,7 @@ export function AddProjectDialog({ isOpen, onClose, onAdded }: AddProjectDialogP
     user: user.trim() || undefined,
     port: port.trim() ? Number(port.trim()) : undefined,
     keyPath: keyPath.trim() || undefined,
+    password: password || undefined,
   };
 
   function applyPath(path: string) {
@@ -219,6 +222,19 @@ export function AddProjectDialog({ isOpen, onClose, onAdded }: AddProjectDialogP
                 >
                   :browse
                 </button>
+              </label>
+              <label className="add-project-row">
+                <span className="add-project-marker">&gt;</span>
+                <span className="add-project-label">password</span>
+                <input
+                  className="add-project-input"
+                  type="password"
+                  value={password}
+                  placeholder="kept until app closes"
+                  autoComplete="new-password"
+                  onChange={(e) => setPassword(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") browse(); }}
+                />
               </label>
 
               <div className="add-project-row add-project-row--static">

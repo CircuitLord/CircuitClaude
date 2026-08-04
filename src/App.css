@@ -3058,7 +3058,7 @@ body,
 
 .add-project-label {
   flex-shrink: 0;
-  width: 56px;
+  width: 64px;
   color: var(--text-tertiary);
 }
 

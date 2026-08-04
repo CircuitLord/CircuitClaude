@@ -105,6 +105,7 @@ pub fn sync_remotes(app_handle: &tauri::AppHandle) {
                 r.authority,
                 crate::remote::RemoteInfo {
                     key_path: r.key_path,
+                    password: None,
                 },
             )
         })

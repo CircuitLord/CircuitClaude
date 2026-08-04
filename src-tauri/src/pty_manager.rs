@@ -322,6 +322,9 @@ impl PtyManager {
                     cmd.arg(arg);
                 }
                 cmd.arg(remote::login_script(&target, command));
+                for (name, value) in remote::ssh_env(&target)? {
+                    cmd.env(name, value);
+                }
                 // ssh forwards TERM to the remote pty, and the app process has none
                 cmd.env("TERM", "xterm-256color");
                 Ok(cmd)

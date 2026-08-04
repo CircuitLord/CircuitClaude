@@ -808,6 +808,8 @@ pub struct RemoteSpec {
     pub port: Option<u16>,
     #[serde(default)]
     pub key_path: Option<String>,
+    #[serde(default)]
+    pub password: Option<String>,
 }
 
 #[derive(serde::Serialize)]
@@ -841,13 +843,17 @@ pub async fn list_remote_dirs(
     path: Option<String>,
 ) -> Result<RemoteListing, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let target = remote::make_target(
+        let mut target = remote::make_target(
             spec.user,
             spec.host,
             spec.port,
             spec.key_path,
             path.unwrap_or_default(),
         );
+        if spec.password.is_some() {
+            target.password = spec.password;
+            remote::remember_password(&target.authority, target.password.clone());
+        }
         // pwd -W is the msys spelling that yields "C:/..." instead of "/c/..."
         let command = format!(
             "{} && (pwd -W 2>/dev/null || pwd -P) && (if [ -d .git ]; then echo 1; else echo 0; fi) && ls -Ap1",

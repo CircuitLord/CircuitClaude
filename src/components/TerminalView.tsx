@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import StatusPill from "./StatusPill";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
-import { WebLinksAddon } from "@xterm/addon-web-links";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { Channel } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -23,6 +22,7 @@ import { THEMES } from "../lib/themes";
 import { PtyOutputEvent } from "../types";
 import { playWaitingSound } from "../lib/sounds";
 import { getSessionCommand } from "../lib/sessionTypes";
+import { registerTerminalLinkProvider } from "../lib/terminalLinks";
 import "@xterm/xterm/css/xterm.css";
 
 /** Regex for lines that start a new markdown block (lists, headings, quotes, etc.) */
@@ -184,19 +184,21 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, age
     const acceptTitleChangesAt = Date.now() + (resumeSession ? 5000 : 0);
     const currentSettings = useSettingsStore.getState().settings;
     const currentProjectTheme = useProjectStore.getState().projects.find((p) => p.path === projectPath)?.theme ?? "midnight";
+    const activateTerminalLink = (_event: MouseEvent, url: string) => {
+      void openUrl(url);
+    };
     const terminal = new Terminal({
       cursorBlink: true,
       cursorStyle: "bar",
       fontSize: currentSettings.terminalFontSize,
       fontFamily: currentSettings.terminalFontFamily,
       theme: THEMES[currentProjectTheme].xterm,
+      linkHandler: { activate: activateTerminalLink },
     });
 
     const fitAddon = new FitAddon();
     terminal.loadAddon(fitAddon);
-    terminal.loadAddon(new WebLinksAddon((_event, url) => {
-      openUrl(url);
-    }));
+    registerTerminalLinkProvider(terminal, activateTerminalLink);
     terminal.open(containerEl);
 
     try {

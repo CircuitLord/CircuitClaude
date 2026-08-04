@@ -39,6 +39,7 @@ export interface RemoteSpec {
   user?: string;
   port?: number;
   keyPath?: string;
+  password?: string;
 }
 
 export interface RemoteConfig {
