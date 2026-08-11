@@ -10,6 +10,7 @@ interface SessionStore {
   activeSessionId: string | null;
   activeProjectPath: string | null;
   tabStatuses: Map<string, TabStatus>;
+  completedTabs: Set<string>;
   sessionTitles: Map<string, string>;
   lastActivity: Map<string, number>;
   bottomTerminalProjects: Set<string>;
@@ -44,7 +45,9 @@ interface SessionStore {
 }
 
 const TOUCH_THROTTLE_MS = 15_000;
+const COMPLETION_THRESHOLD_MS = 10_000;
 const MAX_ARCHIVED = 10;
+const thinkingStartedAt = new Map<string, number>();
 
 export function generateTabId(): string {
   return crypto.randomUUID();
@@ -83,6 +86,14 @@ function toDormantSession(session: PersistedSession): TerminalSession {
   return { ...session, sessionId: null, isDormant: true, resumeSession: session.hasStarted === true };
 }
 
+function isSessionVisible(state: SessionStore, id: string): boolean {
+  const session = state.sessions.find((candidate) => candidate.id === id);
+  if (!session || state.activeProjectPath !== session.projectPath || state.activeSessionId === null) return false;
+  const split = state.projectSplits.get(session.projectPath);
+  if (!split) return state.activeSessionId === id;
+  return split.pane1.activeSessionId === id || split.pane2.activeSessionId === id;
+}
+
 function buildPersistedState(state: SessionStore): PersistedSessionState {
   const sessions = state.sessions
     .filter((session) => session.sessionType !== "editor")
@@ -105,6 +116,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   activeSessionId: null,
   activeProjectPath: null,
   tabStatuses: new Map(),
+  completedTabs: new Set(),
   sessionTitles: new Map(),
   lastActivity: new Map(),
   projectSplits: new Map(),
@@ -188,7 +200,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       };
     }),
 
-  removeSession: (id) =>
+  removeSession: (id) => {
+    thinkingStartedAt.delete(id);
     set((state) => {
       const removed = state.sessions.find((s) => s.id === id);
       // Clean up editor store if this was an editor tab
@@ -248,6 +261,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 
       const tabStatuses = new Map(state.tabStatuses);
       tabStatuses.delete(id);
+      const completedTabs = new Set(state.completedTabs);
+      completedTabs.delete(id);
       const sessionTitles = new Map(state.sessionTitles);
       sessionTitles.delete(id);
       const lastActivity = new Map(state.lastActivity);
@@ -258,11 +273,13 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         activeSessionId,
         activeProjectPath: state.activeProjectPath,
         tabStatuses,
+        completedTabs,
         sessionTitles,
         lastActivity,
         projectSplits,
       };
-    }),
+    });
+  },
 
   archiveSession: (id) => {
     const state = get();
@@ -338,10 +355,13 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           .map((s) => s.id)
       );
       const tabStatuses = new Map(state.tabStatuses);
+      const completedTabs = new Set(state.completedTabs);
       const sessionTitles = new Map(state.sessionTitles);
       const lastActivity = new Map(state.lastActivity);
       for (const id of removedIds) {
+        thinkingStartedAt.delete(id);
         tabStatuses.delete(id);
+        completedTabs.delete(id);
         sessionTitles.delete(id);
         lastActivity.delete(id);
       }
@@ -352,6 +372,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         activeProjectPath,
         projectSplits,
         tabStatuses,
+        completedTabs,
         sessionTitles,
         lastActivity,
       };
@@ -363,6 +384,9 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       set({ activeSessionId: id });
       return;
     }
+
+    const completedTabs = new Set(state.completedTabs);
+    completedTabs.delete(id);
 
     const session = state.sessions.find((candidate) => candidate.id === id);
     if (session?.isDormant) {
@@ -383,7 +407,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           const newPane: PaneState = { ...pane, activeSessionId: id };
           const newSplit = withUpdatedPane({ ...split, focusedPane: paneNum as 1 | 2 }, paneNum, newPane);
           nextSplits.set(state.activeProjectPath, newSplit);
-          set({ activeSessionId: id, projectSplits: nextSplits });
+          set({ activeSessionId: id, projectSplits: nextSplits, completedTabs });
           return;
         }
         // Session not in any pane (shouldn't normally happen in split mode)
@@ -391,7 +415,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       }
     }
 
-    set({ activeSessionId: id });
+    set({ activeSessionId: id, completedTabs });
   },
 
   setActiveProject: (path) => set({ activeProjectPath: path, activeSessionId: null }),
@@ -429,14 +453,27 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     get().touchSession(tabId);
     const current = get().tabStatuses.get(tabId) ?? null;
     if (current === status) return;
+
+    const startedAt = thinkingStartedAt.get(tabId);
+    const completedLongTask = status === null && current === "thinking" && startedAt !== undefined
+      && Date.now() - startedAt >= COMPLETION_THRESHOLD_MS;
+    if (status === "thinking") {
+      thinkingStartedAt.set(tabId, Date.now());
+    } else {
+      thinkingStartedAt.delete(tabId);
+    }
+
     set((state) => {
-      const next = new Map(state.tabStatuses);
+      const tabStatuses = new Map(state.tabStatuses);
+      const completedTabs = new Set(state.completedTabs);
       if (status === null) {
-        next.delete(tabId);
+        tabStatuses.delete(tabId);
+        if (completedLongTask && !isSessionVisible(state, tabId)) completedTabs.add(tabId);
       } else {
-        next.set(tabId, status);
+        tabStatuses.set(tabId, status);
+        if (status === "thinking") completedTabs.delete(tabId);
       }
-      return { tabStatuses: next };
+      return { tabStatuses, completedTabs };
     });
   },
 

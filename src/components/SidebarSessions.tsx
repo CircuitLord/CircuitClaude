@@ -108,6 +108,7 @@ export function SidebarSessions() {
   const activeSessionId = useSessionStore((s) => s.activeSessionId);
   const activeProjectPath = useSessionStore((s) => s.activeProjectPath);
   const tabStatuses = useSessionStore((s) => s.tabStatuses);
+  const completedTabs = useSessionStore((s) => s.completedTabs);
   const sessionTitles = useSessionStore((s) => s.sessionTitles);
   const projectSplits = useSessionStore((s) => s.projectSplits);
   const activateSession = useSessionStore((s) => s.activateSession);
@@ -298,6 +299,7 @@ export function SidebarSessions() {
                 const isActive = s.id === activeSessionId;
                 const isPreview = s.isPreview === true;
                 const status = isEditor ? null : tabStatuses.get(s.id) ?? null;
+                const isCompleted = !isEditor && completedTabs.has(s.id);
                 const editorFile = editorFiles.get(s.id);
                 const dirty = isEditor && !!editorFile && editorFile.content !== editorFile.savedContent;
                 const label = isEditor ? s.fileName ?? "file" : sessionTitles.get(s.id) ?? s.projectName;
@@ -316,6 +318,7 @@ export function SidebarSessions() {
                   isActive && "active",
                   isPreview && "preview",
                   status === "thinking" && "thinking",
+                  isCompleted && "completed",
                   dragging && "dragging",
                   dropClass,
                 ].filter(Boolean).join(" ");

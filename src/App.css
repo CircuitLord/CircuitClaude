@@ -383,12 +383,32 @@ body,
   cursor: pointer;
   font-size: 13px;
   color: var(--text-secondary);
-  transition: background 0.1s, color 0.1s;
+  transition: background 0.1s, box-shadow 0.1s, color 0.1s;
 }
 
 .sidebar-session:hover {
   background: var(--bg-elevated);
   color: var(--text-primary);
+}
+
+.sidebar-session.completed {
+  background: color-mix(in srgb, var(--sidebar-project-accent, var(--accent)) 4%, transparent);
+}
+
+.sidebar-session.completed::after {
+  content: "";
+  position: absolute;
+  left: 5%;
+  bottom: 1px;
+  width: 90%;
+  height: 1px;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--sidebar-project-accent, var(--accent)) 65%, transparent);
+  box-shadow: 0 0 4px color-mix(in srgb, var(--sidebar-project-accent, var(--accent)) 45%, transparent);
+}
+
+.sidebar-session.completed:hover {
+  background: color-mix(in srgb, var(--sidebar-project-accent, var(--accent)) 6%, var(--bg-elevated));
 }
 
 .sidebar-session.active {
@@ -415,6 +435,7 @@ body,
   position: absolute;
   left: 12px;
   right: 12px;
+  width: auto;
   height: 1px;
   background: var(--accent);
   box-shadow: 0 0 6px var(--accent);
