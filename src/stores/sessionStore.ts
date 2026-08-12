@@ -31,6 +31,7 @@ interface SessionStore {
   activateSession: (id: string) => void;
   updateSessionPtyId: (id: string, sessionId: string) => void;
   setTabStatus: (tabId: string, status: TabStatus | null) => void;
+  acknowledgeCompletion: (tabId: string) => void;
   setSessionTitle: (tabId: string, title: string) => void;
   /** stamp a session as interacted with, throttled so streaming output doesn't thrash the store */
   touchSession: (id: string) => void;
@@ -84,14 +85,6 @@ function toPersistedSession({ id, projectName, projectPath, agentSessionId, hasS
 /** restored from disk or from the archive: no pty yet, resume only if it ever ran */
 function toDormantSession(session: PersistedSession): TerminalSession {
   return { ...session, sessionId: null, isDormant: true, resumeSession: session.hasStarted === true };
-}
-
-function isSessionVisible(state: SessionStore, id: string): boolean {
-  const session = state.sessions.find((candidate) => candidate.id === id);
-  if (!session || state.activeProjectPath !== session.projectPath || state.activeSessionId === null) return false;
-  const split = state.projectSplits.get(session.projectPath);
-  if (!split) return state.activeSessionId === id;
-  return split.pane1.activeSessionId === id || split.pane2.activeSessionId === id;
 }
 
 function buildPersistedState(state: SessionStore): PersistedSessionState {
@@ -458,7 +451,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     const completedLongTask = status === null && current === "thinking" && startedAt !== undefined
       && Date.now() - startedAt >= COMPLETION_THRESHOLD_MS;
     if (status === "thinking") {
-      thinkingStartedAt.set(tabId, Date.now());
+      if (startedAt === undefined) thinkingStartedAt.set(tabId, Date.now());
     } else {
       thinkingStartedAt.delete(tabId);
     }
@@ -468,7 +461,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       const completedTabs = new Set(state.completedTabs);
       if (status === null) {
         tabStatuses.delete(tabId);
-        if (completedLongTask && !isSessionVisible(state, tabId)) completedTabs.add(tabId);
+        if (completedLongTask) completedTabs.add(tabId);
       } else {
         tabStatuses.set(tabId, status);
         if (status === "thinking") completedTabs.delete(tabId);
@@ -476,6 +469,14 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       return { tabStatuses, completedTabs };
     });
   },
+
+  acknowledgeCompletion: (tabId) =>
+    set((state) => {
+      if (!state.completedTabs.has(tabId)) return state;
+      const completedTabs = new Set(state.completedTabs);
+      completedTabs.delete(tabId);
+      return { completedTabs };
+    }),
 
   setSessionTitle: (tabId, title) =>
     set((state) => {

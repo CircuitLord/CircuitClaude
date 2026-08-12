@@ -357,6 +357,7 @@ export function PiChatView({ tabId, projectPath, agentSessionId }: PiChatViewPro
   const addUserMessage = usePiChatStore((state) => state.addUserMessage);
   const appendError = usePiChatStore((state) => state.appendError);
   const setTabStatus = useSessionStore((state) => state.setTabStatus);
+  const acknowledgeCompletion = useSessionStore((state) => state.acknowledgeCompletion);
   const setSessionTitle = useSessionStore((state) => state.setSessionTitle);
   const activeSessionId = useSessionStore((state) => state.activeSessionId);
   const piChatFontFamily = useSettingsStore((state) => state.settings.piChatFontFamily);
@@ -981,7 +982,10 @@ export function PiChatView({ tabId, projectPath, agentSessionId }: PiChatViewPro
               ref={inputRef}
               className="pi-chat-input"
               value={inputValue}
-              onChange={(event) => setInputValue(event.target.value)}
+              onChange={(event) => {
+                acknowledgeCompletion(tabId);
+                setInputValue(event.target.value);
+              }}
               onKeyDown={handleKeyDown}
               placeholder={ready ? (isStreaming ? "type a steering message..." : "type a message...") : "starting pi..."}
               rows={2}

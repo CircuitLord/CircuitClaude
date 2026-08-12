@@ -81,6 +81,8 @@ pub struct WhisperManager {
 
 impl WhisperManager {
     pub fn new(models_dir: PathBuf) -> Self {
+        whisper_rs::install_logging_hooks();
+
         let sessions = Arc::new(Mutex::new(HashMap::new()));
         let context: Arc<Mutex<Option<whisper_rs::WhisperContext>>> =
             Arc::new(Mutex::new(None));
@@ -111,7 +113,6 @@ impl WhisperManager {
                 if elapsed.as_secs() >= MODEL_IDLE_TIMEOUT_SECS {
                     *context.lock().unwrap() = None;
                     loaded_model.lock().unwrap().take();
-                    eprintln!("[whisper] unloaded idle model after {}s", elapsed.as_secs());
                 }
             });
         }

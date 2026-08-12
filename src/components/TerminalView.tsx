@@ -120,6 +120,14 @@ function logPtyLifecycle(message: string, details?: Record<string, unknown>) {
 }
 
 const textEncoder = new TextEncoder();
+const ENABLE_CONPTY_MOUSE = "\x1b[?1000h\x1b[?1002h\x1b[?1006h";
+const DISABLE_CONPTY_MOUSE = "\x1b[?1006l\x1b[?1003l\x1b[?1002l\x1b[?1000l";
+
+function binaryStringToBytes(data: string): Uint8Array {
+  const bytes = new Uint8Array(data.length);
+  for (let index = 0; index < data.length; index++) bytes[index] = data.charCodeAt(index) & 0xff;
+  return bytes;
+}
 
 function fitTerminal(terminal: Terminal, fitAddon: FitAddon, preserveScroll = false) {
   const buf = terminal.buffer.active;
@@ -299,16 +307,23 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, age
       });
     });
 
-    const onDataDisposable = terminal.onData((data) => {
+    const forwardTerminalInput = (data: Uint8Array) => {
       lastUserInputTime = Date.now();
       useSessionStore.getState().touchSession(tabId);
       const currentStatus = useSessionStore.getState().tabStatuses.get(tabId);
-      if (currentStatus === "waiting") {
-        setTabStatus(tabId, null);
-      }
-      if (sessionIdRef.current) {
-        writePtySession(sessionIdRef.current, textEncoder.encode(data)).catch(() => {});
-      }
+      if (currentStatus === "waiting") setTabStatus(tabId, null);
+      if (sessionIdRef.current) writePtySession(sessionIdRef.current, data).catch(() => {});
+    };
+
+    const onDataDisposable = terminal.onData((data) => {
+      useSessionStore.getState().acknowledgeCompletion(tabId);
+      forwardTerminalInput(textEncoder.encode(data));
+    });
+    const onBinaryDisposable = terminal.onBinary((data) => forwardTerminalInput(binaryStringToBytes(data)));
+
+    // ConPTY consumes mouse DECSET sequences before xterm receives them.
+    const onBufferChangeDisposable = terminal.buffer.onBufferChange((buffer) => {
+      terminal.write(buffer.type === "alternate" ? ENABLE_CONPTY_MOUSE : DISABLE_CONPTY_MOUSE);
     });
 
     const onResizeDisposable = terminal.onResize(({ cols, rows }) => {
@@ -449,6 +464,8 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, age
       setTabStatus(tabId, null);
       resizeObserver.disconnect();
       onDataDisposable.dispose();
+      onBinaryDisposable.dispose();
+      onBufferChangeDisposable.dispose();
       onResizeDisposable.dispose();
       onTitleDisposable.dispose();
       onSelectionDisposable.dispose();
