@@ -72,6 +72,10 @@ export function closePtySession(sessionId: string): Promise<void> {
   return invoke("close_pty_session", { sessionId });
 }
 
+export function hibernatePtySession(sessionId: string): Promise<void> {
+  return invoke("hibernate_pty_session", { sessionId });
+}
+
 export function closeAllPtySessions(): Promise<void> {
   return invoke("close_all_pty_sessions");
 }

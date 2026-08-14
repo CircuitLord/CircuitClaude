@@ -36,22 +36,31 @@ export function supportsAgentSessionResume(sessionType: string): boolean {
   return strategy === "claude" || strategy === "pi";
 }
 
-export function getSessionCommand(
-  sessionType: string,
-  agentSessionId?: string,
-  resumeSession = false,
-): string {
+export function isPiTerminalSession(sessionType: string): boolean {
+  return sessionType !== PI_CHAT_SESSION_TYPE.id && getSessionTypeConfig(sessionType)?.resumeStrategy === "pi";
+}
+
+interface SessionCommandOptions {
+  agentSessionId?: string;
+  agentSessionPath?: string;
+  resumeSession?: boolean;
+  additionalArgs?: string;
+}
+
+export function getSessionCommand(sessionType: string, options: SessionCommandOptions): string {
   const config = getSessionTypeConfig(sessionType);
-  const command = config?.command ?? sessionType;
-  if (!agentSessionId) return command;
+  const command = options.additionalArgs ? `${config?.command ?? sessionType} ${options.additionalArgs}` : config?.command ?? sessionType;
+  if (!options.agentSessionId) return command;
 
   switch (config?.resumeStrategy) {
     case "claude":
-      return resumeSession
-        ? `${command} --resume ${agentSessionId}`
-        : `${command} --session-id ${agentSessionId}`;
+      return options.resumeSession
+        ? `${command} --resume ${options.agentSessionId}`
+        : `${command} --session-id ${options.agentSessionId}`;
     case "pi":
-      return `${command} --session-id ${agentSessionId}`;
+      return options.resumeSession && options.agentSessionPath
+        ? `${command} --session ${options.agentSessionPath}`
+        : `${command} --session-id ${options.agentSessionId}`;
     default:
       return command;
   }

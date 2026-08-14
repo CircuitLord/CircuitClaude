@@ -30,6 +30,7 @@ interface SessionStore {
   /** Focus a session from anywhere, switching project first if needed */
   activateSession: (id: string) => void;
   updateSessionPtyId: (id: string, sessionId: string) => void;
+  hibernateSession: (id: string) => void;
   setTabStatus: (tabId: string, status: TabStatus | null) => void;
   acknowledgeCompletion: (tabId: string) => void;
   setSessionTitle: (tabId: string, title: string) => void;
@@ -378,6 +379,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       return;
     }
 
+    get().touchSession(id);
     const completedTabs = new Set(state.completedTabs);
     completedTabs.delete(id);
 
@@ -434,6 +436,20 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         s.id === id ? { ...s, sessionId } : s
       ),
     })),
+
+  hibernateSession: (id) =>
+    set((state) => {
+      const tabStatuses = new Map(state.tabStatuses);
+      tabStatuses.delete(id);
+      return {
+        sessions: state.sessions.map((session) =>
+          session.id === id
+            ? { ...session, sessionId: null, isDormant: true, resumeSession: true }
+            : session
+        ),
+        tabStatuses,
+      };
+    }),
 
   updateSession: (id, partial) =>
     set((state) => ({

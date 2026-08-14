@@ -21,7 +21,9 @@ import { VoiceTranscriptBox } from "./VoiceTranscriptBox";
 import { THEMES } from "../lib/themes";
 import { PtyOutputEvent } from "../types";
 import { playWaitingSound } from "../lib/sounds";
-import { getSessionCommand } from "../lib/sessionTypes";
+import { getPiSessionTrackingArgs, loadTrackedPiSession } from "../lib/piSessionTracking";
+import { isRemotePath } from "../lib/remote";
+import { getSessionCommand, isPiTerminalSession } from "../lib/sessionTypes";
 import { registerTerminalLinkProvider } from "../lib/terminalLinks";
 import "@xterm/xterm/css/xterm.css";
 
@@ -271,12 +273,28 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, age
           ?.sessionId ?? null;
 
         if (!sid) {
+          let effectiveAgentSessionId = agentSessionId;
+          let effectiveAgentSessionPath: string | undefined;
+          let additionalArgs: string | undefined;
+          if (agentSessionId && isPiTerminalSession(sessionType) && !isRemotePath(projectPath)) {
+            const tracked = await loadTrackedPiSession(tabId);
+            if (tracked) {
+              effectiveAgentSessionId = tracked.sessionId;
+              effectiveAgentSessionPath = tracked.sessionFile;
+            }
+            additionalArgs = await getPiSessionTrackingArgs(tabId);
+          }
           const created = await createPtySession({
             projectPath,
             cols,
             rows,
             sessionType,
-            command: getSessionCommand(sessionType, agentSessionId, resumeSession),
+            command: getSessionCommand(sessionType, {
+              agentSessionId: effectiveAgentSessionId,
+              agentSessionPath: effectiveAgentSessionPath,
+              resumeSession,
+              additionalArgs,
+            }),
           });
           sid = created.sessionId;
           if (cleanedUp || spawnGenerationRef.current !== spawnGeneration) {

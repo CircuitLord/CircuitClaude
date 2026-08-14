@@ -61,6 +61,38 @@ pub struct CreatePtySessionResponse {
     pub session_id: String,
 }
 
+#[derive(serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrackedPiSession {
+    pub session_id: String,
+    pub session_file: Option<String>,
+}
+
+fn pi_session_tracking_path(
+    app_handle: &tauri::AppHandle,
+    tab_id: &str,
+) -> Result<std::path::PathBuf, String> {
+    let tab_id = uuid::Uuid::parse_str(tab_id).map_err(|e| format!("Invalid tab ID: {}", e))?;
+    Ok(config::config_dir(app_handle)
+        .join("session-tracking")
+        .join(format!("{}.json", tab_id)))
+}
+
+#[tauri::command]
+pub fn load_tracked_pi_session(
+    app_handle: tauri::AppHandle,
+    tab_id: String,
+) -> Result<Option<TrackedPiSession>, String> {
+    let path = pi_session_tracking_path(&app_handle, &tab_id)?;
+    if !path.exists() {
+        return Ok(None);
+    }
+    let contents = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+    serde_json::from_str(&contents)
+        .map(Some)
+        .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub fn create_pty_session(
     pty_manager: State<'_, PtyManager>,
@@ -120,6 +152,14 @@ pub fn close_pty_session(
     session_id: String,
 ) -> Result<(), String> {
     pty_manager.close_session(&session_id, "closed_by_client")
+}
+
+#[tauri::command]
+pub fn hibernate_pty_session(
+    pty_manager: State<'_, PtyManager>,
+    session_id: String,
+) -> Result<(), String> {
+    pty_manager.close_session(&session_id, "hibernated")
 }
 
 #[tauri::command]

@@ -249,15 +249,16 @@ impl PtyManager {
             .map_err(|e| format!("Resize failed: {}", e))
     }
 
+    fn take_session(&self, session_id: &str) -> Result<Option<Arc<PtySession>>, String> {
+        let mut sessions = self
+            .sessions
+            .lock()
+            .map_err(|e| format!("Lock poisoned in take_session: {}", e))?;
+        Ok(sessions.remove(session_id))
+    }
+
     pub fn close_session(&self, session_id: &str, reason: &str) -> Result<(), String> {
-        let removed = {
-            let mut sessions = self
-                .sessions
-                .lock()
-                .map_err(|e| format!("Lock poisoned in close_session: {}", e))?;
-            sessions.remove(session_id)
-        };
-        if let Some(session) = removed {
+        if let Some(session) = self.take_session(session_id)? {
             let reason = reason.to_string();
             std::thread::spawn(move || {
                 Self::close_session_handle(&session, &reason);

@@ -19,6 +19,7 @@ import { applyThemeToDOM, applySyntaxThemeToDOM } from "./lib/themes";
 import { useHotkeys } from "./hooks/useHotkeys";
 import { useUpdateCheck } from "./hooks/useUpdateCheck";
 import { useGitPolling } from "./hooks/useGitPolling";
+import { useSessionHibernation } from "./hooks/useSessionHibernation";
 import "./App.css";
 
 function App() {
@@ -28,6 +29,7 @@ function App() {
   const { status: updateStatus, updateInfo, install: installUpdate, dismiss: dismissUpdate } = useUpdateCheck();
   useHotkeys();
   useGitPolling();
+  useSessionHibernation();
 
   // Load settings and projects on startup
   useEffect(() => {
