@@ -239,19 +239,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         }
       }
 
-      if (activeSessionId === id) {
-        if (removed) {
-          const sameProjectBeforeRemoval = state.sessions.filter((s) => s.projectPath === removed.projectPath);
-          const removedProjectIndex = sameProjectBeforeRemoval.findIndex((s) => s.id === id);
-          const fallback =
-            sameProjectBeforeRemoval[removedProjectIndex - 1]
-            ?? sameProjectBeforeRemoval[removedProjectIndex + 1]
-            ?? null;
-          activeSessionId = fallback?.id ?? null;
-        } else {
-          activeSessionId = null;
-        }
-      }
+      if (activeSessionId === id) activeSessionId = null;
 
       const tabStatuses = new Map(state.tabStatuses);
       tabStatuses.delete(id);

@@ -88,9 +88,16 @@ pub fn load_tracked_pi_session(
         return Ok(None);
     }
     let contents = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
-    serde_json::from_str(&contents)
-        .map(Some)
-        .map_err(|e| e.to_string())
+    let mut tracked: TrackedPiSession =
+        serde_json::from_str(&contents).map_err(|e| e.to_string())?;
+    if tracked
+        .session_file
+        .as_ref()
+        .is_some_and(|session_file| !std::path::Path::new(session_file).is_file())
+    {
+        tracked.session_file = None;
+    }
+    Ok(Some(tracked))
 }
 
 #[tauri::command]

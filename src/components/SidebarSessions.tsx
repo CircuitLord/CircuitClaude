@@ -76,7 +76,7 @@ function ShimmerTitle({ label }: { label: string }) {
         <span
           key={i}
           className="shimmer-char"
-          style={{ animationDelay: `${visibleChars.length > 1 ? (i / (visibleChars.length - 1)) * 4 : 0}s` }}
+          style={{ animationDelay: `${visibleChars.length > 1 ? (i / (visibleChars.length - 1)) * 3.4 : 0}s` }}
         >
           {ch}
         </span>
