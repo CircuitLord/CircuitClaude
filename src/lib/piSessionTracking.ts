@@ -9,7 +9,7 @@ export interface TrackedPiSession {
 export async function getPiSessionTrackingArgs(tabId: string): Promise<string> {
   const configDir = await appConfigDir();
   const statePath = await join(configDir, "session-tracking", `${tabId}.json`);
-  return `--cc-session-state "${statePath}"`;
+  return `--cc-session-state ${statePath}`;
 }
 
 export function loadTrackedPiSession(tabId: string): Promise<TrackedPiSession | null> {

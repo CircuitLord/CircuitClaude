@@ -42,7 +42,6 @@ export function isPiTerminalSession(sessionType: string): boolean {
 
 interface SessionCommandOptions {
   agentSessionId?: string;
-  agentSessionPath?: string;
   resumeSession?: boolean;
   additionalArgs?: string;
 }
@@ -58,8 +57,8 @@ export function getSessionCommand(sessionType: string, options: SessionCommandOp
         ? `${command} --resume ${options.agentSessionId}`
         : `${command} --session-id ${options.agentSessionId}`;
     case "pi":
-      return options.resumeSession && options.agentSessionPath
-        ? `${command} --session "${options.agentSessionPath}"`
+      return options.resumeSession
+        ? `${command} --session ${options.agentSessionId}`
         : `${command} --session-id ${options.agentSessionId}`;
     default:
       return command;

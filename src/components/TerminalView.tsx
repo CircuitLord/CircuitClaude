@@ -274,14 +274,10 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, age
 
         if (!sid) {
           let effectiveAgentSessionId = agentSessionId;
-          let effectiveAgentSessionPath: string | undefined;
           let additionalArgs: string | undefined;
           if (agentSessionId && isPiTerminalSession(sessionType) && !isRemotePath(projectPath)) {
             const tracked = await loadTrackedPiSession(tabId);
-            if (tracked) {
-              effectiveAgentSessionId = tracked.sessionId;
-              effectiveAgentSessionPath = tracked.sessionFile;
-            }
+            if (tracked) effectiveAgentSessionId = tracked.sessionId;
             additionalArgs = await getPiSessionTrackingArgs(tabId);
           }
           const created = await createPtySession({
@@ -291,7 +287,6 @@ export function TerminalView({ tabId, projectPath, projectName, sessionType, age
             sessionType,
             command: getSessionCommand(sessionType, {
               agentSessionId: effectiveAgentSessionId,
-              agentSessionPath: effectiveAgentSessionPath,
               resumeSession,
               additionalArgs,
             }),
