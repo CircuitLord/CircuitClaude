@@ -59,7 +59,7 @@ export function getSessionCommand(sessionType: string, options: SessionCommandOp
         : `${command} --session-id ${options.agentSessionId}`;
     case "pi":
       return options.resumeSession && options.agentSessionPath
-        ? `${command} --session ${options.agentSessionPath}`
+        ? `${command} --session "${options.agentSessionPath}"`
         : `${command} --session-id ${options.agentSessionId}`;
     default:
       return command;
